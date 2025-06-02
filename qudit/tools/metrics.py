@@ -67,4 +67,18 @@ def entanglement_fidelity(rho: np.ndarray, kraus_ops: List[np.ndarray]) -> float
         F_e += np.real(term)
 
     return F_e
+
+
+
+def partial_transpose(rho, dim_A, dim_B):
+    """Partial transpose on subsystem B of a bipartite density matrix rho."""
+    rho = rho.reshape((dim_A, dim_B, dim_A, dim_B))
+    rho_pt = np.transpose(rho, (0, 3, 2, 1))
+    return rho_pt.reshape((dim_A * dim_B, dim_A * dim_B))
+
+def negativity(rho, dim_A, dim_B):
+    """Compute the negativity of a bipartite density matrix rho of size dim_A x dim_B."""
+    rho_pt = partial_transpose(rho, dim_A, dim_B)
+    eigenvalues = np.linalg.eigvalsh(rho_pt)
+    return np.sum(np.abs(eigenvalues[eigenvalues < 0]))
   
