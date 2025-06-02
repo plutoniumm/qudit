@@ -83,6 +83,18 @@ class DGate:
     O = np.diag([w(self.d)**i for i in range(self.d)])
     return Gate(self.d, O, "Z")
 
+
+   @property
+    def s(self):
+        omega_s = np.exp(2j * np.pi / (2 * self.d))
+        return np.diag([omega_s**j for j in range(self.d)])
+
+    @property
+    def t(self):
+        omega_t = np.exp(2j * np.pi / (4 * self.d))
+        return np.diag([omega_t**j for j in range(self.d)])
+
+
   @property
   def H(self):
     O = np.zeros((self.d, self.d), dtype=complex)
