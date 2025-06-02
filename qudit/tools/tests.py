@@ -60,3 +60,21 @@ if __name__ == "__main__":
     test_ullmann_fidelity()
     test_quantum_channel()
     test_entanglement_fidelity()"""
+
+
+
+def test_negativity():
+    d = 3
+    psi = np.zeros((d, d), dtype=complex)
+    for i in range(d):
+        psi[i, i] = 1
+    psi = psi.flatten() / np.sqrt(d)
+    rho = np.outer(psi, psi.conj())  # Density matrix for maximally entangled qutrit state
+    N = negativity(rho, d, d)
+    print(f"Qutrit Entangled State Negativity: {N:.4f} (Expected: > 0)")
+
+
+if __name__ == "__main__":
+    test_ullmann_fidelity()
+
+    test_negativity()
