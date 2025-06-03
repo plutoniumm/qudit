@@ -3,7 +3,7 @@ from typing import List, Union
 from .. import Dit, Psi, In
 import numpy as np
 
-def ullmann_fidelity(rho: np.ndarray, sigma: np.ndarray) -> float:
+def fidelity(rho: np.ndarray, sigma: np.ndarray) -> float:
     # Convert pure states to density matrices if needed
     if rho.ndim == 1:
         rho = np.outer(rho, rho.conj())
@@ -29,11 +29,11 @@ psi = np.array([1, 0], dtype=complex)  # |0⟩
 phi = np.array([1/np.sqrt(2), 1/np.sqrt(2)], dtype=complex)  # (|0⟩ + |1⟩)/√2
 
 # Fidelity between two pure states
-f = ullmann_fidelity(psi, phi)
+f = fidelity(psi, phi)
 print(f"Fidelity = {f:.4f}")'''
 
 
-def quantum_channel(kraus: List[np.ndarray], rho: Union[np.ndarray]) -> np.ndarray:
+def channel(kraus: List[np.ndarray], rho: Union[np.ndarray]) -> np.ndarray:
     # Handle pure state input: convert to density matrix
     if rho.ndim == 1:
         rho = np.outer(rho, rho.conj())
