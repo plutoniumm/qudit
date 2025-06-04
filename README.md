@@ -1,4 +1,4 @@
-<img src="./assets/icon.svg" width="75" height="75" align="right">
+<img src="./docs/icon.svg" width="75" height="75" align="right">
 
 ### Qudit
 Simulations for Qudit systems
@@ -47,3 +47,31 @@ GHZ = Dit(P000, P111, P222)
 
 print(GHZ.density())
 ```
+
+### Caveats
+- I don't plan to support Variational circuits anytime soon. For that probably use `cirq`, or hand-write your circuits.
+
+
+### Todos
+**Done**:
+- Define statevector
+- Gates: Rot(GellMann), H, CU, CX, XYZ
+- Circuit; Simulation, Drawing
+- Random; States, Gates
+
+**Almost Done**:
+- Fidelity: Fid, EntFid, Channel Fid
+- GramSchmidt
+- Negativity
+- Gates: T, S
+
+**Not Done**:
+- Partial Trace
+- Standard States
+- Ent Rank
+- Gates: P, SWAP, Toffoli, QFT
+- Noise: Kraus, Choi
+- Stabiliser → States, States → Stabiliser
+- Measurement
+- Discord
+- Entropy
