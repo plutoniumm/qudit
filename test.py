@@ -42,8 +42,7 @@ def PPT(rho: np.ndarray, sub: int) -> bool:
 
 
 
-"""
-def test_quantum_channel():
+def test_channel():
     import numpy as np
 
     # Bit-flip channel with probability p = 0.5
@@ -54,7 +53,7 @@ def test_quantum_channel():
     # Input state: |0⟩
     rho = np.array([[1, 0], [0, 0]], dtype=complex)
 
-    output = quantum_channel(kraus_ops, rho)
+    output = channel(kraus_ops, rho)
     print("Quantum Channel Output (should be 0.5*|0><0| + 0.5*|1><1|):")
     print(np.round(output, 3))
 
@@ -84,30 +83,30 @@ def test_entanglement_fidelity():
     
     
     
-    def test_ullmann_fidelity():
+ def test_fidelity():
     import numpy as np
 
     psi = np.array([1, 0], dtype=complex)  # |0⟩
     phi = np.array([1/np.sqrt(2), 1/np.sqrt(2)], dtype=complex)  # (|0⟩ + |1⟩)/√2
 
-    f = ullmann_fidelity(psi, phi)
+    f = fidelity(psi, phi)
     print(f"Uhlmann Fidelity Test: {f:.4f} (Expected: ~0.7071)")
 
 
 
 if __name__ == "__main__":
-    test_ullmann_fidelity()
-    test_quantum_channel()
-    test_entanglement_fidelity()"""
+    test_u_fidelity()
+    test_channel()
+    test_entanglement_fidelity()
+
     
-'''
 def test_negativity():
     d = 3
     psi = np.zeros((d, d), dtype=complex)
     for i in range(d):
         psi[i, i] = 1
     psi = psi.flatten() / np.sqrt(d)
-    rho = np.outer(psi, psi.conj())  # Density matrix for maximally entangled qutrit state
+    rho = np.outer(psi, psi.conj())  
     N = negativity(rho, d, d)
     print(f"Qutrit Entangled State Negativity: {N:.4f} (Expected: > 0)")
 
@@ -116,4 +115,4 @@ if __name__ == "__main__":
     test_ullmann_fidelity()
     
     test_negativity()
-'''
+
