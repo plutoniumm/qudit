@@ -112,7 +112,7 @@ def test_negativity():
 
 
 if __name__ == "__main__":
-    test_ullmann_fidelity()
+    test_fidelity()
     
     test_negativity()
 
