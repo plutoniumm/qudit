@@ -1,123 +1,145 @@
-from .algebra import w, dGellMann
-from typing import List, Union
-from .qdits import Dit
+
+
+
+from typing import List, Tuple, Callable, Union
+from .index import Gate, Basis, Tensor
+from .algebra import Unity, dGellMann
+import numpy.linalg as LA
 import numpy as np
-import math as ma
 
-# gate as a wrapper around a numpy.ndarray
-class Gate(np.ndarray):
-  def __new__(cls, d: int, O: np.ndarray=None, name: str = None):
-    if O is None:
-      obj = np.zeros((d, d), dtype=complex).view(cls)
-      obj.sz = 1
-    else:
-      obj = np.asarray(O, dtype=complex).view(cls)
-      obj.sz = ma.log(len(O[0]), d)
-    # endif
+ck = 21
 
-    obj.name = name if name else str(d)
-    obj.d = d
+SuperGate = Union[
+    Callable[[int, int], Gate],
+    Callable[[int], Gate],
+    Gate,
+]
 
-    return obj
+def C_Gate(d: int, Ket, U: Gate, dits: List[int]) -> Gate:
+    if len(set(dits)) != len(dits):
+        raise ValueError(f"Dits must be unique, got: {dits}")
+    for dit in dits:
+        assert isinstance(dit, int) and dit > 0, f"Dit: {dit} must be 0<int"
 
-  @property
-  def H(self):
-    return self.conj().T
+    ctrl = lambda k: Ket(k).density()
+    targ = lambda k: LA.matrix_power(U, k)
+    width = abs(dits[1] - dits[0]) + 1
+    """
+      CU = Σ_k U^k ⊗ |k><k| (target, ctrl)
+      CU = Σ_k |k><k| ⊗ U^k (ctrl, target)
 
-  def __array_finalize__(self, obj):
-    if obj is None: return
-    self.d = getattr(obj, 'd', None)
-    self.sz = getattr(obj, 'sz', None)
-    self.name = getattr(obj, 'name', None)
+      for everything else we insert I
+      Eg: CU(1, 4) = Σ_k |k><k| ⊗ I ⊗ I ⊗ U^k
+    """
 
-  def is_unitary(self):
-    return np.allclose(self @ self.H, np.eye(self.shape[0]))
+    gate = []
+    for k in range(d):
+        Op = [ctrl(k)]
+        if width > 2:
+            Op += [np.eye(d * (width - 2))]
+        Op += [targ(k)]
 
-  def is_hermitian(self):
-    return np.allclose(self, self.H)
+        if dits[0] > dits[1]:
+            Op.reverse()
 
-  # gate1 ^ gate2 for np.kron(gate1, gate2)
-  def __xor__(self, other):
-    if not isinstance(other, Gate):
-      other = Gate(other.shape[0], other)
+        gate.append(Tensor(*Op))
 
-    return Gate(self.d * other.d, np.kron(other, self), f"{self.name}^{other.name}")
+    name = U.name if U.name else "U"
+    gate = Gate(d, sum(gate), "C" + name)
+    gate.dits = dits
+    gate.span = 2
+    return gate
 
-  # gate1 | Dit for np.dot(gate1, Dit)
-  def __or__(self, other: Union[Dit, 'Gate']):
-    if isinstance(other, Dit):
-      return np.dot(self, other)
-    else:
-      return np.dot(self, np.dot(other, self.H))
+class Gategen:
+    def __init__(self, d: int):
+        self.d = d
+        self.Ket = Basis(d)
 
-ck = 23
-# special class to create "d" once and pass through all gates
-# so G = DGate(d) -> G.X -> G.Z -> G.H -> ...
-class DGate:
-  def __init__(self, d: int):
-    self.d = d
+    @property
+    def X(self) -> Gate:
+        O = np.zeros((self.d, self.d))
+        O[0, self.d - 1] = 1
+        O[1:, 0 : self.d - 1] = np.eye(self.d - 1)
+        return Gate(self.d, O, "X")
 
-  @property
-  def X(self):
-    O = np.zeros((self.d, self.d))
-    O[0, self.d - 1] = 1
-    O[1:, 0:self.d - 1] = np.eye(self.d - 1)
-    return Gate(self.d, O, "X")
+    @property
+    def Y(self) -> Gate:
+        O = np.zeros((self.d, self.d), dtype=complex)
+        O[0, self.d - 1] = 1j
+        O[1:, 0 : self.d - 1] = np.eye(self.d - 1)
+        return Gate(self.d, O, "Y")
 
-  @property
-  def CX(self):
-    perm = self.X
+    @property
+    def Z(self) -> Gate:
+        w = Unity(self.d)
+        O = np.diag([w**i for i in range(self.d)])
+        return Gate(self.d, O, "Z")
 
-    # Sum of X^k ⊗ |k><k|
-    O = sum(
-      np.kron(
-        np.linalg.matrix_power(perm, k),
-        Dit(self.d, k).density()
-      ) for k in range(self.d)
-    )
+    def CU(self, U: Gate, dits: List[int]) -> SuperGate:
+        if not isinstance(dits, list):
+          raise TypeError(f"dits must be a list, got {type(dits)}")
 
-    return Gate(self.d**2, O, "CX")
+        if len(dits) == 2:
+            return C_Gate(self.d, self.Ket, U, dits)
 
-  @property
-  def Z(self):
-    O = np.diag([w(self.d)**i for i in range(self.d)])
-    return Gate(self.d, O, "Z")
+        def gen(ctrl: int) -> Gate:
+            return C_Gate(self.d, self.Ket, U, [ctrl, dits[0]])
+
+        return gen
+
+    def CX(self, *args) -> SuperGate:
+        return self.CU(self.X, *args)
+
+    def CY(self, *args) -> SuperGate:
+        return self.CU(self.Y, *args)
+
+    def CZ(self, *args) -> SuperGate:
+        return self.CU(self.Z, *args)
+
+    @property
+    def Z(self):
+     O = np.diag([w(self.d)**i for i in range(self.d)])
+     return Gate(self.d, O, "Z")
 
 
-  @property
-  def S(self):
+    @property
+    def S(self):
      omega_s = np.exp(2j * np.pi / (2 * self.d))
      O = np.diag([omega_s**j for j in range(self.d)])
      return Gate(self.d, O, "S")
 
-  @property
-  def T(self):
+    @property
+    def T(self):
        omega_t = np.exp(2j * np.pi / (4 * self.d))
        O = np.diag([omega_t**j for j in range(self.d)])
        return Gate(self.d, O, "T")
 
-  def P(self, theta: float):
+    def P(self, theta: float):
       omega = np.exp(1j * theta * np.pi / self.d)
       O = np.diag([omega**j for j in range(self.d)])
       return Gate(self.d, O, f"P({theta})")
 
+    @property
+    def H(self) -> Gate:
+        O = np.zeros((self.d, self.d), dtype=complex)
+        w = Unity(self.d)
+        for j in range(self.d):
+            for k in range(self.d):
+                O[j, k] = w ** (j * k) / np.sqrt(self.d)
 
-  @property
-  def H(self):
-    O = np.zeros((self.d, self.d), dtype=complex)
-    for j in range(self.d):
-      for k in range(self.d):
-        O[j, k] = w(self.d)**(j*k) / np.sqrt(self.d)
+        return Gate(self.d, O, "H")
 
-    return Gate(self.d, O, "H")
+    def Rot(self, thetas: List[complex]) -> Gate:
+        R = np.eye(self.d)
+        for i, theta in enumerate(thetas):
+            R = np.exp(-1j * theta * dGellMann(self.d)[i]) @ R
 
-  def Rot(self, thetas: List[complex]):
-    R = np.eye(self.d)
-    for i, theta in enumerate(thetas):
-      R = np.exp(-1j * theta * dGellMann(self.d)[i]) @ R
+        return Gate(self.d, R, "Rot")
 
-    return Gate(self.d, R, "Rot")
+    @property
+    def I(self) -> Gate:
+        return Gate(self.d, np.eye(self.d), "I")
 
-  @property
-  def I(self):
-    return Gate(self.d, np.eye(self.d), "I")
+    @property
+    def _(self) -> Gate:
+        return Gate(self.d, np.array([[0]]), "_")
