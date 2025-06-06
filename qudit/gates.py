@@ -1,6 +1,3 @@
-
-
-
 from typing import List, Tuple, Callable, Union
 from .index import Gate, Basis, Tensor
 from .algebra import Unity, dGellMann
