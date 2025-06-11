@@ -1,15 +1,16 @@
 from sympy import SparseMatrix as Matrix
+from dataclasses import dataclass
 from .index import Gate, VarGate
 from scipy import sparse as S
 from scipy.sparse import csr_matrix
 from .index import Gate, VarGate
 from typing import List, Union
 from .utils import Tensor, ID
+from .utils import Tensor, ID
 from .gates import Gategen
 import numpy as np
 
 BARRIER = "─|─"
-
 
 class Layer:
     vqc: bool = False
@@ -105,7 +106,18 @@ class Layer:
             elif b != 1 and a == 0:
                 swap = G.long_swap(b, 1, width=self.span)
             else:  # a == 0 and b == 1
+            if a != 0 and b != 1:
+                swap_a = G.long_swap(a, 0, width=self.span)
+                swap_b = G.long_swap(b, 1, width=self.span)
+                swap = swap_a @ swap_b
+            elif a != 0 and b == 1:
+                swap = G.long_swap(a, 0, width=self.span)
+            elif b != 1 and a == 0:
+                swap = G.long_swap(b, 1, width=self.span)
+            else: # a == 0 and b == 1
                 swap = np.eye(self.d**self.span)
+
+            temp = [gate] + [I] * (self.span - 2)
 
             temp = [gate] + [I] * (self.span - 2)
             temp = Tensor(*temp)
@@ -117,12 +129,15 @@ class Layer:
 
     def __repr__(self):
         names = [gate.name for gate in self.gates]
+        names = [gate.name for gate in self.gates]
         return f"Layer({', '.join(names)})"
 
     def __getitem__(self, index):
         return self.gates[index]
+        return self.gates[index]
 
     def __iter__(self):
+        return iter(self.gates)
         return iter(self.gates)
 
 
@@ -198,6 +213,7 @@ class Circuit:
         return prod
 
     def draw(self):
+    def draw(self):
         qudits = self.layers[0].span
 
         strings = ["─"] * qudits
@@ -210,10 +226,13 @@ class Circuit:
 
             for gate in layer:
                 if gate.span == 2:
+            for gate in layer:
+                if gate.span == 2:
                     strings = cfn.balance(strings)
                     strings = cfn.cx(strings, gate.dits, gate.name)
                     qctr += 2
                 else:
+                    g = gate.dits[0]
                     g = gate.dits[0]
                     if gate.name == "I" or gate.name == "_":
                         strings[g] += "──"
@@ -227,6 +246,7 @@ class Circuit:
         return "\n".join(strings)
 
     def __repr__(self):
+        return self.draw()
         return self.draw()
 
     def __getitem__(self, index):

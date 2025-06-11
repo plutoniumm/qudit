@@ -3,6 +3,7 @@ from sympy.physics.quantum import TensorProduct
 from typing import List, Union
 import numpy.linalg as LA
 from uuid import uuid4
+from uuid import uuid4
 import numpy as np
 import math as ma
 
@@ -16,6 +17,9 @@ import math as ma
 def ID() -> str:
     return str(uuid4()).split("-")[0]
 
+
+def ID() -> str:
+    return str(uuid4()).split("-")[0]
 
 class Basis:
     d: int = -1
@@ -125,6 +129,7 @@ class Gate(np.ndarray):
 
     id: str = ""
 
+    id: str = None
     name: str = ""
     vqc: bool
     span: int
@@ -156,6 +161,7 @@ class Gate(np.ndarray):
                 raise ValueError(f"Got span: {span}, expected span: {obj.span}")
 
         obj.id = ID()
+        obj.id = ID()
         return obj
 
     @property
@@ -168,6 +174,7 @@ class Gate(np.ndarray):
         self.d = getattr(obj, "d", 0)
         self.span = getattr(obj, "span", 0)
         self.name = getattr(obj, "name", "Gate")
+        self.vqc = getattr(obj, "vqc", False)
         self.vqc = getattr(obj, "vqc", False)
         self.dits = getattr(obj, "dits", [])
 
@@ -203,6 +210,7 @@ class VarGate(Matrix):
             if span != mat.span:
                 raise ValueError(f"Got span: {span}, expected span: {mat.span}")
 
+        mat.id = ID()
         mat.id = ID()
         return mat
 

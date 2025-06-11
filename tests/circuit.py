@@ -27,7 +27,12 @@ def everything():
         C.barrier()
 
     C.gate(P, dits=[4])
+
     print(C.draw())
+
+    sum = np.sum(C.solve())
+    sum = np.abs( sum.subs("p", 0.5).n() )
+    print(sum)
 
     sum = np.sum(C.solve())
     sum = np.abs(sum.subs("p", 0.5).n())
