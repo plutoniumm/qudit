@@ -82,7 +82,7 @@ class Entropy:
 
 
     @staticmethod
-    def default(*args): ##
+    def default(*args):
         return Entropy.neumann(*args)
 
 
