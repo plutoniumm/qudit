@@ -82,7 +82,7 @@ class Entropy:
 
 
     @staticmethod
-    def default(*args):
+    def default(*args): ##
         return Entropy.neumann(*args)
 
 
@@ -131,7 +131,7 @@ class Entropy:
 
         if np.isclose(q, 1.0):
          
-            return np.log(s) / ((1 - alpha) * np.log(base)) #gives the same result as renyi with alpha=1
+            return np.log(s) / ((1 - alpha) * np.log(base)) #gives the same result as renyii with alpha=1
         elif np.isclose(alpha, 1.0):
          
             return (1 - np.sum(eigenvalues ** q)) / ((q - 1)) #gives the same result as tsallis with q=1
