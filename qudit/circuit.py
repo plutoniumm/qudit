@@ -1,5 +1,4 @@
 from sympy import SparseMatrix as Matrix
-from dataclasses import dataclass
 from .index import Gate, VarGate
 from scipy import sparse as S
 from scipy.sparse import csr_matrix
@@ -12,10 +11,12 @@ import numpy as np
 
 BARRIER = "─|─"
 
+
 class Layer:
     vqc: bool = False
     data: np.ndarray
     counter: List[int]
+    gates: List[Gate]
     gates: List[Gate]
     span: int
     id: str
@@ -226,6 +227,11 @@ class Circuit:
 
             for gate in layer:
                 if gate.span == 2:
+            if layer[0].name == BARRIER:
+                strings = cfn.balance(strings)
+                strings = [s + BARRIER for s in strings]
+                continue
+
             for gate in layer:
                 if gate.span == 2:
                     strings = cfn.balance(strings)
@@ -298,6 +304,13 @@ class Circuit:
         assert self.span > 0, "Span Unknown, add a layer first"
 
         d = self.d
+        layer = Layer(size=self.span).add(
+            Gate(d, np.eye(d), BARRIER), dits=list(range(self.span))
+        )
+        self.layers.append(layer)
+
+        self._refresh()
+        return self
         layer = Layer(size=self.span).add(
             Gate(d, np.eye(d), BARRIER), dits=list(range(self.span))
         )
