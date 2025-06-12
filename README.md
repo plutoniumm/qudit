@@ -64,10 +64,9 @@ print(GHZ.density()) # |GHZ><GHZ|
 
 **Not Done**:
 - Partial Trace
-- Gates: SWAP, Toffoli, QFT
+- Gates: QFT
 - Noise: Kraus, Choi
 - Stabiliser → States
 - States → Stabiliser
-- Measurement
 - Discord
 - Entropy
