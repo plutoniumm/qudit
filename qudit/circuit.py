@@ -1,37 +1,19 @@
 from typing import List, Union, Callable
 from sympy import SparseMatrix as Matrix
-from .utils import Tensor, isVar, ID
-from dataclasses import dataclass
 from .index import Gate, VarGate
 from scipy import sparse as S
+from .utils import Tensor, ID
 from .gates import Gategen
 import numpy as np
 
 BARRIER = "─|─"
 
 
-@dataclass
-class Frame:
-    dits: List[int]
-    name: str
-    span: int
-    d: int
-
-    def create(gate: Union[Gate, VarGate]):
-        return Frame(
-            name=gate.name,
-            span=gate.span,
-            dits=gate.dits,
-            d=gate.d,
-        )
-
-
 class Layer:
     vqc: bool = False
     data: np.ndarray
-    display: List[str]
     counter: List[int]
-    gates: List[Frame]
+    gates: List[Gate]
     span: int
     id: str
     d: int
@@ -42,7 +24,6 @@ class Layer:
         self.id = ID()
         self.span = size
         self.counter = list(range(size))
-        self.display = []
         self.gates = []
         self.d = -1
 
@@ -55,7 +36,6 @@ class Layer:
                 self.counter.remove(d)
 
         self.gates.append(gate)
-        self.display.append(Frame.create(gate))
         return self
 
     @property
@@ -78,8 +58,6 @@ class Layer:
             prod = prod @ sub
 
         self.data = prod
-        self.finalise = lambda: True
-        return prod
 
     # return list of equal sized matrices
     def getMat(self, in_gates, compress=False) -> List[np.ndarray]:
@@ -112,27 +90,18 @@ class Layer:
             name = gate.name if gate.name else f"?({a}, {b})"
 
             # RUN SWAPS FOR NON CONSECUTIVE DITS
-            if a < b and b != a + 1:
-                swap = G.long_swap(a + 1, b, width=self.span)
-            elif a > b and a != b + 1:
-                swap = G.long_swap(a - 1, b, width=self.span)
-            else:
+            if a != 0 and b != 1:
+                swap_a = G.long_swap(a, 0, width=self.span)
+                swap_b = G.long_swap(b, 1, width=self.span)
+                swap = swap_a @ swap_b
+            elif a != 0 and b == 1:
+                swap = G.long_swap(a, 0, width=self.span)
+            elif b != 1 and a == 0:
+                swap = G.long_swap(b, 1, width=self.span)
+            else:  # a == 0 and b == 1
                 swap = np.eye(self.d**self.span)
-            # endif
 
-            temp = []
-            for i in range(self.span):
-                if i < a:
-                    temp.append(I)
-                elif i == a:
-                    temp.append(gate)
-                elif i == a + 1:
-                    continue
-                else:
-                    temp.append(I)
-                # endif
-            # endfor
-
+            temp = [gate] + [I] * (self.span - 2)
             temp = Tensor(*temp)
             temp = swap @ temp @ swap
             temp.name = name
@@ -141,14 +110,14 @@ class Layer:
         return sublayer
 
     def __repr__(self):
-        names = [gate.name for gate in self.display]
+        names = [gate.name for gate in self.gates]
         return f"Layer({', '.join(names)})"
 
     def __getitem__(self, index):
-        return self.display[index]
+        return self.gates[index]
 
     def __iter__(self):
-        return iter(self.display)
+        return iter(self.gates)
 
 
 class cfn:
@@ -220,18 +189,24 @@ class Circuit:
 
         return prod
 
-    def _draw_penny(self):
+    def draw(self):
         qudits = self.layers[0].span
 
         strings = ["─"] * qudits
         for l, layer in enumerate(self.layers):
             qctr = 0
-            for g, gate in enumerate(layer):
-                if gate.span > 1:
+            if layer[0].name == BARRIER:
+                strings = cfn.balance(strings)
+                strings = [s + BARRIER for s in strings]
+                continue
+
+            for gate in layer:
+                if gate.span == 2:
                     strings = cfn.balance(strings)
                     strings = cfn.cx(strings, gate.dits, gate.name)
                     qctr += 2
                 else:
+                    g = gate.dits[0]
                     if gate.name == "I" or gate.name == "_":
                         strings[g] += "──"
                     else:
@@ -243,25 +218,8 @@ class Circuit:
 
         return "\n".join(strings)
 
-    def _draw_raw(self):
-        p = "Circuit("
-        for layer in self.layers:
-            if layer[0].name == BARRIER:
-                continue
-            p += f"\n  {layer},"
-        p += "\n)"
-        return p
-
-    def draw(self, output: str = "raw"):
-        if output == "penny":
-            return self._draw_penny()
-        elif output == "raw":
-            return self._draw_raw()
-        else:
-            raise ValueError(f"Unknown output format: {output}")
-
     def __repr__(self):
-        return self._draw_raw()
+        return self.draw()
 
     def __getitem__(self, index):
         return self.layers[index]
@@ -278,12 +236,6 @@ class Circuit:
 
     def __iter__(self):
         return iter(self.layers)
-
-    def layer(self, *args: Union[Gate, Callable]):
-        layer = Layer(*args)
-        self.layers.append(layer)
-        self._refresh()
-        return layer
 
     def _refresh(self):
         if self.d == -1:
@@ -317,5 +269,10 @@ class Circuit:
         assert self.span > 0, "Span Unknown, add a layer first"
 
         d = self.d
-        args = [Gate(d, np.eye(d), BARRIER)] * self.span
-        self.layer(*args)
+        layer = Layer(size=self.span).add(
+            Gate(d, np.eye(d), BARRIER), dits=list(range(self.span))
+        )
+        self.layers.append(layer)
+
+        self._refresh()
+        return self
