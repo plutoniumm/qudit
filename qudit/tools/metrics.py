@@ -85,13 +85,16 @@ class Entropy:
     def default(*args):
         return Entropy.neumann(*args)
 
-    @staticmethod
-    def entanglement():
-        raise NotImplementedError("Which entanglement entropy?By Reyni or using von Neumann entropy.")
+
 
     @staticmethod
-    def tsallis():
-        raise NotImplementedError("Unified entropy is not implemented yet.")
+    def tsallis(rho: np.ndarray, q: float = 2.0, base: float = 2.0) -> float:
+        if q == 1:
+            return Entropy.neumann(rho, base=base)
+        rho = Entropy.density_matrix(rho)
+        eigenvalues = np.linalg.eigvalsh(rho)
+        eigenvalues = eigenvalues[eigenvalues > 1e-12]
+        return (1 - np.sum(eigenvalues ** q)) / (q - 1)
 
     @staticmethod
     def shannon(probs: np.ndarray, base: float = 2.0) -> float:
@@ -120,5 +123,17 @@ class Entropy:
         return -np.sum(eigenvalues * np.log(eigenvalues) / np.log(base))
 
     @staticmethod
-    def unified():
-        raise NotImplementedError("Unified entropy is not implemented yet.")
+    def unified(rho: np.ndarray, q: float = 2.0, alpha: float = 2.0, base: float = 2.0) -> float:
+        rho = Entropy.density_matrix(rho)
+        eigenvalues = np.linalg.eigvalsh(rho)
+        eigenvalues = eigenvalues[eigenvalues > 1e-12]
+        s = np.sum(eigenvalues ** alpha)
+
+        if np.isclose(q, 1.0):
+         
+            return np.log(s) / ((1 - alpha) * np.log(base)) #gives the same result as renyi with alpha=1
+        elif np.isclose(alpha, 1.0):
+         
+            return (1 - np.sum(eigenvalues ** q)) / ((q - 1)) #gives the same result as tsallis with q=1
+        else:
+            return ((s ** ((1 - q) / (1 - alpha))) - 1) / (1 - q)
