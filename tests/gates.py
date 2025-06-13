@@ -7,6 +7,7 @@ from qudit import Gategen
 
 
 class Gates(TestCase):
+ class TestGategen(TestCase):
     def setUp(self):
         self.D = Gategen(2)
 

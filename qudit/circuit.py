@@ -108,15 +108,6 @@ class Layer:
             elif b != 1 and a == 0:
                 swap = G.long_swap(b, 1, width=self.span)
             else:  # a == 0 and b == 1
-            if a != 0 and b != 1:
-                swap_a = G.long_swap(a, 0, width=self.span)
-                swap_b = G.long_swap(b, 1, width=self.span)
-                swap = swap_a @ swap_b
-            elif a != 0 and b == 1:
-                swap = G.long_swap(a, 0, width=self.span)
-            elif b != 1 and a == 0:
-                swap = G.long_swap(b, 1, width=self.span)
-            else: # a == 0 and b == 1
                 swap = np.eye(self.d**self.span)
 
             temp = [gate] + [I] * (self.span - 2)
@@ -214,7 +205,7 @@ class Circuit:
 
         return prod
 
-    def draw(self):
+    
     def draw(self):
         qudits = self.layers[0].span
 
@@ -228,18 +219,10 @@ class Circuit:
 
             for gate in layer:
                 if gate.span == 2:
-            if layer[0].name == BARRIER:
-                strings = cfn.balance(strings)
-                strings = [s + BARRIER for s in strings]
-                continue
-
-            for gate in layer:
-                if gate.span == 2:
                     strings = cfn.balance(strings)
                     strings = cfn.cx(strings, gate.dits, gate.name)
                     qctr += 2
                 else:
-                    g = gate.dits[0]
                     g = gate.dits[0]
                     if gate.name == "I" or gate.name == "_":
                         strings[g] += "──"
@@ -308,9 +291,8 @@ class Circuit:
         layer = Layer(size=self.span).add(
             Gate(d, np.eye(d), BARRIER), dits=list(range(self.span))
         )
-        self.layers.append(layer)
-
-        self._refresh()
+        self.layers.append(layer) 
+        self._refresh()        
         return self
         layer = Layer(size=self.span).add(
             Gate(d, np.eye(d), BARRIER), dits=list(range(self.span))

@@ -1,9 +1,9 @@
 import sys
-from unittest import TestCase, main
 
 sys.path.append("..")
 from unittest import TestCase, main
 from qudit import dGellMann
+from unittest import TestCase, main
 from qudit import dGellMann
 
 
