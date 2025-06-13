@@ -1,4 +1,4 @@
-from qudit.tools.metrics import Fidelity, negativity
+from qudit.tools.metrics import Fidelity, negativity,Entropy
 
 import numpy as np
 
@@ -31,10 +31,11 @@ def test_entanglement_fidelity():
     ]
 
     # Input state: |0⟩⟨0|
-    rho = np.array([[1, 0], [0, 0]], dtype=complex)
+    rho = (np.array([[1, 0], [0, 0]], dtype=complex)+(np.array([[0, 0], [0, 1]], dtype=complex)))/2
 
     Fe = Fidelity.entanglement(rho, kraus_ops)
-    print(f"Entanglement Fidelity: {Fe:.4f} (Expected: ~0.8125 for p=0.25)")
+    print(f"Entanglement Fidelity: {Fe}(Expected: ~0.8125 for p=0.25)")
+test_entanglement_fidelity()
 
 
 def test_fidelity():
@@ -43,7 +44,7 @@ def test_fidelity():
 
     # f = Fidelity(psi, phi)
     f = Fidelity.default(psi, phi)
-    print(f"Uhlmann Fidelity Test: {f:.4f} (Expected: ~0.7071)")
+    print(f"Uhlmann Fidelity Test: {f:.4f} (Expected: ~0.5)")
 
 
 def test_negativity():
@@ -62,3 +63,22 @@ if __name__ == "__main__":
     test_channel()
     test_negativity()
     test_entanglement_fidelity()
+
+
+
+def test_entropy():
+    pure_state = np.array([1.0, 0.0], dtype=complex)
+    mixed_state = 0.5 * np.array([[1, 0], [0, 1]], dtype=complex)
+    probs = np.array([0.25, 0.25, 0.25, 0.25])
+
+    print("Von Neumann entropy (pure state):", Entropy(pure_state))                # expected: 0.0
+    print("Von Neumann entropy (max mixed):", Entropy(mixed_state))               # expected: 1.0
+    print("Tsallis entropy (q=2) (pure):", Entropy.tsallis(pure_state, q=2))      # expected: 0.0
+    print("Tsallis entropy (q=2) (mixed):", Entropy.tsallis(mixed_state, q=2))    # expected: 0.5
+    print("Renyi entropy (alpha=2) (pure):", Entropy.renyi(pure_state, alpha=2))  # expected: 0.0
+    print("Renyi entropy (alpha=2) (mixed):", Entropy.renyi(mixed_state, alpha=2))# expected: 1.0
+    print("Shannon entropy (uniform probs):", Entropy.shannon(probs))             # expected: 2.0
+    print("Hartley entropy (uniform probs):", Entropy.hartley(probs))             # expected: 2.0
+    print("Unified entropy (q=2, alpha=2, mixed):", Entropy.unified(mixed_state, q=2, alpha=2))  # expected ~0.5
+    print("Unified entropy (q=1, alpha=2, mixed):", Entropy.unified(mixed_state, q=1, alpha=2))  # expected ~1.0
+    print("Unified entropy (q=2, alpha=1, mixed):", Entropy.unified(mixed_state, q=2, alpha=1))  # expected ~0.5

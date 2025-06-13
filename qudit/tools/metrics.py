@@ -48,8 +48,8 @@ class Fidelity:
 
         F_e = 0.0
         for K in kraus_ops:
-            term = np.trace(rho @ K.conj().T @ K @ rho)
-            F_e += np.real(term)
+         term = np.trace(rho @ K)
+         F_e += np.abs(term)**2
 
         return F_e
 
@@ -124,16 +124,15 @@ class Entropy:
 
     @staticmethod
     def unified(rho: np.ndarray, q: float = 2.0, alpha: float = 2.0, base: float = 2.0) -> float:
-        rho = Entropy.density_matrix(rho)
-        eigenvalues = np.linalg.eigvalsh(rho)
-        eigenvalues = eigenvalues[eigenvalues > 1e-12]
-        s = np.sum(eigenvalues ** alpha)
+      rho = Entropy.density_matrix(rho)
+      eigenvalues = np.linalg.eigvalsh(rho)
+      eigenvalues = eigenvalues[eigenvalues > 1e-12]
+      s = np.sum(eigenvalues ** alpha)
 
-        if np.isclose(q, 1.0):
-         
-            return np.log(s) / ((1 - alpha) * np.log(base)) #gives the same result as renyii with alpha=1
-        elif np.isclose(alpha, 1.0):
-         
-            return (1 - np.sum(eigenvalues ** q)) / ((q - 1)) #gives the same result as tsallis with q=1
-        else:
-            return ((s ** ((1 - q) / (1 - alpha))) - 1) / (1 - q)
+      if abs(q - 1.0) < 1e-8:
+        return np.log(s) / ((1 - alpha) * np.log(base))  # renyi
+      elif abs(alpha - 1.0) < 1e-8:
+        return (1 - np.sum(eigenvalues ** q)) / ((q - 1))  # tsallis
+      else:
+        return ((s ** ((1 - q) / (1 - alpha))) - 1) / (1 - q)
+

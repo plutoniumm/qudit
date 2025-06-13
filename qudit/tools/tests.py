@@ -14,3 +14,5 @@ def PPT(rho: np.ndarray, sub: int) -> bool:
             mat0[i : i + sub, j : j + sub] = mat0[i : i + sub, j : j + sub].T
 
     return np.all(np.linalg.eigvals(mat0) >= 0)
+
+
