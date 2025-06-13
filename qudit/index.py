@@ -24,6 +24,8 @@ def ID() -> str:
 class Basis:
     d: int = -1
     span: int = -1
+    d: int = -1
+    span: int = -1
 
     def __init__(self, d: int):
         self.d = d
@@ -129,7 +131,7 @@ class Gate(np.ndarray):
 
     id: str = ""
 
-    id: str = None
+    id: str = ""
     name: str = ""
     vqc: bool
     span: int

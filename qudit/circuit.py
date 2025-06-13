@@ -1,6 +1,7 @@
 from sympy import SparseMatrix as Matrix
+from scipy.sparse import csr_matrix
 from .index import Gate, VarGate
-from scipy import sparse as S
+from typing import List, Union
 from scipy.sparse import csr_matrix
 from .index import Gate, VarGate
 from typing import List, Union
