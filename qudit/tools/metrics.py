@@ -34,6 +34,8 @@ class Fidelity:
         sqrt_rho = fractional_matrix_power(rho, 0.5)
         inner = sqrt_rho @ sigma @ sqrt_rho
         fidelity = (np.trace(fractional_matrix_power(inner, 0.5))) ** 2
+        return float(np.clip(np.real(fidelity)), 0, 1)
+        fidelity = (np.trace(fractional_matrix_power(inner, 0.5))) ** 2
         return float(np.real(fidelity))
 
     @staticmethod
