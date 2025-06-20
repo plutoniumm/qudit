@@ -36,7 +36,7 @@ class TestQuantumMetrics(unittest.TestCase):
         rho = np.outer(bell, bell.conj())
         N = Fidelity.negativity(rho, d, d)
         self.assertAlmostEqual(N, 0.5, places=6)
-
+        
     def test_entropy_neumann(self):
         rho = np.array([[0.7, 0], [0, 0.3]])
         S = Entropy.neumann(rho)
@@ -79,6 +79,13 @@ class TestQuantumMetrics(unittest.TestCase):
         D = Entropy.relative_entropy(rho, sigma)
         expected = 0.8 * np.log2(0.8 / 0.5) + 0.2 * np.log2(0.2 / 0.5)
         self.assertAlmostEqual(D, expected, places=6)
+    
+    def test_mutual_information_bell_state():
+     psi = np.array([1, 0, 0, 1]) / np.sqrt(2)
+     rho = np.outer(psi, psi.conj())
+     I = Information.mutual_information(rho, 2, 2)
+     assert np.isclose(I, 2.0, atol=1e-5)
+
 
     def test_mutual_information_bell_state():
         psi = np.array([1, 0, 0, 1]) / np.sqrt(2)

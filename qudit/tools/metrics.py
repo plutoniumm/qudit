@@ -3,6 +3,44 @@ from typing import List, Union
 import numpy as np
 
 
+@staticmethod
+def partial_trace(rho: np.ndarray, dA: int, dB: int, keep: str = "A") -> np.ndarray:
+
+    assert rho.shape == (
+        dA * dB,
+        dA * dB,
+    ), "Input must be a square matrix of shape (dA*dB, dA*dB)"
+
+    rho = rho.reshape(dA, dB, dA, dB)
+
+    if keep == "A":
+
+        return np.trace(rho, axis1=1, axis2=3)  # Result: shape (dA, dA)
+    elif keep == "B":
+
+        return np.trace(rho, axis1=0, axis2=2)  # Result: shape (dB, dB)
+    else:
+        raise ValueError("keep must be 'A' or 'B'")
+
+
+@staticmethod
+def partial_transpose(rho: np.ndarray, dim_A: int, dim_B: int) -> np.ndarray:
+    assert rho.shape == (
+        dim_A * dim_B,
+        dim_A * dim_B,
+    ), "Input must be a square matrix of shape (dim_A*dim_B, dim_A*dim_B)"
+
+    rho = rho.reshape(dim_A, dim_B, dim_A, dim_B)
+    rho_pt = np.transpose(rho, axes=(0, 2, 1, 3))
+    return rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
+
+
+@staticmethod
+def projection(d: int):
+
+    return [np.outer(b, b) for b in np.eye(d)]
+
+
 
 def _partial_trace(rho: np.ndarray, dA: int, dB: int, keep: str = "A") -> np.ndarray:
         if keep == "A":
@@ -34,7 +72,7 @@ class Fidelity:
         sqrt_rho = fractional_matrix_power(rho, 0.5)
         inner = sqrt_rho @ sigma @ sqrt_rho
         fidelity = (np.trace(fractional_matrix_power(inner, 0.5))) ** 2
-        return float(np.clip(np.real(fidelity)), 0, 1)
+        return float(np.real(fidelity))
         fidelity = (np.trace(fractional_matrix_power(inner, 0.5))) ** 2
         return float(np.real(fidelity))
 
@@ -105,6 +143,8 @@ class Entropy:
             return Entropy.neumann(rho, base=base)
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
         return (1 - np.sum(eigenvalues**q)) / (q - 1)
@@ -122,6 +162,8 @@ class Entropy:
             )  # renyi entropy with alpha=1 is the same as von Neumann entropy
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
         return np.log(np.sum(eigenvalues**alpha)) / ((1 - alpha) * np.log(base))
@@ -135,6 +177,8 @@ class Entropy:
     def neumann(rho: np.ndarray, base: float = 2.0) -> float:
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
         return -np.sum(eigenvalues * np.log(eigenvalues) / np.log(base))
@@ -143,6 +187,8 @@ class Entropy:
     def unified(
         rho: np.ndarray, q: float = 2.0, alpha: float = 2.0, base: float = 2.0
     ) -> float:
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         eigenvalues = np.linalg.eigvalsh(rho)
@@ -163,6 +209,9 @@ class Entropy:
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
 
         eps = 1e-12
         rho += eps * np.eye(rho.shape[0])
@@ -173,6 +222,84 @@ class Entropy:
         delta_log = log_rho - log_sigma
 
         result = np.trace(rho @ delta_log).real
+        return float(result / np.log(base))
+
+    @staticmethod
+    def conditional_entropy(rho: np.ndarray, dA: int, dB: int) -> float:
+        assert rho.shape == (
+            dA * dB,
+            dA * dB,
+        ), "Input must be a square matrix of shape (dA*dB, dA*dB)"
+
+        rho_A = partial_trace(rho, dA, dB, keep="A")
+        S_A = Entropy.default(rho_A)
+        S_AB = Entropy.default(rho)
+
+        return S_AB - S_A
+
+
+class Information:
+
+    @staticmethod
+    def conditional_entropy(rho: np.ndarray, dA: int, dB: int) -> float:
+
+        projectors = projection(dA)
+        S_cond = 0
+        for P in projectors:
+            Pi = np.kron(P, np.eye(dB))
+            prob = np.trace(Pi @ rho)
+            if prob > 1e-12:
+                rho_cond = Pi @ rho @ Pi / prob
+                rho_B = partial_trace(rho_cond, dA, dB, keep="B")
+                S_cond += prob * Entropy.default(rho_B)
+        return S_cond
+
+    @staticmethod
+    def quantum_discord(rho: np.ndarray, dA: int, dB: int) -> float:
+
+        rho_A = partial_trace(rho, dA, dB, keep="A")
+        S_A = Entropy.default(rho_A)
+        S_total = Entropy.default(rho)
+        S_cond = Information.conditional_entropy(rho, dA, dB)
+        return S_A - S_total + S_cond
+
+    @staticmethod
+    def mutual_information(rho: np.ndarray, dA: int, dB: int) -> float:
+        assert rho.shape == (
+            dA * dB,
+            dA * dB,
+        ), "Input must be a square matrix of shape (dA*dB, dA*dB)"
+        rho_A = partial_trace(rho, dA, dB, keep="A")
+        rho_B = partial_trace(rho, dA, dB, keep="B")
+        S_A = Entropy.default(rho_A)
+        S_B = Entropy.default(rho_B)
+        S_AB = Entropy.default(rho)
+        return S_A + S_B - S_AB
+
+    @staticmethod
+    def coherent_information(rho_AB: np.ndarray, dA: int, dB: int) -> float:
+        assert rho_AB.shape == (dA * dB, dA * dB), "rho must be of shape (dA*dB, dA*dB)"
+
+        rho_B = partial_trace(rho_AB, dA, dB, keep="B")
+        S_B = Entropy.default(rho_B)
+        S_AB = Entropy.default(rho_AB)
+
+        return S_B - S_AB
+
+    @staticmethod
+    def conditional_mutual_information(rho: np.ndarray, dA: int, dB: int) -> float:
+        assert rho.shape == (
+            dA * dB,
+            dA * dB,
+        ), "Input must be a square matrix of shape (dA*dB, dA*dB)"
+
+        rho_A = partial_trace(rho, dA, dB, keep="A")
+        rho_B = partial_trace(rho, dA, dB, keep="B")
+        S_A = Entropy.default(rho_A)
+        S_B = Entropy.default(rho_B)
+        S_AB = Entropy.default(rho)
+
+        return S_A + S_B - S_AB
         return float(result / np.log(base))
 
     @staticmethod

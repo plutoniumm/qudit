@@ -4,11 +4,19 @@ import numpy as np
 from qudit.tools.metrics import Entropy, Fidelity
 
 
+@staticmethod
+def density(matrix: np.ndarray) -> np.ndarray:
+    return np.outer(matrix, matrix.conj()) if matrix.ndim == 1 else matrix
+
+
 class Distance:
     @staticmethod
     def relative_entropy(
         rho: np.ndarray, sigma: np.ndarray, base: float = 2.0
     ) -> float:
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
@@ -28,8 +36,9 @@ class Distance:
     @staticmethod
     def bures(rho: np.ndarray, sigma: np.ndarray) -> float:
 
-        rho = Entropy.density_matrix(rho)
-        sigma = Entropy.density_matrix(sigma)
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
 
         bures_distance = np.sqrt(2 - 2 * (Fidelity.default(rho, sigma)) ** 0.5)
 
@@ -57,8 +66,8 @@ class Distance:
 
     @staticmethod
     def jensen_shannon(rho: np.ndarray, sigma: np.ndarray, base: float = 2.0) -> float:
-        rho = Entropy.density_matrix(rho)
-        sigma = Entropy.density_matrix(sigma)
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
     def jensen_shannon(rho: np.ndarray, sigma: np.ndarray, base: float = 2.0) -> float:
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
@@ -71,8 +80,8 @@ class Distance:
 
     @staticmethod
     def trace_distance(rho: np.ndarray, sigma: np.ndarray) -> float:
-        rho = Entropy.density_matrix(rho)
-        sigma = Entropy.density_matrix(sigma)
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
         return 0.5 * (
             Distance.relative_entropy(rho, m, base)
             + Distance.relative_entropy(sigma, m, base)
@@ -81,8 +90,8 @@ class Distance:
 
     @staticmethod
     def bhattacharyya(rho: np.ndarray, sigma: np.ndarray, base: float = 2.0) -> float:
-        rho = Entropy.density_matrix(rho)
-        sigma = Entropy.density_matrix(sigma)
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
 
         return Fidelity.default(rho, sigma)
 
