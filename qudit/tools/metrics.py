@@ -241,64 +241,64 @@ class Entropy:
 class Information:
 
     @staticmethod
-    def conditional_entropy(rho: np.ndarray, dA: int, dB: int) -> float:
-
-        projectors = projection(dA)
-        S_cond = 0
-        for P in projectors:
-            Pi = np.kron(P, np.eye(dB))
-            prob = np.trace(Pi @ rho)
-            if prob > 1e-12:
-                rho_cond = Pi @ rho @ Pi / prob
-                rho_B = partial_trace(rho_cond, dA, dB, keep="B")
-                S_cond += prob * Entropy.default(rho_B)
-        return S_cond
+    def conditional_entropy(rho: np.ndarray, dA: int, dB: int, true_case: bool = True) -> float:
+        if true_case:
+            
+            projectors = projection(dA)
+            S_cond = 0
+            for P in projectors:
+                Pi = np.kron(P, np.eye(dB))
+                prob = np.trace(Pi @ rho)
+                if prob > 1e-12:
+                    rho_cond = Pi @ rho @ Pi / prob
+                    rho_B = partial_trace(rho_cond, dA, dB, keep='B')
+                    S_cond += prob * Entropy.default(rho_B)
+            return S_cond
+        else:
+            
+            assert rho.shape == (dA * dB, dA * dB)
+            rho_A = partial_trace(rho, dA, dB, keep='A')
+            S_A = Entropy.default(rho_A)
+            S_AB = Entropy.default(rho)
+            return S_AB - S_A
 
     @staticmethod
-    def quantum_discord(rho: np.ndarray, dA: int, dB: int) -> float:
-
-        rho_A = partial_trace(rho, dA, dB, keep="A")
+    def discord(rho: np.ndarray, dA: int, dB: int, true_case: bool = True) -> float:
+        rho_A = partial_trace(rho, dA, dB, keep='A')
         S_A = Entropy.default(rho_A)
         S_total = Entropy.default(rho)
-        S_cond = Information.conditional_entropy(rho, dA, dB)
+        S_cond = Information.conditional_entropy(rho, dA, dB, true_case=true_case)
         return S_A - S_total + S_cond
 
+         
     @staticmethod
     def mutual_information(rho: np.ndarray, dA: int, dB: int) -> float:
-        assert rho.shape == (
-            dA * dB,
-            dA * dB,
-        ), "Input must be a square matrix of shape (dA*dB, dA*dB)"
-        rho_A = partial_trace(rho, dA, dB, keep="A")
-        rho_B = partial_trace(rho, dA, dB, keep="B")
+        assert rho.shape == (dA * dB, dA * dB)
+        rho_A = partial_trace(rho, dA, dB, keep='A')
+        rho_B = partial_trace(rho, dA, dB, keep='B')
         S_A = Entropy.default(rho_A)
         S_B = Entropy.default(rho_B)
         S_AB = Entropy.default(rho)
         return S_A + S_B - S_AB
-
     @staticmethod
     def coherent_information(rho_AB: np.ndarray, dA: int, dB: int) -> float:
         assert rho_AB.shape == (dA * dB, dA * dB), "rho must be of shape (dA*dB, dA*dB)"
-
-        rho_B = partial_trace(rho_AB, dA, dB, keep="B")
+    
+        rho_B = partial_trace(rho_AB, dA, dB, keep='B')
         S_B = Entropy.default(rho_B)
         S_AB = Entropy.default(rho_AB)
-
+    
         return S_B - S_AB
-
     @staticmethod
     def conditional_mutual_information(rho: np.ndarray, dA: int, dB: int) -> float:
-        assert rho.shape == (
-            dA * dB,
-            dA * dB,
-        ), "Input must be a square matrix of shape (dA*dB, dA*dB)"
-
-        rho_A = partial_trace(rho, dA, dB, keep="A")
-        rho_B = partial_trace(rho, dA, dB, keep="B")
+        assert rho.shape == (dA * dB, dA * dB)
+        
+        rho_A = partial_trace(rho, dA, dB, keep='A')
+        rho_B = partial_trace(rho, dA, dB, keep='B')
         S_A = Entropy.default(rho_A)
         S_B = Entropy.default(rho_B)
         S_AB = Entropy.default(rho)
-
+        
         return S_A + S_B - S_AB
         return float(result / np.log(base))
 

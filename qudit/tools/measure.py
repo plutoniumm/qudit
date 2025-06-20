@@ -1,8 +1,7 @@
 from scipy.linalg import logm, fractional_matrix_power, svdvals
+from typing import List, Union,fractional_matrix_power,svdvals
 from typing import List, Union
 import numpy as np
-from qudit.tools.metrics import Entropy, Fidelity
-
 
 @staticmethod
 def density(matrix: np.ndarray) -> np.ndarray:
@@ -87,13 +86,25 @@ class Distance:
             + Distance.relative_entropy(sigma, m, base)
         )
 
+        return 0.5 * np.trace(svdvals(rho - sigma)).real
 
     @staticmethod
     def bhattacharyya(rho: np.ndarray, sigma: np.ndarray, base: float = 2.0) -> float:
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
 
-        return Fidelity.default(rho, sigma)
+        if rho.ndim == 1 and sigma.ndim == 1:
+            return float(np.abs(np.vdot(rho, sigma)) ** 2)
+
+        if rho.ndim == 1:
+            rho = np.outer(rho, rho.conj())
+        if sigma.ndim == 1:
+            sigma = np.outer(sigma, sigma.conj())
+
+        sqrt_rho = fractional_matrix_power(rho, 0.5)
+        inner = sqrt_rho @ sigma @ sqrt_rho
+        fidelity = (np.trace(fractional_matrix_power(inner, 0.5))) ** 2
+        return float(np.real(fidelity))
 
     def trace_distance(rho: np.ndarray, sigma: np.ndarray) -> float:
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
