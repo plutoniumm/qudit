@@ -74,13 +74,12 @@ class TestQuantumMetrics(unittest.TestCase):
         D = Entropy.relative_entropy(rho, sigma)
         expected = 0.8 * np.log2(0.8 / 0.5) + 0.2 * np.log2(0.2 / 0.5)
         self.assertAlmostEqual(D, expected, places=6)
-    
-    def test_mutual_information_bell_state():
-     psi = np.array([1, 0, 0, 1]) / np.sqrt(2)
-     rho = np.outer(psi, psi.conj())
-     I = Information.mutual_information(rho, 2, 2)
-     assert np.isclose(I, 2.0, atol=1e-5)
 
+    def test_mutual_information_bell_state():
+        psi = np.array([1, 0, 0, 1]) / np.sqrt(2)
+        rho = np.outer(psi, psi.conj())
+        I = Information.mutual_information(rho, 2, 2)
+        assert np.isclose(I, 2.0, atol=1e-5)
 
 
 if __name__ == "__main__":

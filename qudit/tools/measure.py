@@ -1,11 +1,7 @@
-from scipy.linalg import logm, fractional_matrix_power, svdvals
-from typing import List, Union,fractional_matrix_power,svdvals
+from scipy.linalg import logm,  fractional_matrix_power, svdvals
+from typing import List, Union,fractional_matrix_power, svdvals
 from typing import List, Union
 import numpy as np
-
-@staticmethod
-def density(matrix: np.ndarray) -> np.ndarray:
-    return np.outer(matrix, matrix.conj()) if matrix.ndim == 1 else matrix
 
 
 class Distance:

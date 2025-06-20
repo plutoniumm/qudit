@@ -3,8 +3,7 @@ from typing import List, Union
 import numpy as np
 
 
-@staticmethod
-def partial_trace(rho: np.ndarray, dA: int, dB: int, keep: str = "A") -> np.ndarray:
+def _partial_trace(rho: np.ndarray, dA: int, dB: int, keep: str = "A") -> np.ndarray:
 
     assert rho.shape == (
         dA * dB,
@@ -23,8 +22,7 @@ def partial_trace(rho: np.ndarray, dA: int, dB: int, keep: str = "A") -> np.ndar
         raise ValueError("keep must be 'A' or 'B'")
 
 
-@staticmethod
-def partial_transpose(rho: np.ndarray, dim_A: int, dim_B: int) -> np.ndarray:
+def _partial_transpose(rho: np.ndarray, dim_A: int, dim_B: int) -> np.ndarray:
     assert rho.shape == (
         dim_A * dim_B,
         dim_A * dim_B,
@@ -35,27 +33,11 @@ def partial_transpose(rho: np.ndarray, dim_A: int, dim_B: int) -> np.ndarray:
     return rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
 
 
-@staticmethod
-def projection(d: int):
+def _projection(d: int):
 
     return [np.outer(b, b) for b in np.eye(d)]
 
 
-
-def _partial_trace(rho: np.ndarray, dA: int, dB: int, keep: str = "A") -> np.ndarray:
-        if keep == "A":
-            return np.einsum("ij->i", rho.reshape(dA, dB, dA, dB)).reshape(dA, dA)
-        elif keep == "B":
-            return np.einsum("ij->j", rho.reshape(dA, dB, dA, dB)).reshape(dB, dB)
-        else:
-            raise ValueError("keep must be 'A' or 'B'")
-
-def _partial_transpose(rho: np.ndarray, dim_A: int, dim_B: int) -> np.ndarray:
-        assert rho.shape == (dim_A * dim_B, dim_A * dim_B)
-        rho = rho.reshape(dim_A, dim_B, dim_A, dim_B)
-        rho_pt = np.transpose(rho, axes=(0, 2, 1, 3))
-        return rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
-    
 class Fidelity:
 
     @staticmethod
@@ -123,6 +105,12 @@ class Fidelity:
 
     @staticmethod
     def negativity(rho: np.ndarray, dim_A: int, dim_B: int) -> float:
+        rho_reshaped = rho.reshape(dim_A, dim_B, dim_A, dim_B)
+        rho_pt = np.transpose(rho_reshaped, axes=(0, 3, 2, 1))
+        rho_pt = rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
+        singular_values = np.linalg.svd(rho_pt, compute_uv=False)
+        trace_norm = np.sum(singular_values)
+        return (trace_norm - 1) / 2
         rho_reshaped = rho.reshape(dim_A, dim_B, dim_A, dim_B)
         rho_pt = np.transpose(rho_reshaped, axes=(0, 3, 2, 1))
         rho_pt = rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
@@ -231,7 +219,7 @@ class Entropy:
             dA * dB,
         ), "Input must be a square matrix of shape (dA*dB, dA*dB)"
 
-        rho_A = partial_trace(rho, dA, dB, keep="A")
+        rho_A = _partial_trace(rho, dA, dB, keep="A")
         S_A = Entropy.default(rho_A)
         S_AB = Entropy.default(rho)
 
@@ -241,88 +229,11 @@ class Entropy:
 class Information:
 
     @staticmethod
-    def conditional_entropy(rho: np.ndarray, dA: int, dB: int, true_case: bool = True) -> float:
-        if true_case:
-            
-            projectors = projection(dA)
-            S_cond = 0
-            for P in projectors:
-                Pi = np.kron(P, np.eye(dB))
-                prob = np.trace(Pi @ rho)
-                if prob > 1e-12:
-                    rho_cond = Pi @ rho @ Pi / prob
-                    rho_B = partial_trace(rho_cond, dA, dB, keep='B')
-                    S_cond += prob * Entropy.default(rho_B)
-            return S_cond
-        else:
-            
-            assert rho.shape == (dA * dB, dA * dB)
-            rho_A = partial_trace(rho, dA, dB, keep='A')
-            S_A = Entropy.default(rho_A)
-            S_AB = Entropy.default(rho)
-            return S_AB - S_A
-
-    @staticmethod
-    def discord(rho: np.ndarray, dA: int, dB: int, true_case: bool = True) -> float:
-        rho_A = partial_trace(rho, dA, dB, keep='A')
-        S_A = Entropy.default(rho_A)
-        S_total = Entropy.default(rho)
-        S_cond = Information.conditional_entropy(rho, dA, dB, true_case=true_case)
-        return S_A - S_total + S_cond
-
-         
-    @staticmethod
-    def mutual_information(rho: np.ndarray, dA: int, dB: int) -> float:
-        assert rho.shape == (dA * dB, dA * dB)
-        rho_A = partial_trace(rho, dA, dB, keep='A')
-        rho_B = partial_trace(rho, dA, dB, keep='B')
-        S_A = Entropy.default(rho_A)
-        S_B = Entropy.default(rho_B)
-        S_AB = Entropy.default(rho)
-        return S_A + S_B - S_AB
-    @staticmethod
-    def coherent_information(rho_AB: np.ndarray, dA: int, dB: int) -> float:
-        assert rho_AB.shape == (dA * dB, dA * dB), "rho must be of shape (dA*dB, dA*dB)"
-    
-        rho_B = partial_trace(rho_AB, dA, dB, keep='B')
-        S_B = Entropy.default(rho_B)
-        S_AB = Entropy.default(rho_AB)
-    
-        return S_B - S_AB
-    @staticmethod
-    def conditional_mutual_information(rho: np.ndarray, dA: int, dB: int) -> float:
-        assert rho.shape == (dA * dB, dA * dB)
-        
-        rho_A = partial_trace(rho, dA, dB, keep='A')
-        rho_B = partial_trace(rho, dA, dB, keep='B')
-        S_A = Entropy.default(rho_A)
-        S_B = Entropy.default(rho_B)
-        S_AB = Entropy.default(rho)
-        
-        return S_A + S_B - S_AB
-        return float(result / np.log(base))
-
-    @staticmethod
-    def conditional_entropy(rho: np.ndarray, dA: int, dB: int) -> float:
-        
-        rho_A = _partial_trace(rho, dA, dB, keep="A")
-        S_A = Entropy.default(rho_A)
-        S_AB = Entropy.default(rho)
-
-        return S_AB - S_A
-
-
-class Info:
-
-    @staticmethod
     def conditional_entropy(
         rho: np.ndarray, dA: int, dB: int, true_case: bool = True
     ) -> float:
-
         if true_case:
 
-            def _projection(d: int):
-                return [np.outer(b, b) for b in np.eye(d)]
             projectors = _projection(dA)
             S_cond = 0
             for P in projectors:
@@ -342,9 +253,8 @@ class Info:
             return S_AB - S_A
 
     @staticmethod
-    def mutual(rho: np.ndarray, dA: int, dB: int) -> float:
+    def mutual_information(rho: np.ndarray, dA: int, dB: int) -> float:
         assert rho.shape == (dA * dB, dA * dB)
-
         rho_A = _partial_trace(rho, dA, dB, keep="A")
         rho_B = _partial_trace(rho, dA, dB, keep="B")
         S_A = Entropy.default(rho_A)
@@ -353,8 +263,9 @@ class Info:
         return S_A + S_B - S_AB
 
     @staticmethod
-    def coherent(rho_AB: np.ndarray, dA: int, dB: int) -> float:
+    def coherent_information(rho_AB: np.ndarray, dA: int, dB: int) -> float:
         assert rho_AB.shape == (dA * dB, dA * dB), "rho must be of shape (dA*dB, dA*dB)"
+
         rho_B = _partial_trace(rho_AB, dA, dB, keep="B")
         S_B = Entropy.default(rho_B)
         S_AB = Entropy.default(rho_AB)
