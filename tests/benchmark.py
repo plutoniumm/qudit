@@ -3,12 +3,12 @@ import numpy as np
 from qudit.index import Gate, State,Basis
 from qudit.circuit import Circuit, cfn, Layer
 from qudit.gates import Gategen
-from qudit.algebra import Unity, gellmann
-from qudit.utils import ID, isVar, Braket, Tensor
+from qudit import Unity, gellmann
+from qudit .utils import ID, isVar, Braket, Tensor
 import cirq
 import qutip
 from qutip import basis, tensor
-from qutip.qip.operations import hadamard_transform, cnot
+from qutip.qip import hadamard_transform, cnot
 
 
 REPEATS = 100
@@ -38,8 +38,8 @@ def benchmark_cirq():
     simulator = cirq.Simulator()
 
     start = time.perf_counter()
-    for _ in range(REPEATS):
-        _ = simulator.simulate(circuit)
+    for t in range(REPEATS):
+        t = simulator.simulate(circuit)
     end = time.perf_counter()
     return (end - start) / REPEATS
 

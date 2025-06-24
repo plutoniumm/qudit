@@ -1,26 +1,12 @@
 from scipy.linalg import logm, fractional_matrix_power
 from typing import List, Union
 import numpy as np
+from qudit.utils import _partial
 
 
-
-def _partial_trace(rho: np.ndarray, dA: int, dB: int, keep: str = "A") -> np.ndarray:
-        if keep == "A":
-            return np.einsum("ij->i", rho.reshape(dA, dB, dA, dB)).reshape(dA, dA)
-        elif keep == "B":
-            return np.einsum("ij->j", rho.reshape(dA, dB, dA, dB)).reshape(dB, dB)
-        else:
-            raise ValueError("keep must be 'A' or 'B'")
-
-def _partial_transpose(rho: np.ndarray, dim_A: int, dim_B: int) -> np.ndarray:
-        assert rho.shape == (dim_A * dim_B, dim_A * dim_B)
-        rho = rho.reshape(dim_A, dim_B, dim_A, dim_B)
-        rho_pt = np.transpose(rho, axes=(0, 2, 1, 3))
-        return rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
     
 class Fidelity:
 
-    @staticmethod
     @staticmethod
     def default(rho: np.ndarray, sigma: np.ndarray) -> float:
         if rho.ndim == 1 and sigma.ndim == 1:
@@ -35,10 +21,7 @@ class Fidelity:
         inner = sqrt_rho @ sigma @ sqrt_rho
         fidelity = (np.trace(fractional_matrix_power(inner, 0.5))) ** 2
         return float(np.real(fidelity))
-        fidelity = (np.trace(fractional_matrix_power(inner, 0.5))) ** 2
-        return float(np.real(fidelity))
-
-    @staticmethod
+        
     @staticmethod
     def channel(
         kraus: List[Union[np.ndarray, List[float]]], rho: np.ndarray
@@ -59,7 +42,6 @@ class Fidelity:
         return rho_out
 
     # TODO: is ndim enough? or do we need to check for square?
-    @staticmethod
     @staticmethod
     def entanglement(rho: np.ndarray, kraus_ops: List[np.ndarray]) -> float:
         d = rho.shape[0]
@@ -85,12 +67,6 @@ class Fidelity:
 
     @staticmethod
     def negativity(rho: np.ndarray, dim_A: int, dim_B: int) -> float:
-        rho_reshaped = rho.reshape(dim_A, dim_B, dim_A, dim_B)
-        rho_pt = np.transpose(rho_reshaped, axes=(0, 3, 2, 1))
-        rho_pt = rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
-        singular_values = np.linalg.svd(rho_pt, compute_uv=False)
-        trace_norm = np.sum(singular_values)
-        return (trace_norm - 1) / 2
         rho_reshaped = rho.reshape(dim_A, dim_B, dim_A, dim_B)
         rho_pt = np.transpose(rho_reshaped, axes=(0, 3, 2, 1))
         rho_pt = rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
@@ -195,7 +171,7 @@ class Entropy:
     @staticmethod
     def conditional_entropy(rho: np.ndarray, dA: int, dB: int) -> float:
         
-        rho_A = _partial_trace(rho, dA, dB, keep="A")
+        rho_A = _partial.trace(rho, dA, dB, keep="A")
         S_A = Entropy.default(rho_A)
         S_AB = Entropy.default(rho)
 
@@ -220,13 +196,13 @@ class Info:
                 prob = np.trace(Pi @ rho)
                 if prob > 1e-12:
                     rho_cond = Pi @ rho @ Pi / prob
-                    rho_B = _partial_trace(rho_cond, dA, dB, keep="B")
+                    rho_B = _partial.trace(rho_cond, dA, dB, keep="B")
                     S_cond += prob * Entropy.default(rho_B)
             return S_cond
         else:
 
             assert rho.shape == (dA * dB, dA * dB)
-            rho_A = _partial_trace(rho, dA, dB, keep="A")
+            rho_A = _partial.trace(rho, dA, dB, keep="A")
             S_A = Entropy.default(rho_A)
             S_AB = Entropy.default(rho)
             return S_AB - S_A
@@ -235,8 +211,8 @@ class Info:
     def mutual(rho: np.ndarray, dA: int, dB: int) -> float:
         assert rho.shape == (dA * dB, dA * dB)
 
-        rho_A = _partial_trace(rho, dA, dB, keep="A")
-        rho_B = _partial_trace(rho, dA, dB, keep="B")
+        rho_A = _partial.trace(rho, dA, dB, keep="A")
+        rho_B = _partial.trace(rho, dA, dB, keep="B")
         S_A = Entropy.default(rho_A)
         S_B = Entropy.default(rho_B)
         S_AB = Entropy.default(rho)
@@ -245,7 +221,7 @@ class Info:
     @staticmethod
     def coherent(rho_AB: np.ndarray, dA: int, dB: int) -> float:
         assert rho_AB.shape == (dA * dB, dA * dB), "rho must be of shape (dA*dB, dA*dB)"
-        rho_B = _partial_trace(rho_AB, dA, dB, keep="B")
+        rho_B = _partial.trace(rho_AB, dA, dB, keep="B")
         S_B = Entropy.default(rho_B)
         S_AB = Entropy.default(rho_AB)
 

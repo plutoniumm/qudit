@@ -60,3 +60,20 @@ def Tensor(*args: Union[Gate, State]) -> np.ndarray:
             # since X, H, CNOT are not longer valid names
     else:
         return result
+    
+class _partial:
+    def trace(rho: np.ndarray, dA: int, dB: int, keep: str = "A") -> np.ndarray:
+        if keep == "A":
+            return np.einsum("ij->i", rho.reshape(dA, dB, dA, dB)).reshape(dA, dA)
+        elif keep == "B":
+            return np.einsum("ij->j", rho.reshape(dA, dB, dA, dB)).reshape(dB, dB)
+        else:
+            raise ValueError("keep must be 'A' or 'B'")
+
+    def transpose(rho: np.ndarray, dim_A: int, dim_B: int) -> np.ndarray:
+        assert rho.shape == (dim_A * dim_B, dim_A * dim_B)
+        rho = rho.reshape(dim_A, dim_B, dim_A, dim_B)
+        rho_pt = np.transpose(rho, axes=(0, 2, 1, 3))
+        return rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
+    
+
