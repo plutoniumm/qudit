@@ -18,7 +18,7 @@ def ID() -> str:
 
 
 class Basis:
-    d: int = -1
+    d: int
     span: int = -1
 
     def __init__(self, d: int):

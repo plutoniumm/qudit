@@ -90,7 +90,6 @@ class Swapper:
 
         return Gate(self.d, gates, "SWAP")
 
-    @cache
     def get(self, a: int, b: int) -> Gate:
         if a == b:
             return self.I
@@ -116,26 +115,26 @@ class Gategen:
     def __init__(self, d: int, width: int = 2):
         self.d = d
         self.Ket = Basis(d)
-        self.swapper = Swapper(self.d, width, self.swap, self.I)
+        self.swapper = Swapper(self.d, width, self.SWAP, self.I)
 
     def create(self, O: np.ndarray = None, name: str = "U"):
         return Gate(self.d, O, name)
 
-    @cproperty
+    @property
     def X(self) -> Gate:
         O = np.zeros((self.d, self.d))
         O[0, self.d - 1] = 1
         O[1:, 0 : self.d - 1] = np.eye(self.d - 1)
         return Gate(self.d, O, "X")
 
-    @cproperty
+    @property
     def Y(self) -> Gate:
         O = np.zeros((self.d, self.d), dtype=complex)
         O[0, self.d - 1] = 1j
         O[1:, 0 : self.d - 1] = np.eye(self.d - 1)
         return Gate(self.d, O, "Y")
 
-    @cproperty
+    @property
     def Z(self) -> Gate:
         w = Unity(self.d)
         O = np.diag([w**i for i in range(self.d)])
@@ -162,21 +161,21 @@ class Gategen:
 
         return gate
 
-    @cproperty
+    @property
     def CX(self) -> Gate:
         return self.CU(self.X, False)
 
-    @cproperty
+    @property
     def CY(self) -> Gate:
         return self.CU(self.Y, False)
 
-    @cproperty
+    @property
     def CZ(self) -> Gate:
         return self.CU(self.Z, False)
 
     # https://www.ijcte.org/vol11/1252-A3006.pdf
-    @cproperty
-    def swap(self) -> Gate:
+    @property
+    def SWAP(self) -> Gate:
         n = self.d
         nn = n * n
         vec = np.arange(nn).reshape(n, n, order="F").flatten()
@@ -186,29 +185,27 @@ class Gategen:
 
         return Gate(self.d, P, "SWAP")
 
-    @cache
     def long_swap(self, a: int, b: int) -> Gate:
         return self.swapper.get(a, b)
 
-    @cproperty
+    @property
     def S(self):
         w = Unity(self.d)
         O = np.diag([w**j for j in range(self.d)])
         return Gate(self.d, O, "S")
 
-    @cproperty
+    @property
     def T(self):
         w = Unity(self.d * 2)
         O = np.diag([w**j for j in range(self.d)])
         return Gate(self.d, O, "T")
 
-    @cache
     def P(self, theta: float):
         w = Unity(self.d * 2)
         O = np.diag([w**j for j in range(self.d)])
         return Gate(self.d, O, f"P({theta:.2f})")
 
-    @cproperty
+    @property
     def H(self) -> Gate:
         O = np.zeros((self.d, self.d), dtype=complex)
         w = Unity(self.d)
@@ -218,7 +215,6 @@ class Gategen:
 
         return Gate(self.d, O, "H")
 
-    @cache
     def Rot(self, thetas: List[complex]) -> Gate:
         R = np.eye(self.d)
         for i, theta in enumerate(thetas):
@@ -226,6 +222,6 @@ class Gategen:
 
         return Gate(self.d, R, "Rot")
 
-    @cproperty
+    @property
     def I(self) -> Gate:
         return Gate(self.d, np.eye(self.d), "I")

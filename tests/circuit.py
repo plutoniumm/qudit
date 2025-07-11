@@ -8,36 +8,25 @@ from unittest import TestCase, main
 from qudit import Circuit
 import numpy as np
 
-C = Circuit(4, dim=2)
-D = C.gates
 
 
-def everything():
-    # P = exp(1j * Symbol("p"))
-    # P = SparseMatrix([[1, 0], [0, P]])
-    # P = D.create(P, "P")
+def mirror(n):
+    C1, C2 = Circuit(2, dim=n), Circuit(2, dim=n)
+    G = C1.gates
 
-    for i in range(4):
-        ip = (i + 1) % 4
+    C1.gate(G.H, dits=[0])
+    C2.gate(G.H, dits=[1])
+    SWAP = G.SWAP
 
-        C.gate(D.CX, dits=[i, ip])
-        C.gate(D.X, dits=[ip])
-        C.gate(D.Y, dits=[i])
-        C.gate(D.Z, dits=[ip])
-        C.gate(D.H, dits=[i])
-        C.barrier()
+    C1 = C1.solve()
+    C2 = C2.solve()
 
-    C.gate(D.CZ, dits=[1, 3])
-    # C.gate(P, dits=[3])
-    print(C.draw())
-    print(np.sum(C.solve()))
+    C1 = SWAP @ C1 @ SWAP.T
 
-    # sum = np.sum(C.solve())
-    # sum = np.abs(sum.subs("p", 0.5).n())
+    diff = np.sum(np.abs(C1 - C2))
+    print(diff)
 
-
-everything()
-
+mirror(2)
 
 class Circuits(TestCase):
     def test_bell(self):

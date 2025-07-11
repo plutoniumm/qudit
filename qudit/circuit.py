@@ -138,7 +138,6 @@ class Circuit:
         self.span = size
 
     def gate(self, gate: Union[Gate, VarGate], dits: List[int]):
-        assert gate.span <= 2, f"Span {gate.span} not supported, upto 2"
         layer = self.layers[-1]
         if not layer.open(*dits):
             layer.finalise()
@@ -168,7 +167,6 @@ class Circuit:
 
     def draw(self):
         qudits = self.layers[0].span
-
         strings = ["─"] * qudits
         for l, layer in enumerate(self.layers):
             qctr = 0
@@ -215,23 +213,9 @@ class Circuit:
         return iter(self.layers)
 
     def _refresh(self):
-        if self.span == -1:
-            span_sum = 0
-            for layer in self.layers:
-                if layer.span > 0:
-                    span_sum += layer.span
-
-            if span_sum > 0:
-                self.span = span_sum
-
-        if self.vqc is False:
-            for layer in self.layers:
-                if layer.vqc:
-                    self.vqc = True
-                    break
+        self.vqc = any(layer.vqc for layer in self.layers)
 
     def barrier(self):
-        self._refresh()
         if len(self.layers) < 1:
             raise ValueError("Add at least 1 layer for a barrier")
         assert self.span > 0, "Span Unknown, add a layer first"
