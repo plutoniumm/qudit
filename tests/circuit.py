@@ -3,7 +3,7 @@ import sys
 sys.path.append("..")
 
 
-from sympy import exp, SparseMatrix, Symbol
+# from sympy import exp, SparseMatrix, Symbol
 from unittest import TestCase, main
 from qudit import Circuit
 import numpy as np
@@ -13,9 +13,9 @@ D = C.gates
 
 
 def everything():
-    P = exp(1j * Symbol("p"))
-    P = SparseMatrix([[1, 0], [0, P]])
-    P = D.create(P, "P")
+    # P = exp(1j * Symbol("p"))
+    # P = SparseMatrix([[1, 0], [0, P]])
+    # P = D.create(P, "P")
 
     for i in range(4):
         ip = (i + 1) % 4
@@ -27,12 +27,16 @@ def everything():
         C.gate(D.H, dits=[i])
         C.barrier()
 
-    C.gate(P, dits=[3])
+    C.gate(D.CZ, dits=[1, 3])
+    # C.gate(P, dits=[3])
     print(C.draw())
+    print(np.sum(C.solve()))
 
-    sum = np.sum(C.solve())
-    sum = np.abs(sum.subs("p", 0.5).n())
-    print(sum)
+    # sum = np.sum(C.solve())
+    # sum = np.abs(sum.subs("p", 0.5).n())
+
+
+everything()
 
 
 class Circuits(TestCase):
@@ -50,5 +54,5 @@ class Circuits(TestCase):
         self.assertTrue(np.allclose(U, HCX, atol=1e-4))
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

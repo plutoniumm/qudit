@@ -3,11 +3,13 @@ from typing import Any, Union, List
 from ..index import Gate, State
 import numpy as np
 
+
 def isSquare(i: Union[np.ndarray, List[np.ndarray]]):
     if not isinstance(list):
         return i.ndim == 2 and i.shape[0] == i.shape[1]
     else:
         return all([isSquare(j) for j in i])
+
 
 class Error(Gate):
     params: dict[str, Any]
@@ -36,7 +38,7 @@ class Channel:
 
     @cached_property
     def isTP(self) -> bool:
-        ti = np.trace(O.conj().T @ O) for O in self.ops
+        ti = [np.trace(O.conj().T @ O) for O in self.ops]
 
         return np.isclose(sum(ti), 1.0)
 
@@ -53,7 +55,7 @@ class Channel:
     def toChoi(self) -> np.ndarray:
         # J = sum_{i,j} |i⟩⟨j| ⊗ Φ(|i⟩⟨j|)
         d = self.d
-        J = np.zeros((d*d, d*d), dtype=complex)
+        J = np.zeros((d * d, d * d), dtype=complex)
         basis = np.eye(d, dtype=complex)
         for i in range(d):
             for j in range(d):
@@ -65,9 +67,9 @@ class Channel:
     def toSuperop(self) -> np.ndarray:
         # S acting on vec(ρ): vec(Φ(ρ)) = S · vec(ρ)
         d = self.d
-        S = np.zeros((d*d, d*d), dtype=complex)
+        S = np.zeros((d * d, d * d), dtype=complex)
         I = np.eye(d, dtype=complex)
-        for k in range(d*d):
+        for k in range(d * d):
             ek = I.flatten()[k]
             E = ek.reshape(d, d)
             vecPhi = self.run(E).flatten()
@@ -79,7 +81,7 @@ class Channel:
         K = len(self.ops)
         d = self.d
         r = K
-        V = np.zeros((d*r, d), dtype=complex)
+        V = np.zeros((d * r, d), dtype=complex)
         for n, O in enumerate(self.ops):
-            V[n*d:(n+1)*d, :] = O
+            V[n * d : (n + 1) * d, :] = O
         return V

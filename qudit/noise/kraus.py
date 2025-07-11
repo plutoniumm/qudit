@@ -6,6 +6,7 @@ import numpy as np
 
 C128 = np.complex128
 
+
 class GAD:
     @staticmethod
     def A(order: int, d: int, Y: float):

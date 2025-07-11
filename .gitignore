@@ -4,3 +4,4 @@ local/
 build/
 qudit.egg-info
 program.prof
+.vscode

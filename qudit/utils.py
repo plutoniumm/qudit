@@ -45,8 +45,9 @@ def Tensor(*args: Union[Gate, State]):
 
     return result
 
+
 # # A ^ B ^ C ^ D ^ ... ^ N
-def CTensor(*args: Union['Gate', 'VarGate', 'State']):
+def CTensor(*args: Union["Gate", "VarGate", "State"]):
     if not args:
         raise ValueError("At least one arg needed")
 
@@ -61,7 +62,6 @@ def CTensor(*args: Union['Gate', 'VarGate', 'State']):
             result = skron(result, csr_matrix(arg))
 
     return result
-
 
 
 class partial:

@@ -1,36 +1,12 @@
 from sympy import SparseMatrix as Matrix
-from .utils import CTensor as Tensor, ID
 from scipy.sparse import csr_matrix
 from .index import Gate, VarGate
 from typing import List, Union
+from .utils import CTensor, ID
 from .gates import Gategen
 import numpy as np
 
 BARRIER = "─|─"
-
-
-def calculate_swaps(G, a, b, width, gate_tensor):
-    if abs(a - b) == 1:
-        if a < b:
-            return gate_tensor  # already in correct order
-        else:
-            # swap a and b to match order
-            swap = G.long_swap(a, b, width=width)
-            return swap @ gate_tensor @ swap
-
-    # Bring a -> 0, b -> 1 if a < b; else reverse
-    if a > b:
-        a, b = b, a
-        gate_tensor = (
-            G.long_swap(b, a, width=width)
-            @ gate_tensor
-            @ G.long_swap(b, a, width=width)
-        )
-
-    swap_a = G.long_swap(a, 0, width=width)
-    swap_b = G.long_swap(b, 1, width=width)
-    swap = swap_a @ swap_b
-    return swap @ gate_tensor @ swap
 
 
 class Layer:
@@ -38,21 +14,22 @@ class Layer:
     data: np.ndarray
     counter: List[int]
     gates: List[Gate]
+    gategen: Gategen
     span: int
     id: str
     d: int
-    gategen: Union[Gategen, None]
 
-    def __init__(self, size: int, dim: int):
+    def __init__(self, size: int, dim: int, gategen: Gategen):
         assert size > 0, f"Size must be a >0, got: {size}"
         assert dim >= 0, f"Dimension must be int>=0, got: {dim}"
+        assert isinstance(gategen, Gategen), f"Expected Gategen, got {type(gategen)}"
 
         self.id = ID()
         self.span = size
         self.counter = list(range(size))
         self.gates = []
         self.d = dim
-        self.gategen = None
+        self.gategen = gategen
 
     def add(self, gate: Union[Gate, VarGate], dits: List[int]):
         gate.dits = dits
@@ -65,12 +42,9 @@ class Layer:
         self.gates.append(gate)
         return self
 
-    @property
-    def available(self):
-        return [d for d in range(self.span) if d in self.counter]
-
     def open(self, *args: List[int]) -> bool:
-        return all(d in self.available for d in args)
+        avl = [d for d in range(self.span) if d in self.counter]
+        return all(d in avl for d in args)
 
     def finalise(self):
         sublayer = self.getMat(self.gates)
@@ -90,31 +64,23 @@ class Layer:
                 l_gates.append(gate)
             elif gate.span == 1:
                 s_gates.append(gate)
+            else:
+                raise ValueError(f"Expected span: 1/2, got {gate.span}")
         # endfor
-
-        if self.gategen is None:
-            self.gategen = Gategen(self.d)
 
         G = self.gategen
-        I = G.I
 
-        sublayer[0] = [I] * self.span
+        sublayer[0] = [G.I] * self.span
         for gate in s_gates:
-            dit = gate.dits[0]
-            sublayer[0][dit] = gate
+            idx = gate.dits[0]
+            sublayer[0][idx] = gate
         # endfor
-        sublayer[0] = Tensor(*sublayer[0])
+        sublayer[0] = CTensor(*sublayer[0])
+        if len(l_gates) == 0:
+            return sublayer
 
         for gate in l_gates:
-            a, b = gate.dits
-            name = gate.name if gate.name else f"?({a}, {b})"
-
-            temp = [gate] + [I] * (self.span - 2)
-            temp = Tensor(*temp)
-            temp = calculate_swaps(G, a, b, self.span, temp)
-
-            temp.name = name
-            sublayer.append(temp)
+            sublayer.append(G.swapper.widen(gate))
 
         return sublayer
 
@@ -156,8 +122,8 @@ class cfn:
 
 
 class Circuit:
-    gates: Union[Gategen, None]
     layers: List[Layer]
+    gates: Gategen
     vqc: bool = False
     span: int
     d: int
@@ -166,17 +132,17 @@ class Circuit:
         assert size >= 0, "Size must be int>=0"
         assert dim >= 0, "Dimension must be int>=0"
 
-        self.layers = [Layer(size=size, dim=dim)]
+        self.gates = Gategen(dim, width=size)
+        self.layers = [Layer(size=size, dim=dim, gategen=self.gates)]
         self.d = dim
         self.span = size
-        self.gates = Gategen(dim)
 
     def gate(self, gate: Union[Gate, VarGate], dits: List[int]):
         assert gate.span <= 2, f"Span {gate.span} not supported, upto 2"
         layer = self.layers[-1]
         if not layer.open(*dits):
             layer.finalise()
-            layer = Layer(size=self.span, dim=self.d)
+            layer = Layer(size=self.span, dim=self.d, gategen=self.gates)
             self.layers.append(layer)
 
         layer.add(gate, dits)
@@ -198,7 +164,7 @@ class Circuit:
         for m in self.layers[1:]:
             prod = m.data @ prod
 
-        return prod
+        return prod.todense()
 
     def draw(self):
         qudits = self.layers[0].span
@@ -271,7 +237,7 @@ class Circuit:
         assert self.span > 0, "Span Unknown, add a layer first"
 
         d = self.d
-        layer = Layer(size=self.span, dim=self.d).add(
+        layer = Layer(size=self.span, dim=self.d, gategen=self.gates).add(
             Gate(d, np.eye(d), BARRIER), dits=list(range(self.span))
         )
         self.layers.append(layer)
