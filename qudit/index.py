@@ -42,12 +42,12 @@ class State(np.ndarray):
 
     def __new__(cls, d: Union[np.ndarray, List, "State"]):
         arr = np.asarray(d, dtype=np.complex128)
-
         if arr.ndim == 1:
-            arr = arr / np.linalg.norm(arr)
+            arr /= np.linalg.norm(arr)
         elif arr.ndim == 2:
             if arr.shape[0] != arr.shape[1]:
                 raise ValueError("Density matrix must be square")
+            arr /= np.trace(arr).real
         else:
             raise ValueError("Input must be 1D (vector) or 2D (density matrix)")
 
@@ -136,25 +136,13 @@ class Gate(np.ndarray):
         if isinstance(O, Matrix):
             return VarGate(d, O, name)
 
-        if O is None:
-            raise ValueError("Gate must be initialized with a matrix or None")
-            obj = np.zeros((d, d), dtype=complex).view(cls)
-            obj.span = 1
-        else:
-            obj = np.asarray(O, dtype=complex).view(cls)
-            obj.span = int(ma.log(len(O[0]), d))
-        # endif
+        obj = np.asarray(O, dtype=complex).view(cls)
 
+        obj.span = round(ma.log(O.shape[0], d))
         obj.name = name if name else f"Gate({d})"
         obj.d = d
         obj.dits = dits
         obj.vqc = False
-
-        if len(dits) > 0:
-            span = max(dits) - min(dits) + 1
-            if span != obj.span:
-                raise ValueError(f"Got span: {span}, expected span: {obj.span}")
-
         obj.id = ID()
         return obj
 

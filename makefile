@@ -2,7 +2,7 @@ FILE=local/token.env
 TOK=`cat $(FILE)`
 
 build:
-	python3 setup.py bdist_wheel sdist
+	python setup.py bdist_wheel sdist
 	twine check dist/*
 
 deploy:
@@ -11,7 +11,7 @@ deploy:
 
 test:
 	pip install .
-	python3 test.py
+	python test.py
 
 prof:
-	cd benchmark && python3 -m cProfile -o program.prof prof.py && snakeviz program.prof;
+	cd benchmark && python -m cProfile -o program.prof prof.py && snakeviz program.prof;

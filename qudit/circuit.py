@@ -5,6 +5,7 @@ from typing import List, Union
 from .utils import CTensor, ID
 from .gates import Gategen
 import numpy as np
+import math as ma
 
 BARRIER = "─|─"
 
@@ -32,12 +33,25 @@ class Layer:
         self.gategen = gategen
 
     def add(self, gate: Union[Gate, VarGate], dits: List[int]):
-        gate.dits = dits
         self.vqc = self.vqc or gate.vqc
+        name = gate.name if gate.name else "U_" + str(gate.d)
+        assert self.d == gate.d, "D mistmatch"
 
         for d in dits:
             if d in self.counter:
                 self.counter.remove(d)
+
+        if self.vqc:
+            gate = Matrix(gate)
+        else:
+            gate = csr_matrix(gate)
+
+        gate.span = self.count(gate)
+        gate.name = name
+        gate.d = self.d
+        gate.vqc = self.vqc
+        gate.id = ID()
+        gate.dits = dits
 
         self.gates.append(gate)
         return self
@@ -54,18 +68,20 @@ class Layer:
 
         self.data = prod
 
+    def count(self, gate):
+        return round(ma.log(gate.shape[0], self.d))
+
     # return list of equal sized matrices
     def getMat(self, in_gates) -> List[np.ndarray]:
         sublayer = [[]]
         l_gates, s_gates = [], []
 
         for gate in in_gates:
-            if gate.span == 2:
+            span = gate.span
+            if span > 1:
                 l_gates.append(gate)
-            elif gate.span == 1:
-                s_gates.append(gate)
             else:
-                raise ValueError(f"Expected span: 1/2, got {gate.span}")
+                s_gates.append(gate)
         # endfor
 
         G = self.gategen
@@ -147,17 +163,24 @@ class Circuit:
         layer.add(gate, dits)
         return self
 
+    def _solve_var(self) -> np.ndarray:
+        for i in range(len(self.layers)):
+            self.layers[i].data = Matrix(self.layers[i].data)
+
+    def _solve_def(self) -> np.ndarray:
+        for i in range(len(self.layers)):
+            self.layers[i].data = csr_matrix(self.layers[i].data)
+
     def solve(self) -> np.ndarray:
-        self._refresh()
+        self.vqc = any(layer.vqc for layer in self.layers)
         for layer in self.layers:
             if not hasattr(layer, "data"):
                 layer.finalise()
 
-        for i in range(len(self.layers)):
-            if self.vqc:
-                self.layers[i].data = Matrix(self.layers[i].data)
-            else:
-                self.layers[i].data = csr_matrix(self.layers[i].data)
+        if self.vqc:
+            self._solve_var()
+        else:
+            self._solve_def()
 
         prod = self.layers[0].data
         for m in self.layers[1:]:
@@ -199,21 +222,8 @@ class Circuit:
     def __getitem__(self, index):
         return self.layers[index]
 
-    def __setitem__(self, index: int, value: Layer):
-        if not isinstance(value, Layer):
-            raise TypeError(f"Expected Layer, got {type(value)}")
-        if index < 0 or index >= len(self.layers):
-            raise IndexError(
-                f"Expected index in [0, {len(self.layers) - 1}], got {index}"
-            )
-        self.layers[index] = value
-        self._refresh()
-
     def __iter__(self):
         return iter(self.layers)
-
-    def _refresh(self):
-        self.vqc = any(layer.vqc for layer in self.layers)
 
     def barrier(self):
         if len(self.layers) < 1:

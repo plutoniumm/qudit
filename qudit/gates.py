@@ -1,10 +1,10 @@
-from functools import cache, cached_property as cproperty
-from scipy.sparse import csr_matrix, kron
+from scipy.sparse import csr_matrix, kron, eye_array
 from .index import Gate, Basis, VarGate
 from .algebra import Unity, dGellMann
 from typing import List, Tuple, Union
 import numpy.linalg as LA
 import numpy as np
+import math as ma
 
 ck = 21
 
@@ -21,27 +21,25 @@ I  sw
 sw
 """
 
-
 class Swapper:
     def __init__(self, d: int, width: int, swap: Gate, I: Gate):
         self.d = d
         self.width = width
-        self.swap = csr_matrix(swap)
-        self.I = csr_matrix(I)
 
-        swaps = [swap]
-        op = swap
+        sw = csr_matrix(swap)
+        I = csr_matrix(I)
+
+        swaps = [sw]
         for _ in range(width - 2):
-            op = I ^ op
-            swaps.append(op)
+            swaps.append(kron(I, swaps[-1], format="csr"))
 
         for i in range(len(swaps)):
-            temp = swaps[i]
-            rem = width - temp.span
-            temp = temp ^ np.eye(d**rem)
-            temp.name = temp.name.replace(".U", ".I" * rem)
-
+            temp = swaps[i] # SW, I.SW, I.I.SW...
+            rem = width - round(ma.log(temp.shape[0], d))
+            temp = kron(temp, eye_array(d**rem), format="csr")
             swaps[i] = temp
+
+            assert temp.shape[0] == d**width, f"Swapper {i} has wrong shape {temp.shape} != {d**width}"
             del temp
 
         fwd = list(range(len(swaps)))
@@ -49,7 +47,6 @@ class Swapper:
         bkd.reverse()
 
         prod = 1
-        # [0, 1, 2, 1, 0]
         for i in fwd + bkd:
             prod *= swaps[i]
 
@@ -64,7 +61,8 @@ class Swapper:
         idle = [d for d in targ if d not in dits]
 
         swap = self.recepie(dits + idle, targ)
-        gate = gate ^ np.eye(gate.d ** (w - gate.span))
+        rem = w - gate.span
+        gate = kron(gate, eye_array(gate.d ** rem), format="csr")
 
         return swap @ gate @ swap.T
 
@@ -82,29 +80,13 @@ class Swapper:
     def recepie(self, arr, tar) -> List[Gate]:
         cycles = self.cycle_decomp(arr, tar)
         if not cycles or len(cycles) == 0:
-            return np.eye(self.d**self.width)
+            return eye_array(self.d**self.width, format='csr')
 
         gates = 1
         for sw in cycles:
             gates *= self.swaps[sw[0]]
 
-        return Gate(self.d, gates, "SWAP")
-
-    def get(self, a: int, b: int) -> Gate:
-        if a == b:
-            return self.I
-        if a > b:
-            a, b = b, a
-
-        if a < 0 or b >= self.d:
-            raise IndexError(f"Swap indices {a}, {b} out of range [0, {self.d})")
-
-        # literally just multiply the swap gates
-        gate = self.swaps[a]
-        for i in range(a + 1, b + 1):
-            gate = gate @ self.swaps[i]
-
-        return Gate(self.d, gate, f"SWAP({a}, {b})")
+        return gates
 
 
 class Gategen:
@@ -184,9 +166,6 @@ class Gategen:
         P[np.arange(nn), vec] = 1
 
         return Gate(self.d, P, "SWAP")
-
-    def long_swap(self, a: int, b: int) -> Gate:
-        return self.swapper.get(a, b)
 
     @property
     def S(self):

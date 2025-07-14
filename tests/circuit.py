@@ -9,7 +9,6 @@ from qudit import Circuit
 import numpy as np
 
 
-
 def mirror(n):
     C1, C2 = Circuit(2, dim=n), Circuit(2, dim=n)
     G = C1.gates
@@ -23,10 +22,7 @@ def mirror(n):
 
     C1 = SWAP @ C1 @ SWAP.T
 
-    diff = np.sum(np.abs(C1 - C2))
-    print(diff)
-
-mirror(2)
+    return np.sum(np.abs(C1 - C2)) == 0.0
 
 class Circuits(TestCase):
     def test_bell(self):
@@ -39,9 +35,13 @@ class Circuits(TestCase):
         C.gate(G.H, dits=[0])
         C.gate(G.CX, dits=[0, 1])
 
-        U = C.solve().todense()
+        U = C.solve()
         self.assertTrue(np.allclose(U, HCX, atol=1e-4))
 
+    def test_mirror(self):
+        for i in range(2, 5):
+            self.assertTrue(mirror(i))
 
-# if __name__ == "__main__":
-#     main()
+
+if __name__ == "__main__":
+    main()
