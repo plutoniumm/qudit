@@ -124,11 +124,11 @@ class Gategen:
 
     def CU(self, U: Gate, rev=False) -> Gate:
         """
-        CU = Σ_k U^k ⊗ |k><k| (target, ctrl)
-        CU = Σ_k |k><k| ⊗ U^k (ctrl, target)
+        CU = Σ_k U^k ⊗ |k⟩⟨k| (target, ctrl)
+        CU = Σ_k |k⟩⟨k| ⊗ U^k (ctrl, target)
 
         for everything else we insert I
-        Eg: CU(1, 4) = Σ_k |k><k| ⊗ I ⊗ I ⊗ U^k
+        Eg: CU(1, 4) = Σ_k |k⟩⟨k| ⊗ I ⊗ I ⊗ U^k
         """
 
         F = lambda k: [LA.matrix_power(U, k), self.Ket(k).density()]

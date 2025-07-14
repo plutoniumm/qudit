@@ -9,11 +9,11 @@ Ordering followed same as:
   - https://pypi.org/project/liepy/
 
 In general:
-Symm(j, k) = |j><k| + |k><j|
-Anti(j, j) = -i|j><k| + i|k><j|
+Symm(j, k) = |j⟩⟨k| + |k⟩⟨j|
+Anti(j, j) = -i|j⟩⟨k| + i|k⟩⟨j|
 
 A = sqrt(2/(j*(j+1)))
-Diag(l) = A (sum_{j=0}^l |j><j| - l|l+1><l+1|)
+Diag(l) = A (sum_{j=0}^l |j⟩⟨j| - l|l+1⟩⟨l+1|)
 - https://arxiv.org/pdf/0806.1174
 """
 
