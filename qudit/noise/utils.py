@@ -5,10 +5,10 @@ import numpy as np
 
 
 def isSquare(i: Union[np.ndarray, List[np.ndarray]]):
-    if not isinstance(list):
-        return i.ndim == 2 and i.shape[0] == i.shape[1]
-    else:
+    if isinstance(list):
         return all([isSquare(j) for j in i])
+
+    return i.ndim == 2 and i.shape[0] == i.shape[1]
 
 
 class Error(Gate):

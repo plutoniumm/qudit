@@ -1,4 +1,4 @@
-<img src="./docs/icon.svg" width="125" height="125" align="right" style="position:relative;top:60px;">
+<img src="./icon.svg" width="125" height="125" align="right" style="position:relative;top:60px;">
 
 # Qudit
 Sparse Matrix simulations for qudit systems. To make qudit machine learning, qudit error correction, and qudit circuit simulation easier.
@@ -40,10 +40,3 @@ rho = D.CX @ (D.I ^ D.H)
 
 rho @ k00 @ rho.H # Tr = 1
 ```
-
-**Not Done**:
-- Partial Trace
-- Gates: QFT
-- Noise: Kraus, Choi
-- States → Stabiliser
-- Discord

@@ -23,7 +23,7 @@ _paulis = {
 }
 
 
-# Usage S(X, I, X, X, I)
+# Usage _S(X, I, X, X, I)
 def _S(*args) -> np.ndarray:
     state = args[0]
     for d in args[1:]:
@@ -32,7 +32,7 @@ def _S(*args) -> np.ndarray:
     return state
 
 
-# Usage SS("XIXXI")
+# Usage S("XIXXI")
 # literally just call S() string by string
 def S(string: str) -> np.ndarray:
     paulis = [_paulis[i] for i in string]
