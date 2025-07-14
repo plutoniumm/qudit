@@ -11,8 +11,8 @@ all unitary and special unitary groups](https://arxiv.org/pdf/1103.3408) - Expli
 """
 
 
-# https://case.edu/artsci/math/mwmeckes/elizabeth/Meckes_SAMSI_Lecture2.pdf
-def unitary(n: int) -> np.ndarray:
+# SRC: https://case.edu/artsci/math/mwmeckes/elizabeth/Meckes_SAMSI_Lecture2.pdf
+def random_unitary(n: int) -> np.ndarray:
     l, r = N(size=(n, n)).astype(C128), N(size=(n, n)).astype(C128)
     Q, R = LA.qr(l + 1j * r)
 
@@ -22,8 +22,8 @@ def unitary(n: int) -> np.ndarray:
     return np.dot(Q, A)
 
 
-def state(n: int) -> np.ndarray:
-    U = unitary(n)
+def random_state(n: int) -> np.ndarray:
+    U = random_unitary(n)
     vec = np.eye(n, dtype=C128)
     vec = vec[np.random.randint(0, n)]
 

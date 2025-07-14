@@ -1,64 +1,93 @@
-from qudit.tools.metrics import Fidelity, negativity
+import unittest
+import sys
+
+sys.path.append("..")
 
 import numpy as np
+from qudit.tools.metrics import Fidelity, Entropy, Information
 
 
-def test_channel():
-    K0 = np.sqrt(0.5) * np.eye(2)
-    K1 = np.sqrt(0.5) * np.array([[0, 1], [1, 0]])
-    kraus_ops = [K0, K1]
+class TestQuantumMetrics(unittest.TestCase):
 
-    # Input state: |0⟩
-    rho = np.array([[1, 0], [0, 0]], dtype=complex)
+    def test_channel(self):
+        K0 = np.sqrt(0.5) * np.eye(2)
+        K1 = np.sqrt(0.5) * np.array([[0, 1], [1, 0]])
+        kraus_ops = [K0, K1]
 
-    output = Fidelity.channel(kraus_ops, rho)
-    print("Quantum Channel Output (should be 0.5*|0><0| + 0.5*|1><1|):")
-    print(np.round(output, 3))
+        rho = np.array([[1, 0], [0, 0]], dtype=complex)
+        output = Fidelity.channel(kraus_ops, rho)
 
+        expected = 0.5 * np.eye(2)
+        np.testing.assert_almost_equal(output, expected, decimal=6)
 
-def test_entanglement_fidelity():
-    p = 0.25
-    I = np.eye(2)
-    X = np.array([[0, 1], [1, 0]])
-    Y = np.array([[0, -1j], [1j, 0]])
-    Z = np.array([[1, 0], [0, -1]])
+    def test_fidelity_pure(self):
+        psi = np.array([1, 0], dtype=complex)
+        phi = np.array([1 / np.sqrt(2), 1 / np.sqrt(2)], dtype=complex)
+        f = Fidelity.default(psi, phi)
+        self.assertAlmostEqual(f, 0.5, places=6)
 
-    kraus_ops = [
-        np.sqrt(1 - 3 * p / 4) * I,
-        np.sqrt(p / 4) * X,
-        np.sqrt(p / 4) * Y,
-        np.sqrt(p / 4) * Z,
-    ]
+    def test_negativity(self):
+        d = 2
+        bell = np.array([1, 0, 0, 1], dtype=complex) / np.sqrt(2)
+        rho = np.outer(bell, bell.conj())
+        N = Fidelity.negativity(rho, d, d)
+        self.assertAlmostEqual(N, 0.5, places=6)
 
-    # Input state: |0⟩⟨0|
-    rho = np.array([[1, 0], [0, 0]], dtype=complex)
+    def test_entropy_neumann(self):
+        rho = np.array([[0.7, 0], [0, 0.3]])
+        S = Entropy.neumann(rho)
+        self.assertAlmostEqual(S, -0.7 * np.log2(0.7) - 0.3 * np.log2(0.3), places=6)
 
-    Fe = Fidelity.entanglement(rho, kraus_ops)
-    print(f"Entanglement Fidelity: {Fe:.4f} (Expected: ~0.8125 for p=0.25)")
+    def test_entropy_shannon(self):
+        probs = np.array([0.5, 0.5])
+        S = Entropy.shannon(probs)
+        self.assertAlmostEqual(S, 1.0, places=6)
 
+    def test_entropy_tsallis(self):
+        rho = np.array([[0.6, 0], [0, 0.4]])
+        S = Entropy.tsallis(rho, q=2)
+        expected = (1 - (0.6**2 + 0.4**2)) / (2 - 1)
+        self.assertAlmostEqual(S, expected, places=6)
 
-def test_fidelity():
-    psi = np.array([1, 0], dtype=complex)  # |0⟩
-    phi = np.array([1 / np.sqrt(2), 1 / np.sqrt(2)], dtype=complex)  # (|0⟩ + |1⟩)/√2
+    def test_entropy_renyi(self):
+        rho = np.array([[0.6, 0], [0, 0.4]])
+        S = Entropy.renyi(rho, alpha=2)
+        expected = np.log2(0.6**2 + 0.4**2) / (1 - 2)
+        self.assertAlmostEqual(S, expected, places=6)
 
-    # f = Fidelity(psi, phi)
-    f = Fidelity.default(psi, phi)
-    print(f"Uhlmann Fidelity Test: {f:.4f} (Expected: ~0.7071)")
+    def test_entropy_hartley(self):
+        probs = np.array([0.25, 0.25, 0.25, 0.25])
+        S = Entropy.hartley(probs)
+        self.assertAlmostEqual(S, 2.0, places=6)
 
+    def test_entropy_unified(self):
+        rho = np.array([[0.6, 0], [0, 0.4]])
+        S1 = Entropy.unified(rho, q=1.0, alpha=2.0)
+        S2 = Entropy.unified(rho, q=2.0, alpha=1.0)
+        S3 = Entropy.unified(rho, q=2.0, alpha=2.0)
+        self.assertAlmostEqual(S1, Entropy.renyi(rho, alpha=2.0), places=6)
+        self.assertAlmostEqual(S2, Entropy.tsallis(rho, q=2.0), places=6)
+        self.assertTrue(S3 > 0)
 
-def test_negativity():
-    d = 3
-    psi = np.zeros((d, d), dtype=complex)
-    for i in range(d):
-        psi[i, i] = 1
-    psi = psi.flatten() / np.sqrt(d)
-    rho = np.outer(psi, psi.conj())
-    N = negativity(rho, d, d)
-    print(f"Qutrit Entangled State Negativity: {N:.4f} (Expected: > 0)")
+    def test_relative_entropy(self):
+        rho = np.array([[0.8, 0], [0, 0.2]])
+        sigma = np.array([[0.5, 0], [0, 0.5]])
+        D = Entropy.relative_entropy(rho, sigma)
+        expected = 0.8 * np.log2(0.8 / 0.5) + 0.2 * np.log2(0.2 / 0.5)
+        self.assertAlmostEqual(D, expected, places=6)
+
+    def test_mutual_information_bell_state():
+        psi = np.array([1, 0, 0, 1]) / np.sqrt(2)
+        rho = np.outer(psi, psi.conj())
+        I = Information.mutual_information(rho, 2, 2)
+        assert np.isclose(I, 2.0, atol=1e-5)
+
+    def test_mutual_information_bell_state():
+        psi = np.array([1, 0, 0, 1]) / np.sqrt(2)
+        rho = np.outer(psi, psi.conj())
+        I = Information.mutual_information(rho, 2, 2)
+        assert np.isclose(I, 2.0, atol=1e-5)
 
 
 if __name__ == "__main__":
-    test_fidelity()
-    test_channel()
-    test_negativity()
-    test_entanglement_fidelity()
+    unittest.main()

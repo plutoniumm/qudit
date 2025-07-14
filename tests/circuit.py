@@ -2,38 +2,46 @@ import sys
 
 sys.path.append("..")
 
-import scipy.sparse as sp
-import sympy as sym
-from qudit import *
+
+# from sympy import exp, SparseMatrix, Symbol
+from unittest import TestCase, main
+from qudit import Circuit
 import numpy as np
-import math as m
-
-D = Gategen(2)
 
 
-def everything():
-    C = Circuit(5)
+def mirror(n):
+    C1, C2 = Circuit(2, dim=n), Circuit(2, dim=n)
+    G = C1.gates
 
-    P = sym.exp(1j * sym.Symbol("p"))
-    P = sym.SparseMatrix([[1, 0], [0, P]])
-    P = Gate(D.d, P, "P")
+    C1.gate(G.H, dits=[0])
+    C2.gate(G.H, dits=[1])
+    SWAP = G.SWAP
 
-    for i in range(5):
-        C.gate(D.H, dits=[i])
-        C.gate(D.CX, dits=[i, (i + 1) % 5])
-        C.gate(D.X, dits=[i])
-        C.gate(D.Y, dits=[i])
-        C.gate(D.Z, dits=[i])
+    C1 = C1.solve()
+    C2 = C2.solve()
 
-    # C.barrier()
-    C.gate(P, dits=[4])
+    C1 = SWAP @ C1 @ SWAP.T
 
-    print(C.draw())
+    return np.sum(np.abs(C1 - C2)) == 0.0
 
-    sum = np.sum(C.solve())
-    sum = np.abs( sum.subs("p", 0.5).n() )
-    print(sum)
+class Circuits(TestCase):
+    def test_bell(self):
+        HCX = np.array(
+            [[1, 1, 0, 0], [0, 0, 1, -1], [0, 0, 1, 1], [1, -1, 0, 0]]
+        ) / np.sqrt(2)
+
+        C = Circuit(2, dim=2)
+        G = C.gates
+        C.gate(G.H, dits=[0])
+        C.gate(G.CX, dits=[0, 1])
+
+        U = C.solve()
+        self.assertTrue(np.allclose(U, HCX, atol=1e-4))
+
+    def test_mirror(self):
+        for i in range(2, 5):
+            self.assertTrue(mirror(i))
 
 
 if __name__ == "__main__":
-    everything()
+    main()

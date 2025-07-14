@@ -1,10 +1,7 @@
 import numpy as np
 
 
-def Unity(d: int):
-    assert d > 0 and isinstance(d, int), "Dim must be int>0"
-    return np.exp(1j * np.pi / d)
-
+Unity = lambda d: np.exp(2j * np.pi / d)
 
 """
 Ordering followed same as:
@@ -12,11 +9,11 @@ Ordering followed same as:
   - https://pypi.org/project/liepy/
 
 In general:
-Symm(j, k) = |j><k| + |k><j|
-Anti(j, j) = -i|j><k| + i|k><j|
+Symm(j, k) = |j⟩⟨k| + |k⟩⟨j|
+Anti(j, j) = -i|j⟩⟨k| + i|k⟩⟨j|
 
 A = sqrt(2/(j*(j+1)))
-Diag(l) = A (sum_{j=0}^l |j><j| - l|l+1><l+1|)
+Diag(l) = A (sum_{j=0}^l |j⟩⟨j| - l|l+1⟩⟨l+1|)
 - https://arxiv.org/pdf/0806.1174
 """
 

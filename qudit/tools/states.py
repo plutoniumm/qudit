@@ -39,7 +39,7 @@ def Dicke(n, k):
     return State(vals)
 
 
-# https://arxiv.org/pdf/1402.1487
+# SRC: https://arxiv.org/pdf/1402.1487
 def Coherent(N: int, alpha=1.0) -> State:
     Ket = Basis(N + 1)
     a2 = abs(alpha) ** 2

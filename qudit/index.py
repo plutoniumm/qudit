@@ -16,9 +16,10 @@ import math as ma
 def ID() -> str:
     return str(uuid4()).split("-")[0]
 
+
 class Basis:
-    d: int = None
-    span: int = None
+    d: int
+    span: int = -1
 
     def __init__(self, d: int):
         self.d = d
@@ -41,12 +42,12 @@ class State(np.ndarray):
 
     def __new__(cls, d: Union[np.ndarray, List, "State"]):
         arr = np.asarray(d, dtype=np.complex128)
-
         if arr.ndim == 1:
-            arr = arr / np.linalg.norm(arr)
+            arr /= np.linalg.norm(arr)
         elif arr.ndim == 2:
             if arr.shape[0] != arr.shape[1]:
                 raise ValueError("Density matrix must be square")
+            arr /= np.trace(arr).real
         else:
             raise ValueError("Input must be 1D (vector) or 2D (density matrix)")
 
@@ -121,37 +122,27 @@ class State(np.ndarray):
 
 class Gate(np.ndarray):
     dits: List[int]
-    id: str = None
+
+    id: str = ""
+
     name: str = ""
     vqc: bool
     span: int
     d: int
 
     def __new__(
-        cls, d: int, O: np.ndarray = None, name: str = None, dits: List[int] = []
+        cls, d: int, O: np.ndarray = None, name: str = "U", dits: List[int] = []
     ):
         if isinstance(O, Matrix):
             return VarGate(d, O, name)
 
-        if O is None:
-            raise ValueError("Gate must be initialized with a matrix or None")
-            obj = np.zeros((d, d), dtype=complex).view(cls)
-            obj.span = 1
-        else:
-            obj = np.asarray(O, dtype=complex).view(cls)
-            obj.span = int(ma.log(len(O[0]), d))
-        # endif
+        obj = np.asarray(O, dtype=complex).view(cls)
 
+        obj.span = round(ma.log(O.shape[0], d))
         obj.name = name if name else f"Gate({d})"
         obj.d = d
         obj.dits = dits
         obj.vqc = False
-
-        if len(dits) > 0:
-            span = max(dits) - min(dits) + 1
-            if span != obj.span:
-                raise ValueError(f"Got span: {span}, expected span: {obj.span}")
-
         obj.id = ID()
         return obj
 
@@ -169,7 +160,9 @@ class Gate(np.ndarray):
         self.dits = getattr(obj, "dits", [])
 
     def __xor__(self, other: "Gate") -> "Gate":
-        return Gate(self.d, np.kron(self, other), f"{self.name}.{other.name}")
+        name = f"{self.name}.{getattr(other, 'name', 'U')}"
+
+        return Gate(self.d, np.kron(self, other), name)
 
     def isUnitary(self):
         return np.allclose(self @ self.H, np.eye(self.shape[0]))
@@ -180,7 +173,7 @@ class Gate(np.ndarray):
 
 class VarGate(Matrix):
     def __new__(
-        cls, d: int, O: np.ndarray = None, name: str = None, dits: List[int] = []
+        cls, d: int, O: np.ndarray = None, name: str = "U", dits: List[int] = []
     ):
         if O is None:
             mat = Matrix(np.zeros((d, d), dtype=complex).view(cls))
