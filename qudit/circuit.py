@@ -89,7 +89,7 @@ class Layer:
         sublayer[0] = [G.I] * self.span
         for gate in s_gates:
             idx = gate.dits[0]
-            sublayer[0][idx] = gate
+            sublayer[0][idx] = gate @ sublayer[0][idx]
         # endfor
         sublayer[0] = CTensor(*sublayer[0])
         if len(l_gates) == 0:

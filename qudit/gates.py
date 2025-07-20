@@ -1,4 +1,4 @@
-from scipy.sparse import csr_matrix, kron, eye_array
+from scipy.sparse import csr_matrix, kron, eye_array, dok_matrix
 from .index import Gate, Basis, VarGate
 from .algebra import Unity, dGellMann
 from typing import List, Tuple, Union
@@ -21,50 +21,51 @@ I  sw
 sw
 """
 
+
 class Swapper:
-    def __init__(self, d: int, width: int, swap: Gate, I: Gate):
-        self.d = d
+    def __init__(self, d: int, width: int):
         self.width = width
-
-        sw = csr_matrix(swap)
-        I = csr_matrix(I)
-
-        swaps = [sw]
-        for _ in range(width - 2):
-            swaps.append(kron(I, swaps[-1], format="csr"))
-
-        for i in range(len(swaps)):
-            temp = swaps[i] # SW, I.SW, I.I.SW...
-            rem = width - round(ma.log(temp.shape[0], d))
-            temp = kron(temp, eye_array(d**rem), format="csr")
-            swaps[i] = temp
-
-            assert temp.shape[0] == d**width, f"Swapper {i} has wrong shape {temp.shape} != {d**width}"
-            del temp
-
-        fwd = list(range(len(swaps)))
-        bkd = fwd[:-1]
-        bkd.reverse()
-
-        prod = 1
-        for i in fwd + bkd:
-            prod *= swaps[i]
-
-        swaps.append(prod)
-        self.swaps = swaps
+        self.d = d
 
     def widen(self, gate: Union[Gate, VarGate]) -> List[np.ndarray]:
         w = self.width
-        dits = gate.dits  # [0, 2, 3]
-        targ = list(range(w))  # [0, 1, 2, 4]
+        d = self.d
+        dits = gate.dits
+        idle = [q for q in range(w) if q not in dits]
+        perm = dits + idle
 
-        idle = [d for d in targ if d not in dits]
+        gate = kron(gate, eye_array(d**(w - len(dits))), format="dok")
+        gate = self.permute_in_place(gate, perm)
 
-        swap = self.recepie(dits + idle, targ)
-        rem = w - gate.span
-        gate = kron(gate, eye_array(gate.d ** rem), format="csr")
+        return gate
 
-        return swap @ gate @ swap.T
+    def permute_in_place(self, mat, pattern):
+        nq = len(pattern)
+        d = self.d
+        dim = d**nq
+
+        new_mat = dok_matrix((dim, dim), dtype=complex)
+
+        for (r, c), val in mat.items():
+            r_digits = self._to_digits(r, nq, d)
+            c_digits = self._to_digits(c, nq, d)
+
+            r_perm = self._from_digits([r_digits[i] for i in pattern], d)
+            c_perm = self._from_digits([c_digits[i] for i in pattern], d)
+
+            new_mat[r_perm, c_perm] = val
+
+        return new_mat.tocsr()
+
+    def _to_digits(self, x, nq, d):
+        return [(x // d**i) % d for i in range(nq)]
+
+    def _from_digits(self, digits, d):
+        x = 0
+        for val in reversed(digits):
+            x = x * d + val
+        return x
+
 
     def cycle_decomp(self, arr, tar) -> List[Tuple[int, int]]:
         swaps = []
@@ -77,17 +78,6 @@ class Swapper:
 
         return swaps
 
-    def recepie(self, arr, tar) -> List[Gate]:
-        cycles = self.cycle_decomp(arr, tar)
-        if not cycles or len(cycles) == 0:
-            return eye_array(self.d**self.width, format='csr')
-
-        gates = 1
-        for sw in cycles:
-            gates *= self.swaps[sw[0]]
-
-        return gates
-
 
 class Gategen:
     d: int
@@ -97,7 +87,8 @@ class Gategen:
     def __init__(self, d: int, width: int = 2):
         self.d = d
         self.Ket = Basis(d)
-        self.swapper = Swapper(self.d, width, self.SWAP, self.I)
+        self.width = width
+        self.swapper = Swapper(self.d, width)
 
     def create(self, O: np.ndarray = None, name: str = "U"):
         return Gate(self.d, O, name)
@@ -154,6 +145,30 @@ class Gategen:
     @property
     def CZ(self) -> Gate:
         return self.CU(self.Z, False)
+
+    def permute(self, pattern):
+        nq = len(pattern)
+        d = self.d
+        w = d**nq
+
+        mat = eye_array(w, format="dok")
+        for r in range(w):
+            mat[r, r] = 0
+            digits = []
+            x = r
+            for _ in range(nq):
+                digits.append(x % d)
+                x //= d
+
+            permuted_digits = [digits[j] for j in pattern]
+
+            pr = 0
+            for i in reversed(permuted_digits):
+                pr = pr * d + i
+
+            mat[pr, r] = 1
+
+        return mat.tocsr()
 
     # https://www.ijcte.org/vol11/1252-A3006.pdf
     @property

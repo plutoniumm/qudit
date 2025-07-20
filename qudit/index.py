@@ -136,10 +136,10 @@ class Gate(np.ndarray):
         if isinstance(O, Matrix):
             return VarGate(d, O, name)
 
-        obj = np.asarray(O, dtype=complex).view(cls)
+        obj = np.asarray(O, dtype=np.complex64).view(cls)
 
         obj.span = round(ma.log(O.shape[0], d))
-        obj.name = name if name else f"Gate({d})"
+        obj.name = name if name else f"U({d})"
         obj.d = d
         obj.dits = dits
         obj.vqc = False
@@ -176,8 +176,7 @@ class VarGate(Matrix):
         cls, d: int, O: np.ndarray = None, name: str = "U", dits: List[int] = []
     ):
         if O is None:
-            mat = Matrix(np.zeros((d, d), dtype=complex).view(cls))
-            mat.span = 1
+            raise ValueError("This part is reachable too. deal with it")
         else:
             mat = Matrix(O)
             mat.span = int(np.log(O.shape[0]) / np.log(d))

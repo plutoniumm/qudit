@@ -1,8 +1,15 @@
-.. image:: _static/icon.svg
-   :width: 125
-   :height: 125
-   :align: right
-   :name: icon
+.. raw:: html
+
+    <img src="_static/icon.svg" width="125" height="125" align="right" style="position:relative;top:10px;margin-left: 5px;">
+    <h2 style="border-bottom:0;margin-top:0 !important;"><i><code>Qudit</code></i></h2>
+    <br />
+
+.. toctree::
+    :maxdepth: 2
+    :caption: Contents:
+
+   api
+   mymarkdown
 
 Qudit
 =====

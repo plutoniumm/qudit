@@ -24,6 +24,7 @@ def mirror(n):
 
     return np.sum(np.abs(C1 - C2)) == 0.0
 
+
 class Circuits(TestCase):
     def test_bell(self):
         HCX = np.array(
