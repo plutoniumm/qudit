@@ -1,4 +1,4 @@
-from scipy.sparse import csr_matrix, kron, eye_array, dok_matrix
+from scipy.sparse import kron, eye_array, dok_matrix
 from .index import Gate, Basis, VarGate
 from .algebra import Unity, dGellMann
 from typing import List, Tuple, Union
@@ -7,19 +7,6 @@ import numpy as np
 import math as ma
 
 ck = 21
-
-"""
-01 = sw
-12 = I . sw
-23 = I . I . sw1
-
-03 =
-sw
-I  sw
-I  I  sw
-I  sw
-sw
-"""
 
 
 class Swapper:
@@ -34,7 +21,7 @@ class Swapper:
         idle = [q for q in range(w) if q not in dits]
         perm = dits + idle
 
-        gate = kron(gate, eye_array(d**(w - len(dits))), format="dok")
+        gate = kron(gate, eye_array(d ** (w - len(dits))), format="dok")
         gate = self.permute_in_place(gate, perm)
 
         return gate
@@ -65,7 +52,6 @@ class Swapper:
         for val in reversed(digits):
             x = x * d + val
         return x
-
 
     def cycle_decomp(self, arr, tar) -> List[Tuple[int, int]]:
         swaps = []
