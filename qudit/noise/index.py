@@ -19,6 +19,10 @@ class Error(Gate):
         obj.params = params
         return obj
 
+    @property
+    def correctable(self) -> bool:
+        pass
+
 
 class Channel:
     ops: list[Error]
@@ -30,7 +34,6 @@ class Channel:
         self.ops = ops
         self.d = ops[0].d if isinstance(ops[0], Error) else ops[0].shape[0]
 
-    @lru_cache
     def run(self, rho: Union[State, np.ndarray]) -> np.ndarray:
         result = [O @ rho @ O.conj().T for O in self.ops]
 

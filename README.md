@@ -1,64 +1,57 @@
-.. image:: _static/icon.svg
-   :width: 125
-   :height: 125
-   :align: right
-   :name: icon
+<img src="https://raw.githubusercontent.com/plutoniumm/qudit/v2/docs/_static/icon.svg" alt="icon" width="125" height="125" align="right" name="icon"/>
 
-Qudit
-=====
+# Qudit
 
-Sparse Matrix simulations for qudit systems. To make qudit machine learning, qudit error correction, and qudit circuit simulation easier. Qudit is made fully around ``numpy`` and ``scipy`` to make it easy to mix and match tools without worrying about type errors.
+Sparse Matrix simulations for qudit systems. To make qudit machine learning, qudit error correction, and qudit circuit simulation easier. Qudit is made fully around `numpy` and `scipy` to make it easy to mix and match tools without worrying about type errors.
 
-.. image:: https://badge.fury.io/py/qudit.svg
-   :target: https://pypi.org/project/qudit/
-   :alt: PyPI version
+[![PyPI version](https://badge.fury.io/py/qudit.svg)](https://pypi.org/project/qudit/)
 
-::
+```bash
+pip install qudit
+```
 
-    pip install qudit
+## Quickstart
 
-Quickstart
-----------
+In most cases it should not matter if you mix and match `numpy` with `qudit` since most abstractions are built on top of `numpy` arrays. The following is two examples to do the same thing, one using the `Circuit` class and the other manually using the matrices.
 
-In most cases it should not matter if you mix and match ``numpy`` with ``qudit`` since most abstractions are built on top of ``numpy`` arrays. The following is two examples to do the same thing, one using the ``Circuit`` class and the other manually using the matrices.
+**Using the `Circuit` class:**
 
-Using the ``Circuit`` class:
+```python
+from qudit import Circuit
+import numpy as np
 
-::
+k00 = np.array([1, 0, 0, 0])
+k00 = np.outer(k00, k00)  # |00⟩⟨00|
 
-    from qudit import Circuit
-    k00 = np.array([1, 0, 0, 0])
-    k00 = np.outer(k00, k00)  # |00⟩⟨00|
+C = Circuit(2, dim=2)  # 2 quDits with dim 2
+G = C.gates
 
-    C = Circuit(2, dim=2)  # 2 quDits with dim 2
-    G = C.gates
+C.gate(G.H, dits=[0])
+C.gate(G.CX, dits=[0, 1])
 
-    C.gate(G.H, dits=[0])
-    C.gate(G.CX, dits=[0, 1])
+U = C.solve()
+U @ k00 @ U.T  # Tr = 1
+```
 
-    U = C.solve()
-    U @ k00 @ U.T  # Tr = 1
+**Manual matrix version:**
 
-Manual matrix version:
+```python
+from qudit import Gategen, Basis
 
-::
+D = Gategen(2)
+Ket = Basis(2)
 
-    from qudit import Gategen, Basis
+k00 = Ket(0, 0).density()  # |00><00|
 
-    D = Gategen(2)
-    Ket = Basis(2)
+rho = D.CX @ (D.I ^ D.H)
 
-    k00 = Ket(0, 0).density()  # |00><00|
+rho @ k00 @ rho.H  # Tr = 1
+```
 
-    rho = D.CX @ (D.I ^ D.H)
+## Not Done
 
-    rho @ k00 @ rho.H  # Tr = 1
-
-Not Done
---------
-
-- Partial Trace
-- Gates: QFT
-- Noise: Kraus, Choi
-- States → Stabiliser
-- Discord
+* Partial Trace
+* Gates: QFT
+* Noise: Kraus, Choi
+* States → Stabiliser
+* Discord
