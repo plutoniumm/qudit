@@ -4,6 +4,7 @@ import numpy as np
 
 MD = la.multi_dot
 
+
 class Recovery:
     # Ak
     def leung(

@@ -6,20 +6,21 @@ from unittest import TestCase, main
 from qudit import Basis, State
 import numpy as np
 
-THETA, D, r = 1.5, 5, 2
+THETA, D, r = 0.75, 5, 2
 Bits, Trits = Basis(2), Basis(3)
 
 
 def Psi(i):
     A = Bits(0) ^ Trits(i)
     B = Bits(1) ^ Trits(i + 1)
-    return A * np.cos(THETA / 2) + B * np.sin(THETA / 2)
+    return A * np.cos(THETA) + B * np.sin(THETA)
 
 
 class Ranken(TestCase):
     def system(self, X):
-        qbit = State(X[1:5].reshape(2, 2).dot([1, 1j]))
-        qtrit = State(X[5:11].reshape(3, 2).dot([1, 1j]))
+        toCplx = np.array([1, 1j])
+        qbit = State(X[1:5].reshape(2, 2).dot(toCplx))
+        qtrit = State(X[5:11].reshape(3, 2).dot(toCplx))
         phi_rx = (X[0] * (qbit ^ qtrit)).norm()
 
         return Loss(phi_rx, self.perp)

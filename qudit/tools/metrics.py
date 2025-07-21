@@ -6,12 +6,6 @@ import numpy as np
 
 MD = LA.multi_dot
 
-def isSquare(i: Union[np.ndarray, List[np.ndarray]]):
-    if not isinstance(List):
-        return i.ndim == 2 and i.shape[0] == i.shape[1]
-    else:
-        return all([isSquare(j) for j in i])
-
 
 class Fidelity:
 
@@ -34,8 +28,6 @@ class Fidelity:
     def channel(
         kraus: List[Union[np.ndarray, List[float]]], rho: np.ndarray
     ) -> np.ndarray:
-        assert isSquare(kraus) and isSquare(rho), "Expected Square matrices"
-
         rho_out = np.zeros_like(rho, dtype=np.complex128)
         for K in kraus:
             rho_out += K @ rho @ K.conj().T
@@ -53,7 +45,9 @@ class Fidelity:
     #     return F_e
 
     @staticmethod
-    def entanglement(R_kraus: List[np.ndarray], E_kraus: List[np.ndarray], codes: List[np.ndarray]) -> float:
+    def entanglement(
+        R_kraus: List[np.ndarray], E_kraus: List[np.ndarray], codes: List[np.ndarray]
+    ) -> float:
         l = len(codes)
         R = np.eye(l)
 
@@ -231,6 +225,7 @@ class Info:
         S_AB = Entropy.default(rho_AB)
 
         return S_B - S_AB
+
 
 class Distance:
     @staticmethod

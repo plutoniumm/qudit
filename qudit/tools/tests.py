@@ -16,6 +16,7 @@ def PPT(rho: np.ndarray, sub: int) -> bool:
 
     return np.all(np.linalg.eigvals(mat0) >= 0)
 
+
 class Space:
     @staticmethod
     def gramSchmidt(vectors: np.ndarray) -> np.ndarray:
