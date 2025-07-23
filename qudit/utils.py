@@ -3,12 +3,7 @@ from sympy.physics.quantum.tensorproduct import TensorProduct
 from sympy import SparseMatrix as Matrix
 from .index import Gate, State, VarGate
 from typing import Union
-from uuid import uuid4
 import numpy as np
-
-
-def ID() -> str:
-    return str(uuid4()).split("-")[0]
 
 
 def isVar(*args) -> bool:

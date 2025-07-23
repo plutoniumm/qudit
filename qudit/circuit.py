@@ -2,7 +2,7 @@ from sympy import SparseMatrix as Matrix
 from scipy.sparse import csr_matrix
 from .index import Gate, VarGate
 from typing import List, Union
-from .utils import CTensor, ID
+from .utils import CTensor
 from .gates import Gategen
 import numpy as np
 import math as ma
@@ -17,7 +17,6 @@ class Layer:
     gates: List[Gate]
     gategen: Gategen
     span: int
-    id: str
     d: int
 
     def __init__(self, size: int, dim: int, gategen: Gategen):
@@ -25,7 +24,6 @@ class Layer:
         assert dim >= 0, f"Dimension must be int>=0, got: {dim}"
         assert isinstance(gategen, Gategen), f"Expected Gategen, got {type(gategen)}"
 
-        self.id = ID()
         self.span = size
         self.counter = list(range(size))
         self.gates = []
@@ -50,7 +48,6 @@ class Layer:
         gate.name = name
         gate.d = self.d
         gate.vqc = self.vqc
-        gate.id = ID()
         gate.dits = dits
 
         self.gates.append(gate)

@@ -2,7 +2,6 @@ from sympy import SparseMatrix as Matrix, zeros, eye, simplify
 from sympy.physics.quantum import TensorProduct
 from typing import List, Union
 import numpy.linalg as LA
-from uuid import uuid4
 import numpy as np
 import math as ma
 
@@ -11,11 +10,6 @@ import math as ma
   so B("111") will return State for |111>
   or B(1, 2, 0) will return State for |120>
 """
-
-
-def ID() -> str:
-    return str(uuid4()).split("-")[0]
-
 
 class Basis:
     d: int
@@ -122,9 +116,6 @@ class State(np.ndarray):
 
 class Gate(np.ndarray):
     dits: List[int]
-
-    id: str = ""
-
     name: str = ""
     vqc: bool
     span: int
@@ -143,7 +134,6 @@ class Gate(np.ndarray):
         obj.d = d
         obj.dits = dits
         obj.vqc = False
-        obj.id = ID()
         return obj
 
     @property
@@ -192,7 +182,6 @@ class VarGate(Matrix):
             if span != mat.span:
                 raise ValueError(f"Got span: {span}, expected span: {mat.span}")
 
-        mat.id = ID()
         return mat
 
     @property
