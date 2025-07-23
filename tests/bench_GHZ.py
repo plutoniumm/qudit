@@ -1,3 +1,4 @@
+
 import sys
 
 sys.path.append("..")
@@ -5,10 +6,10 @@ sys.path.append("..")
 from qudiet.core.quantum_circuit import QuantumCircuit as Qudietc
 from qudiet.core.backend.NumpyBackend import NumpyBackend
 from qutip_qip.operations import hadamard_transform, cnot
+from qiskit import QuantumCircuit as Qiskitc
 from qiskit.quantum_info import Operator
 from time import perf_counter as bench
 from qutip import basis, tensor, qeye
-from qiskit import QuantumCircuit as Qiskitc
 from qudit.circuit import Circuit
 import matplotlib.pyplot as plt
 import quforge.quforge as qf
@@ -24,7 +25,7 @@ custom_times = []
 qudiet_times = []
 quforge_times = []
 
-def bench_qudiet(n, repeats):
+def b_qudiet(n, repeats):
     qc = Qudietc(
         qregs=[2]*n,
         backend=NumpyBackend
@@ -39,7 +40,7 @@ def bench_qudiet(n, repeats):
         _ = qc.run()
     return (bench() - start) / repeats
 
-def bench_quforge(n, repeats):
+def b_quforge(n, repeats):
     circ = qf.Circuit(dim=2, wires=n)
     state = qf.State('0' + '-0' * (n-1), dim=2)
 
@@ -52,19 +53,23 @@ def bench_quforge(n, repeats):
         circ(state)
     return (bench() - start) / repeats
 
-def bench_custom(n, repeats):
-    C = Circuit(n, dim=2)
-    G = C.gates
-    C.gate(G.H, dits=[0])
-    for i in range(n - 1):
-        C.gate(G.CX, dits=[i, i + 1])
+def b_custom(n, repeats):
+    circuit = Circuit(n, dim=2, device='cpu')
+
+    circuit.gate("H", [0])
+    for i in range(n-1):
+        circuit.gate("CX", [i, i + 1])
+
+    state = np.zeros(2**n, dtype=np.complex64)
+    state[0] = 1  # |0...0>
+
     start = bench()
     for _ in range(repeats):
-        _ = C.run()
+            _ = circuit(state)
     return (bench() - start) / repeats
 
 
-def bench_qiskit(n, repeats):
+def b_qiskit(n, repeats):
     start = bench()
     for _ in range(repeats):
         qc = Qiskitc(n)
@@ -75,7 +80,7 @@ def bench_qiskit(n, repeats):
     return (bench() - start) / repeats
 
 
-def bench_cirq(n, repeats):
+def b_cirq(n, repeats):
     q = CQ.LineQubit.range(n)
     ops = [CQ.H(q[0])] + [CQ.CNOT(q[i], q[i + 1]) for i in range(n - 1)]
     circuit = CQ.Circuit(ops)
@@ -86,7 +91,7 @@ def bench_cirq(n, repeats):
     return (bench() - start) / repeats
 
 
-def bench_qutip(n, repeats):
+def b_qutip(n, repeats):
     ket0 = basis(2, 0)
     psi = tensor([ket0] * n)
     H = hadamard_transform(1)
@@ -103,26 +108,24 @@ def bench_qutip(n, repeats):
     return (bench() - start) / repeats
 
 
-n_range = range(2, 10)
+repeats = 2
+n_range = range(2, 13)
 for n in n_range:
     print(f"{n}/{len(n_range) + 2}")
-    repeats = 10
 
-    t_qiskit = ms * bench_qiskit(n, repeats)
+    t_qiskit = b_qiskit(n, repeats) * ms
     print(f"\tQiskit: {t_qiskit:.3f} ms")
-    t_cirq = ms * bench_cirq(n, repeats)
+    t_cirq = b_cirq(n, repeats) * ms
     print(f"\tCirq: {t_cirq:.3f} ms")
-    t_qutip = ms * bench_qutip(n, repeats)
+    t_qutip = b_qutip(n, repeats) * ms
     print(f"\tQuTiP: {t_qutip:.3f} ms")
-    t_custom = ms * bench_custom(n, repeats)
-    print(f"\tQudit: {t_custom:.3f} ms")
-    t_qudiet = ms * bench_qudiet(n, repeats)
-    print(f"\tQudiet: {t_qudiet:.3f} ms")
-    t_quforge = ms * bench_quforge(n, repeats)
-    print(f"\tQuForge: {t_quforge:.3f} ms")
 
-    tot = (t_custom + t_qiskit + t_cirq + t_qutip) / ms
-    print(f"\tTotal: {tot*repeats/60:.3f}")
+    t_qudiet = b_qudiet(n, repeats) * ms
+    print(f"\tQudiet: {t_qudiet:.3f} ms")
+    t_quforge = b_quforge(n, repeats) * ms
+    print(f"\tQuForge: {t_quforge:.3f} ms")
+    t_custom = b_custom(n, repeats) * ms
+    print(f"\tQudit: {t_custom:.3f} ms")
 
     custom_times.append(t_custom)
     qiskit_times.append(t_qiskit)

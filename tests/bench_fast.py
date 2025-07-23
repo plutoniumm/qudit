@@ -15,10 +15,10 @@ ms = 1e3
 
 def benchmark_custom(n):
     C = Circuit(n, dim=2)
-    G = C.gates
-    C.gate(G.H, dits=[0])
+
+    C.gate("H", dits=[0])
     for i in range(n - 1):
-        C.gate(G.CX, dits=[i, i + 1])
+        C.gate("CX", dits=[i, i + 1])
     start = bench()
     _ = C.run()
     return bench() - start
@@ -36,7 +36,7 @@ def benchmark_custom(n):
 
 # def benchmark_cirq(n):
 #     q = CQ.LineQubit.range(n)
-#     ops = [CQ.H(q[0])] + [CQ.CNOT(q[i], q[i + 1]) for i in range(n - 1)]
+#     ops = [CQ.H(q[0])] + [CQ.CX(q[i], q[i + 1]) for i in range(n - 1)]
 #     circuit = CQ.Circuit(ops)
 #     sim = CQ.Simulator()
 #     start = bench()
