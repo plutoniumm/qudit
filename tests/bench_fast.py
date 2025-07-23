@@ -20,7 +20,7 @@ def benchmark_custom(n):
     for i in range(n - 1):
         C.gate(G.CX, dits=[i, i + 1])
     start = bench()
-    _ = C.solve()
+    _ = C.run()
     return bench() - start
 
 

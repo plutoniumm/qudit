@@ -57,36 +57,37 @@ class Statiliser:
         self.num_states = 2 ** (self.sz - len(stabilisers))
         self.basis = None
 
-    def _fun(self, x, mode="real"):
+    def _fun(self, x, mode="real", minimal=1):
         vec = x if mode == "real" else self._to_complex(x)
         c1 = sum(np.linalg.norm((g @ vec) - vec) for g in self.stabilisers)
         # minimise ||x||_1 s.t. ||x||_2 = 1
         L1 = np.linalg.norm(vec, 1)
-        L2 = (1 - np.linalg.norm(vec, 2)) ** 2
+        L2 = 2 * (1 - np.linalg.norm(vec, 2)) ** 2
         # L1 = L2 = 0
 
-        return c1 + L1 + 2 * L2
+        return c1 + (L1 + L2) * minimal
 
     def _to_complex(self, vec):
         l = len(vec)
         return vec[: l // 2] + 1j * vec[l // 2 :]
 
-    def generate(self, mode="real"):
+    def generate(self, mode="real", tol=1e-6, minimal=True):
         basis = []
         factor = 2 if mode == "complex" else 1
+
         for _ in range(self.num_states):
             res = minimize(
                 self._fun,
                 x0=np.random.rand(2**self.sz * factor),
-                args=(mode,),
+                args=(mode, int(minimal)),
                 method="Powell",
-                tol=1e-6,
+                tol=tol
             ).x
             state = res / np.linalg.norm(res)
             basis.append(state)
 
         basis = np.array(GramSchmidt(basis))
-        basis = basis.round(4).astype(np.float16)
+        basis = basis.astype(np.float16)
         self.basis = basis
 
         return basis

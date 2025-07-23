@@ -18,10 +18,6 @@ def ungroup(lst: List[List[Error]]) -> List[Error]:
     return [item for sublist in lst for item in sublist]
 
 
-def unnull(lst: List[np.ndarray]) -> List[np.ndarray]:
-    return [matrix for matrix in lst if not np.all(np.isclose(matrix, 0, atol=1e-8))]
-
-
 class Process:
 
     @staticmethod
@@ -44,22 +40,23 @@ class Process:
                     raise ValueError(f"Unknown tag {tag} in error word {error_word}")
             return mkron(temp)
 
-        keys = ["a0", "a1", "r0", "r1"] * n
-        Ak = unnull([_op_gen(key) for key in permut(keys, n)])
+        keys = list(permut(["a0", "a1", "r0", "r1"] * n, n))
+        Ak = [_op_gen(key) for key in keys]
 
         Ek = [[] for _ in range((order + 1) * 2 - 1)]
-        for comb in permut(keys, n):
-            s = np.sum([int(Em[-1]) for Em in comb])
-            if s <= order:
-                op = _op_gen(comb)
-                op.correctable = True
+        for key in keys:
+            s = np.sum([int(Em[-1]) for Em in key])
+            if s <= order and not np.all(np.isclose(Ak[keys.index(key)], 0, atol=1e-8)):
 
-                if any("r" in i and int(i[-1]) > 0 for i in comb):
-                    Ek[2 * s - 1].append(op)
+                if any("r" in i and int(i[-1]) > 0 for i in key):
+                    Ek[2 * s - 1].append(keys.index(key))
                 else:
-                    Ek[2 * s - 0].append(op)
+                    Ek[2 * s - 0].append(keys.index(key))
 
-        return Channel(Ak if group else ungroup(Ak))
+        op_ch = Channel(Ak)
+        op_ch.correctables = Ek if group else ungroup(Ek)
+
+        return op_ch
 
     @staticmethod
     def AD(d: int, n: int, Y: float, order: int = 1, group: bool = False) -> Channel:
@@ -70,16 +67,19 @@ class Process:
             individual = [GAD.A(int(tag[-1]), d, Y) for tag in error_word]
             return mkron(individual)
 
-        keys = ["a0", "a1"] * n
-        Ak = unnull([_op_gen(key) for key in permut(keys, n)])
+        keys = list(permut(["a0", "a1"] * n, n))
+        Ak = [_op_gen(key) for key in keys]
 
-        for comb in permut(keys, n):
-            s = np.sum([int(Em[-1]) for Em in comb])
-            if s <= order:
-                op = _op_gen(comb)
-                op.correctable = True
+        Ek = [[] for _ in range(order + 1)]
+        for key in keys:
+            s = np.sum([int(Em[-1]) for Em in key])
+            if s <= order and not np.all(np.isclose(Ak[keys.index(key)], 0, atol=1e-8)):
+                Ek[s].append(keys.index(key))
 
-        return Channel(Ak if group else ungroup(Ak))
+        op_ch = Channel(Ak)
+        op_ch.correctables = Ek if group else ungroup(Ek)
+
+        return op_ch
 
     @staticmethod
     def Pauli(
@@ -100,14 +100,16 @@ class Process:
         def _op_gen(word) -> Error:
             return mkron([funcs[gate](p) for gate in word])
 
-        keys = (["I"] + paulis) * n
-        combos = permut(keys, n)
+        keys = permut((["I"] + paulis) * n, n)
+        Ak = [_op_gen(key) for key in keys]
 
-        Ak = unnull([_op_gen(word) for word in combos])
+        Ek = [[] for _ in range(order + 1)]
+        for key in keys:
+            s = np.sum([weight[i] for i in key])
+            if s <= order and not np.all(np.isclose(Ak[keys.index(key)], 0, atol=1e-8)):
+                Ek[s].append(keys.index(key))
 
-        for word in combos:
-            if sum(weight[g] for g in word) <= order:
-                op = _op_gen(word)
-                op.correctable = True
+        op_ch = Channel(Ak)
+        op_ch.correctables = Ek if group else ungroup(Ek)
 
-        return Channel(Ak if group else ungroup(Ak))
+        return op_ch

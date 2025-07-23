@@ -27,15 +27,21 @@ class Error(Gate):
         return f"{self.name}({self.params})"
 
 
+def unnull(lst: List[np.ndarray]) -> List[np.ndarray]:
+    return [matrix for matrix in lst if not np.all(np.isclose(matrix, 0, atol=1e-8))]
+
+
 class Channel:
+    correctables: list[Union[int, list[int]]] = []
     ops: list[Error]
     d: int
 
     def __init__(self, ops: list[Error]):
         assert isinstance(ops, list) and len(ops) > 0, "ops must be List[ops]"
 
-        self.ops = ops
+        self.ops = unnull(ops)
         self.d = ops[0].d if isinstance(ops[0], Error) else ops[0].shape[0]
+        self.correctables = []
 
     def run(self, rho: Union[State, np.ndarray]) -> np.ndarray:
         result = [O @ rho @ O.conj().T for O in self.ops]
@@ -43,9 +49,20 @@ class Channel:
         return np.sum(result, axis=0)
 
     def correctable(self):
-        print(type(self.ops[0]))
-        print(self.ops[0].correctable)
-        return [O for O in self.ops if O.correctable]
+        if len(self.correctables) == 0:
+            return []
+        c0 = self.correctables[0]
+
+        if isinstance(c0, int):
+            return [self.ops[i] for i in self.correctables]
+
+        if isinstance(c0, list):
+            Ek = []
+            for set in self.correctables:
+                Ek.append([self.ops[i] for i in set])
+            return Ek
+
+        return Exception("Please don't change correctables")
 
     def __getitem__(self, key: Union[int, slice]) -> Union[Error, list[Error]]:
         return self.ops[key]

@@ -17,8 +17,8 @@ def mirror(n):
     C2.gate(G.H, dits=[1])
     SWAP = G.SWAP
 
-    C1 = C1.solve()
-    C2 = C2.solve()
+    C1 = C1.run()
+    C2 = C2.run()
 
     C1 = SWAP @ C1 @ SWAP.T
 
@@ -36,7 +36,7 @@ class Circuits(TestCase):
         C.gate(G.H, dits=[0])
         C.gate(G.CX, dits=[0, 1])
 
-        U = C.solve()
+        U = C.run()
         self.assertTrue(np.allclose(U, HCX, atol=1e-4))
 
     def test_mirror(self):
@@ -45,4 +45,13 @@ class Circuits(TestCase):
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    HCX = np.array(
+        [[1, 1, 0, 0], [0, 0, 1, -1], [0, 0, 1, 1], [1, -1, 0, 0]]
+    ) / np.sqrt(2)
+
+    C = Circuit(2, dim=2)
+    G = C.gates
+    C.gate(G.H, dits=[0])
+    C.gate(G.CX, dits=[0, 1])
+    print(C)

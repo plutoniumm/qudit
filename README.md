@@ -29,7 +29,7 @@ G = C.gates
 C.gate(G.H, dits=[0])
 C.gate(G.CX, dits=[0, 1])
 
-U = C.solve()
+U = C.run()
 U @ k00 @ U.T  # Tr = 1
 ```
 

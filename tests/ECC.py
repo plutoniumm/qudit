@@ -1,37 +1,40 @@
 import sys
+import unittest
+import numpy as np
+from numpy import linalg as LA
 
 sys.path.append("..")
 from unittest import TestCase, main
-from qudit.noise import Recovery, Channel, Process
+from qudit.noise import Recovery, Process
 from qudit.tools import Fidelity
-from numpy import linalg as LA
-import numpy as np
-
-Y = 0.02
 
 
-def _leung():
-    leung_0 = np.zeros(16)
-    leung_1 = np.zeros(16)
+class QEC(unittest.TestCase):
+    def setUp(self):
+        self.code = np.array(
+            [
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0],
+                [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0.0],
+            ],
+            dtype=np.complex64,
+        )
+        self.code /= LA.norm(self.code, axis=1)[:, None]
+        self.ops = Process.GAD(2, 4, Y=0.01, p=0.001)
 
-    leung_0[0] = 1
-    leung_0[-1] = 1
-    leung_1[3] = 1
-    leung_1[12] = 1
+    def test_petz_recovery(self):
+        rec = Recovery.petz(self.ops, self.code)
+        fid = Fidelity.entanglement(rec, self.ops, self.code)
 
-    return np.array(
-        [leung_0 / np.linalg.norm(leung_0), leung_1 / np.linalg.norm(leung_1)]
-    )
+        self.assertAlmostEqual(fid, 0.98, places=2)
+
+    def test_leung_recovery(self):
+        Ek = self.ops.correctable()
+
+        rec = Recovery.leung(Ek, self.code)
+        fid = Fidelity.entanglement(rec, self.ops, self.code)
+
+        self.assertAlmostEqual(fid, 0.91, places=2)
 
 
-code = _leung()
-
-Ak = Process.GAD(2, 4, Y=Y, p=0.01)
-Ek = Ak.correctable()
-
-print(Ak)
-print(Ek)
-Rks = Recovery.petz(Ak, code)
-
-fid = Fidelity.entanglement(Rks, Ak, code)
-print("Fidelity:", fid)
+if __name__ == "__main__":
+    unittest.main()

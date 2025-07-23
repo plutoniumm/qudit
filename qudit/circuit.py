@@ -163,24 +163,24 @@ class Circuit:
         layer.add(gate, dits)
         return self
 
-    def _solve_var(self) -> np.ndarray:
+    def _run_var(self) -> np.ndarray:
         for i in range(len(self.layers)):
             self.layers[i].data = Matrix(self.layers[i].data)
 
-    def _solve_def(self) -> np.ndarray:
+    def _run_def(self) -> np.ndarray:
         for i in range(len(self.layers)):
             self.layers[i].data = csr_matrix(self.layers[i].data)
 
-    def solve(self) -> np.ndarray:
+    def run(self) -> np.ndarray:
         self.vqc = any(layer.vqc for layer in self.layers)
         for layer in self.layers:
             if not hasattr(layer, "data"):
                 layer.finalise()
 
         if self.vqc:
-            self._solve_var()
+            self._run_var()
         else:
-            self._solve_def()
+            self._run_def()
 
         prod = self.layers[0].data
         for m in self.layers[1:]:

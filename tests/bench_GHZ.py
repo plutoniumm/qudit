@@ -28,7 +28,7 @@ def benchmark_custom(n, repeats):
         C.gate(G.CX, dits=[i, i + 1])
     start = bench()
     for _ in range(repeats):
-        _ = C.solve()
+        _ = C.run()
     return (bench() - start) / repeats
 
 
