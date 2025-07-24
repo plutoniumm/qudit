@@ -11,6 +11,7 @@ import math as ma
   or B(1, 2, 0) will return State for |120>
 """
 
+
 class Basis:
     d: int
     span: int = -1

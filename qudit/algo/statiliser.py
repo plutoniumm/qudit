@@ -81,7 +81,7 @@ class Statiliser:
                 x0=np.random.rand(2**self.sz * factor),
                 args=(mode, int(minimal)),
                 method="Powell",
-                tol=tol
+                tol=tol,
             ).x
             state = res / np.linalg.norm(res)
             basis.append(state)

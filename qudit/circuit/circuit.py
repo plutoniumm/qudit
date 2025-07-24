@@ -1,5 +1,6 @@
-from torch import nn, tensor, complex64 as C64, Tensor
+from torch import nn, tensor, complex64 as Cplx, Tensor, from_numpy
 from . import gates as GG
+
 # import gates as GG
 import numpy as np
 
@@ -14,15 +15,19 @@ class Circuit(nn.Module):
         self.circuit = nn.Sequential()
         self.gates = GG.Gategen(dim=dim, device=device)
 
+    def make(self, *args, **kwargs):
+        return self.gates.make(*args, **kwargs)
+
     def gate(self, gate_or_name, indices, **kwargs):
         pos = str(len(self.circuit))
 
         if isinstance(gate_or_name, Tensor):
-            if hasattr(gate_or_name, 'name'):
+            if hasattr(gate_or_name, "name"):
                 name = gate_or_name.name
             else:
                 name = None
 
+            gate_or_name = gate_or_name.to_sparse_coo()
             gate_or_name = self.gates.make(gate_or_name, name)
 
         if callable(gate_or_name):
@@ -53,14 +58,17 @@ class Circuit(nn.Module):
             gate_instance.device = self.device
             gate_instance.index = indices
         else:
-            raise ValueError(
-                f"Unsupported gate type: {type(gate_or_name)}. "
-            )
+            raise ValueError(f"Unsupported gate type: {type(gate_or_name)}. ")
 
         self.circuit.add_module(pos, gate_instance)
 
     def forward(self, x):
-        if isinstance(x, (list, np.ndarray)):
-            x = tensor(x, dtype=C64, device=self.device)
+        if isinstance(x, Tensor):
+            return self.circuit(x)
+
+        if isinstance(x, np.ndarray):
+            x = from_numpy(x).to(dtype=Cplx, device=self.device)
+        else:
+            x = tensor(x, dtype=Cplx, device=self.device)
 
         return self.circuit(x)

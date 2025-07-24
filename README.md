@@ -2,6 +2,8 @@
 
 # Qudit
 
+<!-- 147 -->
+
 Sparse Matrix simulations for qudit systems. To make qudit machine learning, qudit error correction, and qudit circuit simulation easier. Qudit is made fully around `numpy` and `scipy` to make it easy to mix and match tools without worrying about type errors.
 
 [![PyPI version](https://badge.fury.io/py/qudit.svg)](https://pypi.org/project/qudit/)
