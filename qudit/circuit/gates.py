@@ -6,10 +6,20 @@ import torch
 
 Cplx = torch.complex64
 
-def dec2den(dec, dits, dims):
+def tensorise(m, device="cpu", dtype=Cplx):
+    if isinstance(m, torch.Tensor):
+        return m
+    elif isinstance(m, np.ndarray):
+        return torch.from_numpy(m).to(device).type(dtype)
+    elif isinstance(m, list):
+        return torch.tensor(m, device=device, dtype=dtype)
+    else:
+        raise TypeError(f"Unsupported type for tensorisation: {type(m)}. Expected Tensor, ndarray, or list.")
+
+def dec2den(dec, wires, dims):
     den = []
     temp_dec = dec
-    for i in range(dits - 1, -1, -1):
+    for i in range(wires - 1, -1, -1):
         den.insert(0, temp_dec % dims[i])
         temp_dec //= dims[i]
     return den
@@ -23,15 +33,15 @@ def den2dec(den, dims):
     return dec
 
 
-def CX_sparse(ctrl_index, targ_idx, dim, dits, device):
-    if isinstance(dim, int) and dits > 1:
-        dim = [dim] * dits
+def CX_sparse(ctrl_index, targ_idx, dim, wires, device):
+    if isinstance(dim, int) and wires > 1:
+        dim = [dim] * wires
 
     total_dim = int(np.prod(dim))
     U = torch.eye(total_dim, dtype=Cplx, device=device)
-    dimlist = [dim] * dits if isinstance(dim, int) else dim
+    dimlist = [dim] * wires if isinstance(dim, int) else dim
     for i in range(total_dim):
-        state_n = dec2den(i, dits, dimlist)
+        state_n = dec2den(i, wires, dimlist)
 
         if state_n[ctrl_index] == dimlist[ctrl_index] - 1:
             target = state_n[targ_idx]
@@ -45,13 +55,13 @@ def CX_sparse(ctrl_index, targ_idx, dim, dits, device):
 
 
 class BaseGate(nn.Module):
-    def __init__(self, dim=2, index=[0], dits=1, inverse=False, device="cpu"):
+    def __init__(self, dim=2, index=[0], wires=1, inverse=False, device="cpu"):
         super().__init__()
         self.index = index
         self.device = device
         self.inverse = inverse
-        self.dits = dits
-        self.dims = [dim] * dits if isinstance(dim, int) else dim
+        self.wires = wires
+        self.dims = [dim] * wires if isinstance(dim, int) else dim
         self.total_dim = int(np.prod(self.dims))
         self.omega = torch.tensor(np.exp(2 * 1j * np.pi / dim), dtype=Cplx, device=device) if isinstance(dim, int) else None
 
@@ -87,8 +97,8 @@ class BaseGate(nn.Module):
 
 
 class SingleDitGate(BaseGate):
-    def __init__(self, dim=2, index=[0], dits=1, inverse=False, device="cpu", **kwargs):
-        super().__init__(dim, index, dits, inverse, device)
+    def __init__(self, dim=2, index=[0], wires=1, inverse=False, device="cpu", **kwargs):
+        super().__init__(dim, index, wires, inverse, device)
         self.M_dict = self._getMat(**kwargs)
 
     def _getMat(self, **kwargs):
@@ -99,7 +109,7 @@ class SingleDitGate(BaseGate):
         return U @ x
 
     def matrix(self):
-        L = self.dits
+        L = self.wires
         U = self._eye(1)
         for i in range(L):
             if i in self.index:
@@ -158,14 +168,14 @@ class Y(SingleDitGate):
         x_gate = X(
             dim=self.dims[0] if len(set(self.dims)) == 1 else self.dims,
             index=self.index,
-            dits=self.dits,
+            wires=self.wires,
             device=self.device,
             s=s,
         )
         z_gate = Z(
             dim=self.dims[0] if len(set(self.dims)) == 1 else self.dims,
             index=self.index,
-            dits=self.dits,
+            wires=self.wires,
             device=self.device,
             s=s,
         )
@@ -176,19 +186,21 @@ class Y(SingleDitGate):
 
 
 class ParametrizedRotation(BaseGate):
-    def __init__(self, j=0, k=1, index=[0], dim=2, dits=1, device="cpu", angle=None):
-        super().__init__(dim, index, dits, False, device)
+    def __init__(self, j=0, k=1, index=[0], dim=2, wires=1, device="cpu", angle=None):
+        super().__init__(dim, index, wires, False, device)
         assert angle is not None, "angle parameter is required and cannot be None"
+
         self.j_map = self._build_level_map(j)
         self.k_map = self._build_level_map(k) if k is not None else None
+
         if isinstance(angle, torch.Tensor):
             self.angle = angle
         else:
             self.angle = torch.tensor(angle, device=device, dtype=torch.float32)
         if self.angle.numel() == 1:
-            self.angle = self.angle.expand(self.dits)
-        elif self.angle.numel() != self.dits:
-            raise ValueError(f"Angle must have {self.dits} elements or be a scalar")
+            self.angle = self.angle.expand(self.wires)
+        elif self.angle.numel() != self.wires:
+            raise ValueError(f"Expected {self.wires} angles, got {self.angle.numel()}", self.angle)
 
     def _build_level_map(self, levels):
         if isinstance(levels, int):
@@ -214,8 +226,8 @@ class ParametrizedRotation(BaseGate):
 
 
 class RX(ParametrizedRotation):
-    def __init__(self, index=[0], dim=2, dits=1, device="cpu", angle=None):
-        super().__init__(0, 1, index, dim, dits, device, angle)
+    def __init__(self, index=[0], dim=2, wires=1, device="cpu", angle=None):
+        super().__init__(0, 1, index, dim, wires, device, angle)
 
     def _getRMat(self, d, j_val, k_val, angle_val):
         M = self._eye(d)
@@ -229,8 +241,8 @@ class RX(ParametrizedRotation):
 
 
 class RY(ParametrizedRotation):
-    def __init__(self, index=[0], dim=2, dits=1, device="cpu", angle=None):
-        super().__init__(0, 1, index, dim, dits, device, angle)
+    def __init__(self, index=[0], dim=2, wires=1, device="cpu", angle=None):
+        super().__init__(0, 1, index, dim, wires, device, angle)
 
     def _getRMat(self, d, j_val, k_val, angle_val):
         M = self._eye(d)
@@ -244,8 +256,8 @@ class RY(ParametrizedRotation):
 
 
 class RZ(ParametrizedRotation):
-    def __init__(self, j=1, index=[0], dim=2, dits=1, device="cpu", angle=None):
-        super().__init__(j, None, index, dim, dits, device, angle)
+    def __init__(self, j=1, index=[0], dim=2, wires=1, device="cpu", angle=None):
+        super().__init__(j, None, index, dim, wires, device, angle)
 
     def _getRMat(self, d, j_val, k_val, angle_val):
         if d == 2:
@@ -308,9 +320,9 @@ def dGellMann(d):
 
 
 class GMR(ParametrizedRotation):
-    def __init__(self, j, k, index=[0], dim=2, dits=1, device="cpu", angle=None):
+    def __init__(self, j, k, index=[0], dim=2, wires=1, device="cpu", angle=None):
         super().__init__(
-            j=j, k=k, index=index, dim=dim, dits=dits, device=device, angle=angle
+            j=j, k=k, index=index, dim=dim, wires=wires, device=device, angle=angle
         )
 
     def _getRMat(self, d, j_val, k_val, angle_val):
@@ -325,130 +337,15 @@ class GMR(ParametrizedRotation):
         M[k_val, j_val] = -1j * s * gm_tensor[k_val, j_val]
         return M
 
-
-class TwoQuditGate(BaseGate):
-    def __init__(self, index=[0, 1], dits=2, dim=2, device="cpu", inverse=False):
-        super().__init__(dim, index, dits, inverse, device)
-        self.U = self._makeMat()
-
-    def forward(self, x):
-        return self.U @ x
-
-    def matrix(self):
-        return self.U
-
-
-class CX(TwoQuditGate):
-    def _makeMat(self):
-        U = CX_sparse(
-            self.index[0],
-            self.index[1],
-            self.dims[0] if len(set(self.dims)) == 1 else self.dims,
-            self.dits,
-            device=self.device,
-        )
-        return self._apply_inverse(U)
-
-
-class CZ(TwoQuditGate):
-    def _makeMat(self):
-        D = self.total_dim
-        U = torch.zeros((D, D), device=self.device, dtype=Cplx)
-        ctrl_dim = self.dims[self.index[0]]
-        for c_val in range(ctrl_dim):
-            u = torch.eye(1, device=self.device, dtype=Cplx)
-            for i in range(self.dits):
-                if i == self.index[0]:
-                    dim = self.dims[i]
-                    P = torch.zeros((dim, dim), dtype=Cplx, device=self.device)
-                    P[c_val, c_val] = 1.0
-                    u = torch.kron(u, P)
-                elif i == self.index[1]:
-                    M = Z(dim=self.dims[i], device=self.device, s=c_val).matrix()
-                    u = torch.kron(u, M)
-                else:
-                    u = torch.kron(u, self._eye(self.dims[i]))
-            U += u
-        return U
-
-
-class SWAP(TwoQuditGate):
-    def _makeMat(self):
-        c, t = self.index[0], self.index[1]
-        D = self.total_dim
-        U = torch.zeros((D, D), device=self.device, dtype=Cplx)
-        for k in range(D):
-            localr = dec2den(k, self.dits, self.dims)
-            locall = localr.copy()
-            locall[c], locall[t] = localr[t], localr[c]
-            globall = den2dec(locall, self.dims)
-            U[globall, k] = 1
-        return U
-
-
-class MultictrlGate(BaseGate):
-    def __init__(self, index=[0, 1, 2], dim=2, dits=3, inverse=False, device="cpu"):
-        super().__init__(dim, index, dits, inverse, device)
-        self.U = self._build_multi_ctrl_matrix()
-
-    def forward(self, x):
-        return self.U @ x
-
-    def matrix(self):
-        return self.U
-
-
-class CCX(MultictrlGate):
-    def _build_multi_ctrl_matrix(self):
-        D = self.total_dim
-        basis = torch.tensor(list(product(*[range(d) for d in self.dims]))).to(
-            self.device
-        )
-        basis_modified = basis.clone()
-        target_dim = self.dims[self.index[2]]
-        basis_modified[:, self.index[2]] = (
-            basis[:, self.index[0]] * basis[:, self.index[1]] + basis[:, self.index[2]]
-        ) % target_dim
-        eq_matrix = torch.all(basis[:, None, :] == basis_modified[None, :, :], dim=2)
-        U = torch.where(
-            eq_matrix,
-            torch.tensor(1.0 + 0j, dtype=Cplx, device=self.device),
-            torch.tensor(0.0, dtype=Cplx, device=self.device),
-        )
-        return self._apply_inverse(U)
-
-
-class MCX(MultictrlGate):
-    def _build_multi_ctrl_matrix(self):
-        basis = torch.tensor(list(product(*[range(d) for d in self.dims]))).to(
-            self.device
-        )
-        basis_modified = basis.clone()
-        ctrl_value = 1
-        for i in range(len(self.index) - 1):
-            ctrl_value *= basis_modified[:, self.index[i]]
-        target_dim = self.dims[self.index[-1]]
-        basis_modified[:, self.index[-1]] = (
-            ctrl_value + basis_modified[:, self.index[-1]]
-        ) % target_dim
-        eq_matrix = torch.all(basis[:, None, :] == basis_modified[None, :, :], dim=2)
-        U = torch.where(
-            eq_matrix,
-            torch.tensor(1.0 + 0j, dtype=Cplx, device=self.device),
-            torch.tensor(0.0, dtype=Cplx, device=self.device),
-        )
-        return self._apply_inverse(U)
-
-
 class U(BaseGate):
-    def __init__(self, matrix, dim=2, dits=1, device="cpu", index=None):
+    def __init__(self, matrix, dim=2, wires=1, device="cpu", index=None):
         assert matrix is not None, "matrix parameter is required"
-        index = index or list(range(dits))
-        super().__init__(dim, index, dits, False, device)
+        index = index or list(range(wires))
+        super().__init__(dim, index, wires, False, device)
         self.indices = sorted(index)
         if isinstance(dim, int):
-            self.dims_ = [dim] * dits
-        elif isinstance(dim, list) and len(dim) == dits:
+            self.dims_ = [dim] * wires
+        elif isinstance(dim, list) and len(dim) == wires:
             self.dims_ = dim
         else:
             raise ValueError(
@@ -456,7 +353,7 @@ class U(BaseGate):
             )
         self.sub_dim = int(np.prod([self.dims_[i] for i in self.indices]))
         self.total_dim = int(np.prod(self.dims_))
-        self.perm = self.indices + [i for i in range(dits) if i not in self.indices]
+        self.perm = self.indices + [i for i in range(wires) if i not in self.indices]
         self.inv_perm = np.argsort(self.perm)
         self.shape_perm = [self.dims_[i] for i in self.perm]
         self.M = (
@@ -483,140 +380,457 @@ class U(BaseGate):
         return x
 
 
-class CU(BaseGate):
-    def __init__(
-        self, dim=2, dits=2, device="cpu", index=[0, 1], matrix=None, ctrl_dim=None
-    ):
-        if index is None or len(index) < 2:
-            raise ValueError(
-                "Index must have at least two elements: [ctrl, target(s)]"
-            )
-        assert matrix is not None, "matrix parameter is required and cannot be None"
-        super().__init__(dim, index, dits, False, device)
-        self.ctrl_index = index[0]
-        self.targ_idx = index[1:]
-        self.d_ctrl = self.dims[self.ctrl_index]
-        self.d_target = int(np.prod([self.dims[i] for i in self.targ_idx]))
-        self.sub_dim = self.d_ctrl * self.d_target
+def T(dim=2, index=[0], wires=1, device="cpu"):
+    gate = BaseGate(dim, index, wires, device=device)
 
-        if ctrl_dim is None:
-            self.ctrl_dim = [1] if self.d_ctrl == 2 else [self.d_ctrl - 1]
-        elif isinstance(ctrl_dim, int):
-            self.ctrl_dim = [ctrl_dim]
-        else:
-            self.ctrl_dim = list(ctrl_dim)
+    omega = torch.tensor(np.exp(2 * 1j * np.pi / (dim * 4)), dtype=Cplx, device=device)
+    matrix = torch.diag(torch.tensor([omega**j for j in range(dim)], dtype=Cplx, device=device))
+    return U(matrix=matrix, dim=dim, wires=wires, device=device, index=index)
 
-        for ctrl_state in self.ctrl_dim:
-            if ctrl_state < 0 or ctrl_state >= self.d_ctrl:
-                raise ValueError(
-                    f"ctrl state {ctrl_state} out of range [0, {self.d_ctrl-1}]"
-                )
 
-        self.custom_blocks = self._process_matrix_input(matrix)
+def S(dim=2, index=[0], wires=1, device="cpu"):
+    gate = BaseGate(dim, index, wires, device=device)
 
-    def _process_matrix_input(self, matrix):
-        custom_blocks = {}
-        if isinstance(matrix, list):
-            if len(matrix) != len(self.ctrl_dim):
-                raise ValueError("Matrix list length must equal ctrl_dim length")
-            for i, ctrl_state in enumerate(self.ctrl_dim):
-                if isinstance(matrix[i], torch.Tensor):
-                    M = matrix[i]
-                else:
-                    M = torch.tensor(matrix[i], device=self.device, dtype=Cplx)
-                if M.shape != (self.d_target, self.d_target):
-                    raise ValueError(
-                        f"Matrix {i} shape must be ({self.d_target}, {self.d_target})"
-                    )
-                custom_blocks[ctrl_state] = M
-        elif isinstance(matrix, torch.Tensor):
-            if matrix.ndim == 3:
-                if matrix.shape[0] != len(self.ctrl_dim):
-                    raise ValueError(
-                        "3D tensor first dimension must equal ctrl_dim length"
-                    )
-                for i, ctrl_state in enumerate(self.ctrl_dim):
-                    block = matrix[i]
-                    if block.shape != (self.d_target, self.d_target):
-                        raise ValueError(
-                            f"Block {i} shape must be ({self.d_target}, {self.d_target})"
-                        )
-                    custom_blocks[ctrl_state] = block
-            elif matrix.ndim == 2:
-                expected = len(self.ctrl_dim) * self.d_target
-                if matrix.shape != (expected, expected):
-                    raise ValueError(
-                        f"2D tensor shape must be ({expected}, {expected})"
-                    )
-                reshaped = matrix.view(
-                    len(self.ctrl_dim), self.d_target, self.d_target
-                )
-                for i, ctrl_state in enumerate(self.ctrl_dim):
-                    custom_blocks[ctrl_state] = reshaped[i]
-            else:
-                raise ValueError("Matrix tensor must be 2D or 3D")
-        else:
-            raise ValueError("Matrix must be list or torch.Tensor")
-        return custom_blocks
+    omega = torch.tensor(np.exp(2 * 1j * np.pi / (dim * 2)), dtype=Cplx, device=device)
+    matrix = torch.diag(torch.tensor([omega**j for j in range(dim)], dtype=Cplx, device=device))
+    return U(matrix=matrix, dim=dim, wires=wires, device=device, index=index)
 
-    def _get_ctrl_blocks(self):
-        blocks = []
-        for k in range(self.d_ctrl):
-            if k in self.ctrl_dim:
-                U_k = self.custom_blocks[k]
-            else:
-                U_k = self._eye(self.d_target)
-            blocks.append(U_k)
-        return blocks
+
+def P(theta, dim=2, index=[0], wires=1, device="cpu"):
+    phases = [np.exp(1j * theta * j / (dim - 1)) for j in range(dim)]
+    matrix = torch.diag(torch.tensor(phases, dtype=Cplx, device=device))
+    return U(matrix=matrix, dim=dim, wires=wires, device=device, index=index)
+
+class CX(BaseGate):
+    """
+    Controlled-NOT (CNOT) gate for qudits.
+    Applies an X gate to the target qudit if the control qudit is in state '1' (or the last state for d > 2).
+    """
+    def __init__(self, index=[0, 1], wires=2, dim=2, device="cpu", sparse=False, inverse=False):
+        super().__init__(dim, index, wires, inverse, device)
+        if len(self.index) != 2:
+            raise ValueError("CNOT gate requires exactly two indices: [control, target].")
+        self.control_idx = self.index[0]
+        self.target_idx = self.index[1]
+        self.sparse = sparse
+        self.U = self._build_cnot_matrix()
+        self.register_buffer("U_matrix", self._apply_inverse(self.U))
+
+    def _build_cnot_matrix(self):
+        if self.sparse:
+            # Placeholder for sparse CNOT. This would typically call a sparse construction function.
+            # For this refactoring, we'll assume dense for now unless a concrete aux.CNOT_sparse is provided.
+            raise NotImplementedError("Sparse CNOT not implemented in this refactor.")
+
+        L = torch.tensor(list(product(*[range(d) for d in self.dims]))).to(self.device)
+        l2ns = L.clone()
+        d_target = self.dims[self.target_idx]
+
+        l2ns[:, self.target_idx] = (L[:, self.control_idx] + L[:, self.target_idx]) % d_target
+
+        indices_mask = torch.all(L[:, None, :] == l2ns[None, :, :], dim=2)
+        U = torch.where(
+            indices_mask,
+            torch.tensor(1.0 + 0j, dtype=Cplx, device=self.device),
+            torch.tensor(0.0, dtype=Cplx, device=self.device),
+        )
+        return U
 
     def forward(self, x):
-        remaining = [i for i in range(self.dits) if i not in self.index]
-        new_order = self.index + remaining
-        inv_order = [new_order.index(i) for i in range(self.dits)]
+        return self.U_matrix @ x
+
+    def matrix(self):
+        return self.U_matrix
+
+
+class CZ(BaseGate):
+    def __init__(self, index=[0, 1], dim=2, wires=2, device="cpu"):
+        super().__init__(dim, index, wires, False, device) # CZ is its own inverse for standard qubits
+        if len(self.index) != 2:
+            raise ValueError("CZ gate requires exactly two indices: [control, target].")
+        self.control_idx = self.index[0]
+        self.target_idx = self.index[1]
+        self.U = self._build_cz_matrix()
+        self.register_buffer("U_matrix", self.U)
+
+    def _build_cz_matrix(self):
+        U = torch.zeros((self.total_dim, self.total_dim), device=self.device, dtype=Cplx)
+        control_dim = self.dims[self.control_idx]
+
+        for c_val in range(control_dim):
+            # Identity matrix for the current "block" of states
+            u_block = self._eye(1)
+            for i in range(self.wires):
+                if i == self.control_idx:
+                    proj_vec = base(self.dims[i], device=self.device)[c_val]
+                    P = proj_vec @ proj_vec.T.conj()
+                    u_block = torch.kron(u_block, P)
+                elif i == self.target_idx:
+                    M = Z(dim=self.dims[i], device=self.device, s=c_val).matrix()
+                    u_block = torch.kron(u_block, M)
+                else:
+                    u_block = torch.kron(u_block, self._eye(self.dims[i]))
+            U += u_block
+        return U
+
+    def forward(self, x):
+        return self.U_matrix @ x
+
+    def matrix(self):
+        return self.U_matrix
+
+
+class SWAP(BaseGate):
+    """
+    SWAP gate for qudits.
+    Exchanges the states of two qudits.
+    """
+    def __init__(self, index=[0, 1], dim=2, wires=2, device="cpu"):
+        super().__init__(dim, index, wires, False, device) # SWAP is its own inverse
+        if len(self.index) != 2:
+            raise ValueError("SWAP gate requires exactly two indices: [qudit1, qudit2].")
+        self.q1_idx = self.index[0]
+        self.q2_idx = self.index[1]
+        self.U = self._build_swap_matrix()
+        self.register_buffer("U_matrix", self.U)
+
+    def _build_swap_matrix(self):
+        U = torch.zeros((self.total_dim, self.total_dim), device=self.device, dtype=Cplx)
+        for k in range(self.total_dim):
+            # Convert decimal index k to its denary representation (localr)
+            localr = dec2den(k, self.wires, self.dims)
+            locall = list(localr) # Create a mutable copy
+
+            # Swap the values at the specified indices
+            locall[self.q1_idx], locall[self.q2_idx] = localr[self.q2_idx], localr[self.q1_idx]
+
+            # Convert the swapped denary representation back to a decimal index (globall)
+            globall = den2dec(locall, self.dims)
+
+            # Set the corresponding matrix element to 1
+            U[globall, k] = 1
+        return U
+
+    def forward(self, x):
+        return self.U_matrix @ x
+
+    def matrix(self):
+        return self.U_matrix
+
+
+class CCX(BaseGate):
+    """
+    Controlled-Controlled-NOT (CCNOT) or Toffoli gate for qudits.
+    Applies an X gate to the target qudit if both control qudits are in state '1'
+    (or the last state for d > 2).
+    """
+    def __init__(self, index=[0, 1, 2], dim=2, wires=3, inverse=False, device="cpu"):
+        super().__init__(dim, index, wires, inverse, device)
+        if len(self.index) != 3:
+            raise ValueError("CCNOT gate requires exactly three indices: [control1, control2, target].")
+        self.control1_idx = self.index[0]
+        self.control2_idx = self.index[1]
+        self.target_idx = self.index[2]
+        self.U = self._build_ccnot_matrix()
+        self.register_buffer("U_matrix", self._apply_inverse(self.U))
+
+    def _build_ccnot_matrix(self):
+        basis = torch.tensor(list(product(*[range(d) for d in self.dims]))).to(self.device)
+        basis_modified = basis.clone()
+        target_dim = self.dims[self.target_idx]
+
+        # CCNOT operation: target_state = (control1_state * control2_state + target_state) % target_dim
+        basis_modified[:, self.target_idx] = (
+            basis[:, self.control1_idx] * basis[:, self.control2_idx] + basis[:, self.target_idx]
+        ) % target_dim
+
+        eq_matrix = torch.all(basis[:, None, :] == basis_modified[None, :, :], dim=2)
+        U = torch.where(
+            eq_matrix,
+            torch.tensor(1.0 + 0j, dtype=Cplx, device=self.device),
+            torch.tensor(0.0, dtype=Cplx, device=self.device),
+        )
+        return U
+
+    def forward(self, x):
+        return self.U_matrix @ x
+
+    def matrix(self):
+        return self.U_matrix
+
+
+class U(BaseGate):
+    """
+    Arbitrary unitary gate. Can be applied to a subset of qudits or the entire system.
+    Can be initialized with a fixed matrix or a trainable random unitary.
+    """
+    def __init__(self, matrix=None, dim=2, wires=1, device="cpu", index=None):
+        super().__init__(dim, index if index is not None else list(range(wires)), wires, False, device)
+        # Re-initialize index based on how U works with 'indices'
+        if index is None:
+            self.indices = None # Applies to full Hilbert space
+        elif isinstance(index, int):
+            self.indices = [index]
+        else:
+            self.indices = list(index)
+            self.indices.sort()
+
+        self.random = matrix is None
+
+        if self.indices is None:
+            self.sub_dims = self.dims
+            self.sub_dim = self.total_dim
+        else:
+            self.sub_dims = [self.dims[i] for i in self.indices]
+            self.sub_dim = int(np.prod(self.sub_dims))
+
+        if self.random:
+            # Trainable parameter for the unitary
+            initial_matrix = (torch.eye(self.sub_dim, device=device, dtype=Cplx) +
+                              torch.randn((self.sub_dim, self.sub_dim), device=device, dtype=Cplx))
+            self.U_param = nn.Parameter(initial_matrix)
+        else:
+            self.M = tensorise(matrix, device=device, dtype=Cplx)
+            if self.M.shape != (self.sub_dim, self.sub_dim):
+                raise ValueError("Provided matrix dimensions do not match the product of the targeted qudits' dimensions.")
+
+    def _get_unitary_from_param(self):
+        """Constructs a unitary matrix from the trainable parameter."""
+        # For a general unitary, we can use matrix exponential of a skew-Hermitian matrix (A - A^dagger)
+        # Note: Original code used 0.5 * (U_param - U_param.T.conj()) for full space,
+        # and U_param - U_param.T.conj() for sub-space. Both result in skew-Hermitian.
+        # We'll use the latter for consistency.
+        skew_hermitian_part = self.U_param - torch.conj(self.U_param.T)
+        return torch.matrix_exp(skew_hermitian_part)
+
+    def forward(self, x):
+        if self.indices is None:
+            # Apply to the entire system
+            U_final = self._get_unitary_from_param() if self.random else self.M
+            return U_final @ x
+        else:
+            # Apply to a subset of qudits using permutation
+            all_indices = list(range(self.wires))
+            target_indices = self.indices
+            remaining_indices = [i for i in all_indices if i not in target_indices]
+            new_order = target_indices + remaining_indices
+            inv_order = [new_order.index(i) for i in range(self.wires)]
+
+            psi = x.view(*self.dims)
+            psi_perm = psi.permute(*new_order).contiguous()
+
+            d_rest = self.total_dim // self.sub_dim
+            psi_flat = psi_perm.reshape(self.sub_dim, d_rest)
+
+            U_sub = self._get_unitary_from_param() if self.random else self.M
+            psi_transformed = U_sub @ psi_flat
+
+            new_shape = [self.dims[i] for i in new_order]
+            psi_perm_transformed = psi_transformed.reshape(*new_shape)
+            psi_final = psi_perm_transformed.permute(*inv_order).contiguous()
+            return psi_final.view(self.total_dim, 1)
+
+    def matrix(self):
+        if self.indices is None:
+            return self._get_unitary_from_param() if self.random else self.M
+        else:
+            U_sub = self._get_unitary_from_param() if self.random else self.M
+
+            # Construct the permutation matrix P
+            basis_indices = list(product(*[range(d) for d in self.dims]))
+            perm = []
+            all_indices = list(range(self.wires))
+            target_indices = self.indices
+            remaining_indices = [i for i in all_indices if i not in target_indices]
+            new_order = target_indices + remaining_indices
+            new_dims = [self.dims[i] for i in new_order]
+
+            for m in basis_indices:
+                m_list = list(m)
+                permuted = [m_list[i] for i in new_order]
+                new_dec = 0
+                current_prod = 1
+                # Calculate the decimal value for the permuted state
+                # The original code's `new_dec = new_dec * d + idx` implies a specific ordering.
+                # It should be `new_dec += idx * current_prod; current_prod *= d` for proper base conversion.
+                # Or, using den2dec for clarity:
+                new_dec = den2dec(permuted, new_dims)
+                perm.append(new_dec)
+
+            perm = torch.tensor(perm, dtype=torch.long, device=self.device)
+            P = torch.zeros((self.total_dim, self.total_dim), dtype=Cplx, device=self.device)
+            for i in range(self.total_dim):
+                P[i, perm[i]] = 1.0
+
+            d_rest = self.total_dim // self.sub_dim
+            I_rest = torch.eye(d_rest, dtype=Cplx, device=self.device)
+            U_embedded = torch.kron(U_sub, I_rest)
+
+            U_full = P.T @ U_embedded @ P
+            return U_full
+
+
+class CU(BaseGate):
+    """
+    Controlled-U (CU) gate for qudits.
+    Applies a unitary U to the target qudit(s) if the control qudit is in a specific state(s).
+    """
+    def __init__(self, dim=2, wires=2, device="cpu", index=[0, 1], matrix=None, control_dim=None):
+        super().__init__(dim, index, wires, False, device)
+        if index is None or len(index) < 2:
+            raise ValueError("The 'index' parameter must be a list with at least two elements: one control and at least one target.")
+
+        self.control_index = index[0]
+        self.target_indices = index[1:]
+
+        self.d_control = self.dims[self.control_index]
+        self.d_target = int(np.prod([self.dims[i] for i in self.target_indices]))
+        self.sub_dim_local = self.d_control * self.d_target # This is the dimension of the sub-block handled by CU
+
+        if control_dim is None:
+            self.control_states = [self.d_control - 1] # Default to controlling on the last state for d-level systems
+        elif isinstance(control_dim, int):
+            self.control_states = [control_dim]
+        else:
+            self.control_states = list(control_dim)
+
+        for ctrl_state in self.control_states:
+            if ctrl_state < 0 or ctrl_state >= self.d_control:
+                raise ValueError("Each element in control_dim must lie in range [0, d_control-1].")
+
+        self.random = matrix is None
+        if self.random:
+            num_active_blocks = len(self.control_states)
+            self.U_blocks_param = nn.Parameter(
+                torch.randn(num_active_blocks, self.d_target, self.d_target,
+                            device=device, dtype=Cplx)
+            )
+        else:
+            self.custom_blocks = {}
+            if isinstance(matrix, list):
+                if len(matrix) != len(self.control_states):
+                    raise ValueError("When providing a list, the number of matrices must equal len(control_dim).")
+                for i, ctrl_state in enumerate(self.control_states):
+                    M = torch.tensor(matrix[i], device=device, dtype=Cplx)
+                    if M.shape != (self.d_target, self.d_target):
+                        raise ValueError("Each provided matrix must be of shape (d_target, d_target).")
+                    self.custom_blocks[ctrl_state] = M
+            elif isinstance(matrix, torch.Tensor):
+                if matrix.ndim == 3:
+                    if matrix.shape[0] != len(self.control_states):
+                        raise ValueError("For a 3D tensor, the first dimension must equal len(control_dim).")
+                    for i, ctrl_state in enumerate(self.control_states):
+                        block = matrix[i]
+                        if block.shape != (self.d_target, self.d_target):
+                            raise ValueError("Each provided block must have shape (d_target, d_target).")
+                        self.custom_blocks[ctrl_state] = block
+                elif matrix.ndim == 2:
+                    expected_dim = len(self.control_states) * self.d_target
+                    if matrix.shape[0] != expected_dim or matrix.shape[1] != expected_dim:
+                        raise ValueError("For a 2D tensor, the shape must be (len(control_dim)*d_target, len(control_dim)*d_target).")
+                    reshaped = matrix.view(len(self.control_states), self.d_target, self.d_target)
+                    for i, ctrl_state in enumerate(self.control_states):
+                        self.custom_blocks[ctrl_state] = reshaped[i]
+                else:
+                    raise ValueError("Provided matrix must be either a list of matrices, a 3D tensor, or a 2D tensor.")
+            else:
+                raise ValueError("Provided matrix must be either a list or a torch.Tensor.")
+
+
+    def _get_target_unitary(self, k, idx_in_control_states):
+        """Returns the unitary for the target qudit(s) based on the control state k."""
+        if self.random:
+            param = self.U_blocks_param[idx_in_control_states]
+            # Convert parameter to a unitary matrix using matrix exponential of skew-Hermitian
+            return torch.matrix_exp(param - torch.conj(param).T)
+        else:
+            return self.custom_blocks[k]
+
+    def forward(self, x):
+        # Permute the state to bring control and target qudits to the front
+        all_indices = list(range(self.wires))
+        sub_indices = [self.control_index] + self.target_indices
+        remaining_indices = [i for i in all_indices if i not in sub_indices]
+        new_order = sub_indices + remaining_indices
+        inv_order = [new_order.index(i) for i in range(self.wires)]
+
         state_tensor = x.view(*self.dims)
         psi_perm = state_tensor.permute(*new_order).contiguous()
-        d_sub = int(np.prod([self.dims[i] for i in self.index]))
-        d_rem = int(np.prod([self.dims[i] for i in remaining])) if remaining else 1
-        A = psi_perm.view(self.d_ctrl, self.d_target, d_rem)
-        blocks = self._get_ctrl_blocks()
-        U_sub = torch.block_diag(*blocks)
-        A_sub = A.view(self.sub_dim, d_rem)
-        A_new = U_sub @ A_sub
-        new_shape = (
-            [self.d_ctrl]
-            + [self.dims[i] for i in self.targ_idx]
-            + ([self.dims[i] for i in remaining] if remaining else [])
-        )
+
+        # Reshape for block operation
+        d_sub_permuted_section = int(np.prod([self.dims[i] for i in sub_indices]))
+        d_rem = int(np.prod([self.dims[i] for i in remaining_indices])) if remaining_indices else 1
+        A = psi_perm.view(d_sub_permuted_section, d_rem)
+
+        # Reshape to (d_control, d_target, d_remaining)
+        A = A.view(self.d_control, self.d_target, d_rem)
+
+        # Apply appropriate unitary block based on control state
+        blocks_to_apply = []
+        for k in range(self.d_control):
+            if k in self.control_states:
+                idx = self.control_states.index(k)
+                U_k = self._get_target_unitary(k, idx)
+            else:
+                U_k = self._eye(self.d_target) # Identity if control is not in the specified states
+            blocks_to_apply.append(U_k)
+
+        # Construct the block diagonal matrix for the (control, target) sub-system
+        U_sub_combined = torch.block_diag(*blocks_to_apply)
+
+        # Reshape A to apply the combined U_sub
+        A_sub = A.view(self.sub_dim_local, d_rem)
+        A_new = U_sub_combined @ A_sub
+
+        # Reshape back to the permuted state tensor shape
+        new_shape = ([self.d_control] + [self.dims[i] for i in self.target_indices] +
+                     ([self.dims[i] for i in remaining_indices] if remaining_indices else []))
         psi_perm_new = A_new.view(*new_shape)
+
+        # Permute back to the original order and reshape to column vector
         psi_final = psi_perm_new.permute(*inv_order).contiguous().view(-1, 1)
         return psi_final
 
+    def matrix(self):
+        # Build the block diagonal matrix for the (control, target) sub-system
+        blocks_for_matrix = []
+        for k in range(self.d_control):
+            if k in self.control_states:
+                idx = self.control_states.index(k)
+                U_k = self._get_target_unitary(k, idx)
+            else:
+                U_k = self._eye(self.d_target)
+            blocks_for_matrix.append(U_k)
+        U_sub_combined = torch.block_diag(*blocks_for_matrix)
 
-# Specialized gate functions that provide meaningful quantum operations
-def T(dim=2, index=[0], dits=1, device="cpu"):
-    """T gate - pi/8 phase gate (fourth root of Z)"""
-    gate = BaseGate(dim, index, dits, device=device)
-    # T gate is Z^(1/4), so omega^(1/4)
-    omega = torch.tensor(np.exp(2 * 1j * np.pi / (dim * 4)), dtype=Cplx, device=device)
-    matrix = torch.diag(torch.tensor([omega**j for j in range(dim)], dtype=Cplx, device=device))
-    return U(matrix=matrix, dim=dim, dits=dits, device=device, index=index)
+        # Tensor product with identity for remaining qudits
+        all_indices = list(range(self.wires))
+        sub_indices = [self.control_index] + self.target_indices
+        remaining_indices = [i for i in all_indices if i not in sub_indices]
+        d_rem = int(np.prod([self.dims[i] for i in remaining_indices])) if remaining_indices else 1
+        I_rem = torch.eye(d_rem, dtype=Cplx, device=self.device)
+        U_embedded = torch.kron(U_sub_combined, I_rem)
 
+        # Construct permutation matrix to embed U_embedded into the full Hilbert space
+        new_order = sub_indices + remaining_indices
+        new_dims = [self.dims[i] for i in new_order] # Dimensions in the permuted order
 
-def S(dim=2, index=[0], dits=1, device="cpu"):
-    """S gate - pi/4 phase gate (square root of Z)"""
-    gate = BaseGate(dim, index, dits, device=device)
-    # S gate is Z^(1/2), so omega^(1/2)
-    omega = torch.tensor(np.exp(2 * 1j * np.pi / (dim * 2)), dtype=Cplx, device=device)
-    matrix = torch.diag(torch.tensor([omega**j for j in range(dim)], dtype=Cplx, device=device))
-    return U(matrix=matrix, dim=dim, dits=dits, device=device, index=index)
+        basis_indices = list(product(*[range(d) for d in self.dims]))
+        perm = []
+        for m in basis_indices:
+            m_list = list(m)
+            permuted = [m_list[i] for i in new_order]
+            new_dec = den2dec(permuted, new_dims)
+            perm.append(new_dec)
 
+        perm = torch.tensor(perm, dtype=torch.long, device=self.device)
+        P = torch.zeros((self.total_dim, self.total_dim), dtype=Cplx, device=self.device)
+        for i in range(self.total_dim):
+            P[i, perm[i]] = 1.0
 
-def P(theta, dim=2, index=[0], dits=1, device="cpu"):
-    """P gate - parameterized phase gate"""
-    phases = [np.exp(1j * theta * j / (dim - 1)) for j in range(dim)]
-    matrix = torch.diag(torch.tensor(phases, dtype=Cplx, device=device))
-    return U(matrix=matrix, dim=dim, dits=dits, device=device, index=index)
-
+        # Apply permutation to U_embedded
+        U_full = P.T @ U_embedded @ P
+        return U_full
 
 class Gategen:
     def __init__(self, dim=2, device="cpu"):
@@ -629,22 +843,22 @@ class Gategen:
 
     @property
     def H(self):
-        h_gate = H(dim=self.dim, index=[0], dits=1, device=self.device)
+        h_gate = H(dim=self.dim, index=[0], wires=1, device=self.device)
         return h_gate.M_dict[0]
 
     @property
     def X(self):
-        x_gate = X(dim=self.dim, index=[0], dits=1, device=self.device)
+        x_gate = X(dim=self.dim, index=[0], wires=1, device=self.device)
         return x_gate.M_dict[0]
 
     @property
     def Z(self):
-        z_gate = Z(dim=self.dim, index=[0], dits=1, device=self.device)
+        z_gate = Z(dim=self.dim, index=[0], wires=1, device=self.device)
         return z_gate.M_dict[0]
 
     @property
     def Y(self):
-        y_gate = Y(dim=self.dim, index=[0], dits=1, device=self.device)
+        y_gate = Y(dim=self.dim, index=[0], wires=1, device=self.device)
         return y_gate.M_dict[0]
 
     @property
@@ -663,19 +877,19 @@ class Gategen:
 
     def RX(self, j, k, angle):
         rx_gate = RX(
-            j=j, k=k, index=[0], dim=self.dim, dits=1, device=self.device, angle=angle
+            j=j, k=k, index=[0], dim=self.dim, wires=1, device=self.device, angle=angle
         )
         return rx_gate._getRMat(self.dim, j, k, angle)
 
     def RY(self, j, k, angle):
         ry_gate = RY(
-            j=j, k=k, index=[0], dim=self.dim, dits=1, device=self.device, angle=angle
+            j=j, k=k, index=[0], dim=self.dim, wires=1, device=self.device, angle=angle
         )
         return ry_gate._getRMat(self.dim, j, k, angle)
 
     def RZ(self, j, angle):
         rz_gate = RZ(
-            j=j, index=[0], dim=self.dim, dits=1, device=self.device, angle=angle
+            j=j, index=[0], dim=self.dim, wires=1, device=self.device, angle=angle
         )
         return rz_gate._getRMat(self.dim, j, None, angle)
 
@@ -698,7 +912,7 @@ class Gategen:
     def make(self, matrix, name=None):
         name = "U" if not hasattr(matrix, "name") else matrix.name
 
-        def gate_func(dim=2, dits=1, index=None, **kwargs):
+        def gate_func(dim=2, wires=1, index=None, **kwargs):
             if index is None:
                 if isinstance(dim, int):
                     matrix_shape = np.array(matrix).shape[0]
@@ -718,7 +932,7 @@ class Gategen:
             return U(
                 matrix=pmatrix,
                 dim=dim,
-                dits=dits,
+                wires=wires,
                 device=self.device,
                 index=index,
             )

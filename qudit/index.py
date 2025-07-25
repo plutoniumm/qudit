@@ -116,14 +116,14 @@ class State(np.ndarray):
 
 
 class Gate(np.ndarray):
-    dits: List[int]
+    wires: List[int]
     name: str = ""
     vqc: bool
     span: int
     d: int
 
     def __new__(
-        cls, d: int, O: np.ndarray = None, name: str = "U", dits: List[int] = []
+        cls, d: int, O: np.ndarray = None, name: str = "U", wires: List[int] = []
     ):
         if isinstance(O, Matrix):
             return VarGate(d, O, name)
@@ -133,7 +133,7 @@ class Gate(np.ndarray):
         obj.span = round(ma.log(O.shape[0], d))
         obj.name = name if name else f"U({d})"
         obj.d = d
-        obj.dits = dits
+        obj.wires = wires
         obj.vqc = False
         return obj
 
@@ -148,7 +148,7 @@ class Gate(np.ndarray):
         self.span = getattr(obj, "span", 0)
         self.name = getattr(obj, "name", "Gate")
         self.vqc = getattr(obj, "vqc", False)
-        self.dits = getattr(obj, "dits", [])
+        self.wires = getattr(obj, "wires", [])
 
     def __xor__(self, other: "Gate") -> "Gate":
         name = f"{self.name}.{getattr(other, 'name', 'U')}"
@@ -164,7 +164,7 @@ class Gate(np.ndarray):
 
 class VarGate(Matrix):
     def __new__(
-        cls, d: int, O: np.ndarray = None, name: str = "U", dits: List[int] = []
+        cls, d: int, O: np.ndarray = None, name: str = "U", wires: List[int] = []
     ):
         if O is None:
             raise ValueError("This part is reachable too. deal with it")
@@ -175,11 +175,11 @@ class VarGate(Matrix):
 
         mat.name = name if name else f"VarGate({d})"
         mat.d = d
-        mat.dits = []
+        mat.wires = []
         mat.vqc = True
 
-        if len(dits) > 0:
-            span = max(dits) - min(dits) + 1
+        if len(wires) > 0:
+            span = max(wires) - min(wires) + 1
             if span != mat.span:
                 raise ValueError(f"Got span: {span}, expected span: {mat.span}")
 
