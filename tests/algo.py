@@ -1,15 +1,46 @@
 import sys
 
 sys.path.append("..")
-
-
-# from sympy import exp, SparseMatrix, Symbol
+from qudit.tools.entanglement import Loss, rank, Perp
 from unittest import TestCase, main
 from qudit.algo import Statiliser
+from qudit import Basis, State
 import numpy as np
 
 
-statiliser = Statiliser(["ZZZII", "IIZZZ", "XIXXI", "IXXIX"])
+# statiliser = Statiliser(["ZZZII", "IIZZZ", "XIXXI", "IXXIX"])
 
-states = statiliser.generate()
-print(states.round(3))
+# states = statiliser.generate()
+# print(states.round(3))
+
+
+THETA, D, r = 0.75, 5, 2
+Bits, Trits = Basis(2), Basis(3)
+
+
+def Psi(i):
+    A = Bits(0) ^ Trits(i)
+    B = Bits(1) ^ Trits(i + 1)
+    return A * np.cos(THETA) + B * np.sin(THETA)
+
+
+class Ranken(TestCase):
+    def system(self, X):
+        toCplx = np.array([1, 1j])
+        qbit = State(X[1:5].reshape(2, 2).dot(toCplx))
+        qtrit = State(X[5:11].reshape(3, 2).dot(toCplx))
+        phi_rx = (X[0] * (qbit ^ qtrit)).norm()
+
+        return Loss(phi_rx, self.perp)
+
+    def test_rank(self):
+        self.perp = Perp([Psi(i) for i in range(2)])
+
+        res = rank(self.system, D, r, tries=2)
+        self.assertIsInstance(res, float)
+        self.assertGreater(res, 0)
+        self.assertTrue(res - 0.2481 < 1e-4, "Expected value close to 0.2481")
+
+
+if __name__ == "__main__":
+    main()

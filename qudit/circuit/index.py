@@ -1,7 +1,5 @@
 from torch import nn, tensor, complex64 as Cplx, Tensor, from_numpy
 from . import gates as GG
-
-# import gates as GG
 import numpy as np
 
 
@@ -9,7 +7,17 @@ class Circuit(nn.Module):
     def __init__(self, dits, dim=2, device="cpu"):
         super(Circuit, self).__init__()
 
+        if isinstance(dim, int):
+            self.dims_ = [dim] * dits
+        elif isinstance(dim, list):
+            if len(dim) != dits:
+                raise ValueError(
+                    f"Dimension list length {len(dim)} does not match number of dits {dits}."
+                )
+            self.dims_ = dim
+
         self.dim = dim
+        self.width = int(np.prod(self.dims_))
         self.dits = dits
         self.device = device
         self.circuit = nn.Sequential()
@@ -20,15 +28,12 @@ class Circuit(nn.Module):
 
     def gate(self, gate_or_name, indices, **kwargs):
         pos = str(len(self.circuit))
+        if "device" not in kwargs:
+            kwargs["device"] = self.device
 
         if isinstance(gate_or_name, Tensor):
-            if hasattr(gate_or_name, "name"):
-                name = gate_or_name.name
-            else:
-                name = None
-
             gate_or_name = gate_or_name.to_sparse_coo()
-            gate_or_name = self.gates.make(gate_or_name, name)
+            gate_or_name = self.gates.make(gate_or_name)
 
         if callable(gate_or_name):
             gate_instance = gate_or_name(
@@ -37,23 +42,8 @@ class Circuit(nn.Module):
                 index=indices,
                 **kwargs,
             )
-        elif isinstance(gate_or_name, str):
-            if not hasattr(GG, gate_or_name):
-                raise ValueError(
-                    f"Gate '{gate_or_name}' is not defined in the gates module."
-                )
-
-            mod = getattr(GG, gate_or_name)
-            gate_instance = mod(
-                dim=self.dim,
-                dits=self.dits,
-                device=self.device,
-                index=indices,
-                **kwargs,
-            )
         elif isinstance(gate_or_name, GG.BaseGate):
             gate_instance = gate_or_name
-            gate_instance.dim = self.dim
             gate_instance.dits = self.dits
             gate_instance.device = self.device
             gate_instance.index = indices

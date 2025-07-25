@@ -17,13 +17,6 @@ circuit.gate(H, [0])
 state = np.zeros(circuit.width, dtype=np.float32)
 state[0] = 1  # |0...0>
 
-# tensor([[0.7071+0.j],
-#         [0.0000+0.j],
-#         [0.0000+0.j],
-#         [0.7071+0.j],
-#         [0.0000+0.j],
-#         [0.0000+0.j]])
-
 state = circuit(state)
 predicted = torch.tensor(
     [[1, 0.0, 0.0, 1, 0.0, 0.0]] / np.sqrt(2), dtype=torch.complex64

@@ -1,10 +1,8 @@
-from .circuit import *
-from .gates import *
-from .utils import *
+# from .index import *
+# from .gates import *
 
-# from circuit import *
-# from gates import *
-# from utils import *
+from .index import *
+from .gates import *
 
 if __name__ == "__main__":
     circuit = Circuit(2, dim=2)
@@ -19,8 +17,5 @@ if __name__ == "__main__":
     circuit.gate(my_cnot, [0, 1])
 
     state = np.array([1, 0, 0, 0], dtype=np.complex64)
-    print(state)
 
-    result = circuit(state)
-
-    print(result)
+    print(circuit(state))

@@ -2,10 +2,12 @@ import sys
 
 sys.path.append("..")
 from qudit.random import random_unitary, random_state
-from qudit import Basis, State, Unity
 from unittest import TestCase, main
+from qudit import Basis, State
 from qudit import dGellMann
 import numpy as np
+
+Unity = lambda d: np.exp(2j * np.pi / d)
 
 
 class States(TestCase):

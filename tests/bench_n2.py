@@ -1,22 +1,22 @@
-import sys
+import sys, json
 
 sys.path.append("..")
 
 from qudiet.core.quantum_circuit import QuantumCircuit as Qudietc
 
-# from qudiet.core.backend.NumpyBackend import NumpyBackend
-# from qutip_qip.operations import hadamard_transform, cnot
-# from braket.circuits import Circuit as Braketc
-# from qiskit import QuantumCircuit as Qiskitc
-# from qiskit.quantum_info import Statevector
-# from braket.devices import LocalSimulator
+from qudiet.core.backend.NumpyBackend import NumpyBackend
+from qutip_qip.operations import hadamard_transform, cnot
+from braket.circuits import Circuit as Braketc
+from qiskit import QuantumCircuit as Qiskitc
+from qiskit.quantum_info import Statevector
+from braket.devices import LocalSimulator
 from time import perf_counter as bench
 
-# from qutip import basis, tensor, qeye
+from qutip import basis, tensor, qeye
 from qudit.circuit import Circuit
 
-# import matplotlib.pyplot as plt
-# import quforge.quforge as qf
+import matplotlib.pyplot as plt
+import quforge.quforge as qf
 import pennylane as qml
 import numpy as np
 import cirq as CQ
@@ -44,11 +44,11 @@ def b_braket(n, repeats):
     circ.h(0)
     for i in range(n - 1):
         circ.cnot(i, i + 1)
-
     device = LocalSimulator()
+
     start = bench()
     for _ in range(repeats):
-        _ = device.run(circ, shots=0).result()
+        _ = device.run(circ, shots=1).result()
     return (bench() - start) / repeats
 
 
@@ -140,20 +140,20 @@ def b_qutip(n, repeats):
     return (bench() - start) / repeats
 
 
-ms = 1e3
+n_range = range(3, 25)
 LOG_THRESHOLD = 5
-repeats = 5
-n_range = range(20, 22)
+repeats = 10
+ms = 1e3
 
 backends = {
     "Qudit": b_qudit,
     "Cirq": b_cirq,
     "PennyLane": b_pennylane,
-    # "Qudiet": b_qudiet,
-    # "QuForge": b_quforge,
-    # "Braket": b_braket,
-    # "Qiskit": b_qiskit,
-    # "QuTiP": b_qutip,
+    "Qudiet": b_qudiet,
+    "QuForge": b_quforge,
+    "Braket": b_braket,
+    "Qiskit": b_qiskit,
+    "QuTiP": b_qutip,
 }
 
 results = {name: [] for name in backends}
@@ -173,20 +173,24 @@ for n in n_range:
             continue
         results[name].append(log_t)
 
-# # Clean out stopped benchmarks
-# for name in list(backends.keys()):
-#     if backends[name] is None:
-#         del backends[name]
+for name in list(backends.keys()):
+    if backends[name] is None:
+        del backends[name]
 
-# # Plot
-# for name, times in results.items():
-#     if times:
-#         plt.plot(n_range[:len(times)], times, label=name, marker='.')
+for name, times in results.items():
+    if times:
+        plt.plot(n_range[: len(times)], times, label=name, marker=".")
 
-# plt.xlabel("Number of Qubits (n)")
-# plt.ylabel("Log Avg Time per Run (ms)")
-# plt.title("GHZ Circuit Benchmark")
-# plt.legend()
-# plt.grid(True)
-# plt.tight_layout()
-# plt.show()
+data = {name: times for name, times in results.items() if times}
+with open("bench_n2.json", "w") as f:
+    json.dump(data, f, indent=4)
+
+plt.xlabel("Num Qubits (n)")
+plt.ylabel("log (avg ms/run)")
+plt.title("GHZ Circuit Benchmark")
+plt.xticks(n_range)
+plt.legend()
+plt.axhline(LOG_THRESHOLD, color="red", linestyle="--", label="Log Threshold")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("bench_n2.png", dpi=300)
