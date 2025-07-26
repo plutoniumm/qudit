@@ -1,16 +1,19 @@
-from functools import cached_property, lru_cache
+from functools import cached_property
 from typing import Any, Union, List
-from ..index import Gate, State
+from ..index import State
 import numpy as np
 
 
-class Error(Gate):
+class Error(np.ndarray):
     params: dict[str, Any]
     correctable: bool = False
+    name: str
+    d: int
 
     def __new__(cls, d: int, O: np.ndarray = None, name: str = "Err", params={}):
-        obj = super().__new__(cls, d, O, name)
+        obj = np.asarray(O).view(cls)
         obj.params = params
+        obj.name = name
         obj.d = d
 
         return obj
@@ -21,6 +24,7 @@ class Error(Gate):
         self.params = getattr(obj, "params", {})
         self.correctable = getattr(obj, "correctable", False)
         self.d = getattr(obj, "d", 0)
+        self.name = getattr(obj, "name", "Err")
 
     def __repr__(self):
         print(f"Error: {self.name} with params {self.params}")

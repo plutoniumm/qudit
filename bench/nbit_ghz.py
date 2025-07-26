@@ -20,6 +20,8 @@ def b_qudit(n, repeats):
     for i in range(n - 1):
         circuit.gate(G.CX, [i, i + 1])
 
+    circuit = circuit.optimise()
+
     state = torch.zeros(n**n, dtype=torch.complex64)
     state[0] = 1
 

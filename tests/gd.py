@@ -7,6 +7,7 @@ import torch.nn as nn
 import numpy as np
 import torch
 
+from qudit.circuit import tensorise
 from qudit.ml import Accel, Hybrid
 from torch.optim import Adam
 from qudit import Circuit
@@ -18,10 +19,8 @@ dev = "cpu"
 
 def train(model, targ, data, epochs=100, lr=0.01):
     optimizer = Adam(model.parameters(), lr=lr)
-    if isinstance(targ, np.ndarray):
-        targ = torch.from_numpy(targ).to(dev).type(C64)
-    if isinstance(data, np.ndarray):
-        data = torch.from_numpy(data).to(dev).type(C64)
+    targ = tensorise(targ, device=dev)
+    data = tensorise(data, device=dev)
 
     for epoch in range(epochs):
         loss = torch.norm(targ - model(data))

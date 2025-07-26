@@ -81,19 +81,20 @@ def b_quforge(n, repeats):
 
 def b_qudit(n, repeats):
     circuit = Circuit(n, dim=2, device="cpu")
-    CX = circuit.make([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]], "CX")
-    H = circuit.make([[1, 1], [1, -1]], "H")
+    CX = circuit.make([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]], dim=2)
+    H = circuit.make([[1, 1], [1, -1]], dim=2)
 
     circuit.gate(H, [0])
     for i in range(n - 1):
         circuit.gate(CX, [i, i + 1])
+    circuit = circuit.optimise()
 
     state = torch.zeros(2**n, dtype=torch.complex64)
     state[0] = 1  # |0...0>
 
     start = bench()
     for _ in range(repeats):
-        _ = circuit(state)
+        circuit(state)
     return (bench() - start) / repeats
 
 

@@ -10,7 +10,7 @@ ms = 1e3
 
 circuit = Circuit(2, dim=[2, 3], device="cpu")
 
-H = circuit.make([[1, 1], [1, -1]] / np.sqrt(2), name="H")
+H = circuit.make([[1, 1], [1, -1]] / np.sqrt(2), dim=2)
 
 circuit.gate(H, [0])
 

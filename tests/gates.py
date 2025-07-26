@@ -3,16 +3,20 @@ import numpy as np
 from unittest import TestCase, main
 
 sys.path.append("..")
-from qudit import Gategen
+from qudit import Gategen, tensorise
+import torch
 
 
 class Gates(TestCase):
     def setUp(self):
         self.D = Gategen(2)
 
-    def matEqual(self, A, B, places=6):
+    def matEqual(self, A, B):
         self.assertEqual(A.shape, B.shape)
-        np.testing.assert_almost_equal(A, B, decimal=places)
+        A, B = tensorise(A), tensorise(B)
+
+        diff = round(torch.sum(torch.abs(A - B)).item(), 4)
+        self.assertEqual(diff, 0)
 
     def test_X(self):
         X = np.array([[0, 1], [1, 0]])
