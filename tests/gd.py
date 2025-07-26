@@ -17,6 +17,7 @@ print(f"Using device: {Accel.available()}")
 C64 = torch.complex64
 dev = "cpu"
 
+
 def train(model, targ, data, epochs=100, lr=0.01):
     optimizer = Adam(model.parameters(), lr=lr)
     targ = tensorise(targ, device=dev)
@@ -116,6 +117,7 @@ train(
 
 print("--------------------------------------")
 
+
 class HybridMixed(Hybrid):
     def __init__(self, dim, wires, device="cpu"):
         super().__init__()
@@ -143,7 +145,6 @@ target[0] = 1.0
 target[14] = 1.0
 target /= torch.norm(target)
 
-model = HybridMixed(dim=D_list, wires=2,
-device=dev)
+model = HybridMixed(dim=D_list, wires=2, device=dev)
 
 train(model=model, targ=target.reshape(-1, 1), data=x0, epochs=200, lr=0.1)

@@ -13,8 +13,8 @@ def mirror(n):
     C1, C2 = Circuit(2, dim=n), Circuit(2, dim=n)
     G = C1.gates
 
-    C1.gate(G.H, dits=[0])
-    C2.gate(G.H, dits=[1])
+    C1.gate(G.H, indices=[0])
+    C2.gate(G.H, indices=[1])
     SWAP = G.SWAP
 
     C1 = C1.run()
@@ -32,9 +32,9 @@ class Circuits(TestCase):
         ) / np.sqrt(2)
 
         C = Circuit(2, dim=2)
-        G = C.gates
-        C.gate(G.H, dits=[0])
-        C.gate(G.CX, dits=[0, 1])
+        G = C.gates[2]
+        C.gate(G.H, indices=[0])
+        C.gate(G.CX, indices=[0, 1])
 
         U = C.run()
         self.assertTrue(np.allclose(U, HCX, atol=1e-4))
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     ) / np.sqrt(2)
 
     C = Circuit(2, dim=2)
-    G = C.gates
-    C.gate(G.H, dits=[0])
-    C.gate(G.CX, dits=[0, 1])
+    G = C.gates[2]
+    C.gate(G.H, [0])
+    C.gate(G.CX, [0, 1])
     print(C)

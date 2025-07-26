@@ -25,10 +25,9 @@ class States(TestCase):
     def test_state_construction(self):
         pi = np.pi
         e, rt = np.exp, np.sqrt
-        cos, sin = np.cos, np.sin
 
-        w = Unity(3)
-        Ket = Basis(4)
+        w, Ket = Unity(3), Basis(4)
+
         SV = State(
             w * Ket("0000")
             + w**2 * Ket("1010")
@@ -41,15 +40,13 @@ class States(TestCase):
             + Ket("0112")
             + (5 + 9j) * Ket("1200")
             + 0.67 * Ket("1111")
-            + (9 * cos(pi / 16) + 1j * sin(pi / 5)) * Ket("2222")
+            + (9 * e(1j * pi / 16)) * Ket("2222")
         )
 
         self.assertEqual(SV.shape, (4**4,))
         self.assertTrue(np.iscomplexobj(SV))
 
-        self.assertAlmostEqual(SV[0], 0.0208 + 3.597e-02j, places=3)
-
-        self.assertAlmostEqual(SV[0], 0.0208 + 3.597e-02j, places=3)
+        self.assertAlmostEqual(SV[0], -0.0205 + 3.55e-02j, places=3)
 
 
 class Random(TestCase):
@@ -76,7 +73,7 @@ class GellMann(TestCase):
         gm = dGellMann(self.n)
 
         for mat in gm:
-            self.assertTrue(hasattr(mat, "shape"))
+            mat = mat.matrix
             self.assertEqual(mat.shape, (self.n, self.n))
 
 

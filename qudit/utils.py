@@ -2,6 +2,7 @@ from .index import State
 from typing import Union
 import numpy as np
 
+
 # <A|b@c@d@e...@n|B>
 def Braket(*args: np.ndarray) -> np.ndarray:
     if len(args) < 2:

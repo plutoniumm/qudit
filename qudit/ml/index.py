@@ -5,6 +5,7 @@ import torch
 
 Hybrid = nn.Module
 
+
 class Accel:
     allowed = ["cpu", "cuda", "mps", "openmp"]
 

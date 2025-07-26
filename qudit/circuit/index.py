@@ -4,13 +4,16 @@ from typing import Union, List
 from . import gates as GG
 import numpy as np
 
+
 @dataclass
 class Gateless:
     index: Union[None, List[int]]
     dim: Union[int, List[int]]
     wires: int
 
-    def __init__(self, dim: Union[int, List[int]], wires: int, index: Union[None, List[int]]):
+    def __init__(
+        self, dim: Union[int, List[int]], wires: int, index: Union[None, List[int]]
+    ):
         self.index = index
         self.dim = dim
         self.wires = wires
@@ -36,10 +39,10 @@ class Circuit(nn.Module):
         self.circuit = nn.Sequential()
 
         udits = sorted(list(set(self.dims_)))
-        self.gates = [None] * (max(udits) - 1)
+        self.gates = [None] * (max(udits) + 1)
         for i in range(2, max(udits) + 1):
             if i in udits:
-                self.gates[i-2] = GG.Gategen(dim=i, device=device)
+                self.gates[i] = GG.Gategen(dim=i, device=device)
 
         self.ops = []
 
@@ -54,32 +57,45 @@ class Circuit(nn.Module):
             elif isinstance(self.dim, list):
                 raise ValueError("Cannot auto-determine dimension from multiple wires.")
 
-        return self.gates[dim - 2].make(*args, **kwargs)
+        return self.gates[dim].make(*args, **kwargs)
 
     def optimise(self):
         traced = jit.trace(self, randn(1, self.width, dtype=Cplx, device=self.device))
         return traced.eval()
 
-    def gate(self, gate_or_name, indices, **kwargs):
-        pos = str(len(self.circuit))
+    def gate(self, gate_or_name, index, **kwargs):
         if "device" not in kwargs:
             kwargs["device"] = self.device
 
-        if callable(gate_or_name):
+        if isinstance(gate_or_name, GG.BaseGate):
+            gate_instance = gate_or_name
+            gate_instance.index = index
+            gate_instance.wires = self.wires
+            gate_instance.device = self.device
+        elif callable(gate_or_name):
+            if "device" not in kwargs:
+                kwargs["device"] = self.device
+
             gate_instance = gate_or_name(
                 dim=self.dim,
                 wires=self.wires,
-                index=indices,
+                index=index,
                 **kwargs,
             )
-        elif isinstance(gate_or_name, GG.BaseGate):
-            gate_instance = gate_or_name
-            gate_instance.wires = self.wires
-            gate_instance.device = self.device
-            gate_instance.index = indices
+        elif isinstance(gate_or_name, Tensor):
+            if gate_or_name.dim() != 2:
+                raise ValueError("Tensor gate must be a 2D matrix.")
+            gate_instance = GG.U(
+                matrix=gate_or_name,
+                dim=self.dim,
+                wires=self.wires,
+                index=index,
+                device=self.device,
+            )
         else:
-            raise ValueError(f"Unsupported gate type: {type(gate_or_name)}. ")
+            raise TypeError(f"Unsupported gate type: {type(gate_or_name)}")
 
+        pos = str(len(self.circuit))
         self.circuit.add_module(pos, gate_instance)
 
     def forward(self, x):
