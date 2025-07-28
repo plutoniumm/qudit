@@ -12,8 +12,15 @@ deploy:
 	rm -rf build dist qudit.egg-info
 
 test:
-	pip install .
-	python test.py
+	cd tests && python algo.py
+	cd tests && python ECC.py
+	cd tests && python circuit.py
+	cd tests && python gates.py
+	cd tests && python gd.py
+	cd tests && python metrics.py
+	cd tests && python qsvt.py
+	cd tests && python primitives.py
+
 
 prof:
 	cd tests && python -m cProfile -o program.prof bench_fast.py && snakeviz program.prof;

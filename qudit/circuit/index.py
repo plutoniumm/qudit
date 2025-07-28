@@ -1,9 +1,12 @@
-from torch import nn, tensor, complex64 as Cplx, Tensor, from_numpy, jit, randn
 from dataclasses import dataclass
 from typing import Union, List
 from . import gates as GG
-import numpy as np
 
+import torch.nn as nn
+import numpy as np
+import torch
+
+C64 = torch.complex64
 
 @dataclass
 class Gateless:
@@ -60,7 +63,7 @@ class Circuit(nn.Module):
         return self.gates[dim].make(*args, **kwargs)
 
     def optimise(self):
-        traced = jit.trace(self, randn(1, self.width, dtype=Cplx, device=self.device))
+        traced = torch.jit.trace(self, torch.randn(1, self.width, dtype=C64, device=self.device))
         return traced.eval()
 
     def gate(self, gate_or_name, index, **kwargs):
@@ -82,7 +85,7 @@ class Circuit(nn.Module):
                 index=index,
                 **kwargs,
             )
-        elif isinstance(gate_or_name, Tensor):
+        elif isinstance(gate_or_name, torch.Tensor):
             if gate_or_name.dim() != 2:
                 raise ValueError("Tensor gate must be a 2D matrix.")
             gate_instance = GG.U(
@@ -98,13 +101,25 @@ class Circuit(nn.Module):
         pos = str(len(self.circuit))
         self.circuit.add_module(pos, gate_instance)
 
-    def forward(self, x):
-        if isinstance(x, Tensor):
-            return self.circuit(x)
+    def matrix(self):
+        basis = torch.zeros((self.width, 1), dtype=C64, device=self.device)
 
+        columns = []
+        for i in range(self.width):
+            basis[i, 0] = 1.0
+            columns.append(self.forward(basis))
+
+        return torch.cat(columns, dim=1)
+
+    def forward(self, x):
         if isinstance(x, np.ndarray):
-            x = from_numpy(x).to(dtype=Cplx, device=self.device)
-        else:
-            x = tensor(x, dtype=Cplx, device=self.device)
+            x = torch.from_numpy(x).to(dtype=C64, device=self.device)
+        elif not isinstance(x, torch.Tensor):
+            x = torch.tensor(x, dtype=C64, device=self.device)
+
+        # if x.dim() == 1:
+        #     x = x.view(-1, 1)
+        # elif x.dim() > 2 or (x.dim() == 2 and x.shape[1] != 1):
+        #     raise ValueError(f"Input state has an invalid shape: {x.shape}. Expected (total_dim, 1) or (total_dim,).")
 
         return self.circuit(x)

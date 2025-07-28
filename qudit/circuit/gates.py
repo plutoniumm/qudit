@@ -594,11 +594,10 @@ class U(BaseGate):
             self.M = tensorise(matrix, device=device, dtype=Cplx)
             if self.M.shape != (self.sub_dim, self.sub_dim):
                 raise ValueError(
-                    "Provided matrix dimensions do not match the product of the targeted qudits' dimensions."
+                    f"Provided matrix dimensions ({self.M.shape}) do not match the product of the targeted qudits' dimensions ({self.sub_dim})."
                 )
 
     def _get_unitary_from_param(self):
-        """Constructs a unitary matrix from the trainable parameter."""
         skew_hermitian_part = self.U_param - torch.conj(self.U_param.T)
         return torch.matrix_exp(skew_hermitian_part)
 
@@ -862,62 +861,82 @@ class Gategen:
     @property
     def H(self):
         h_gate = H(dim=self.dim, index=[0], wires=1, device=self.device)
-        return h_gate.M_dict[0]
+        m = h_gate.M_dict[0]
+        m.__name__ = "H"
+        return m
 
     @property
     def X(self):
         x_gate = X(dim=self.dim, index=[0], wires=1, device=self.device)
-        return x_gate.M_dict[0]
+        m = x_gate.M_dict[0]
+        m.__name__ = "X"
+        return m
 
     @property
     def Z(self):
         z_gate = Z(dim=self.dim, index=[0], wires=1, device=self.device)
-        return z_gate.M_dict[0]
+        m = z_gate.M_dict[0]
+        m.__name__ = "Z"
+        return m
 
     @property
     def Y(self):
         y_gate = Y(dim=self.dim, index=[0], wires=1, device=self.device)
-        return y_gate.M_dict[0]
+        m = y_gate.M_dict[0]
+        m.__name__ = "Y"
+        return m
 
     @property
     def S(self):
         omega = torch.tensor(
             np.exp(2 * 1j * np.pi / (self.dim * 2)), dtype=Cplx, device=self.device
         )
-        return torch.diag(
+        m = torch.diag(
             torch.tensor(
                 [omega**j for j in range(self.dim)], dtype=Cplx, device=self.device
             )
         )
+        m.__name__ = "S"
+        return m
 
     @property
     def T(self):
         omega = torch.tensor(
             np.exp(2 * 1j * np.pi / (self.dim * 4)), dtype=Cplx, device=self.device
         )
-        return torch.diag(
+        m = torch.diag(
             torch.tensor(
                 [omega**j for j in range(self.dim)], dtype=Cplx, device=self.device
             )
         )
+        m.__name__ = "T"
+        return m
 
     def P(self, theta):
         phases = [np.exp(1j * theta * j / (self.dim - 1)) for j in range(self.dim)]
-        return torch.diag(torch.tensor(phases, dtype=Cplx, device=self.device))
+        m = torch.diag(torch.tensor(phases, dtype=Cplx, device=self.device))
+        m.__name__ = "P"
+        return m
 
     def RX(self, j, k, angle):
         rx_gate = RX(index=[0], dim=self.dim, wires=1, device=self.device, angle=angle)
-        return rx_gate._getRMat(self.dim, j, k, angle)
+        m = rx_gate._getRMat(self.dim, j, k, angle)
+        m.__name__ = "RX"
+        return m
 
     def RY(self, j, k, angle):
         ry_gate = RY(index=[0], dim=self.dim, wires=1, device=self.device, angle=angle)
-        return ry_gate._getRMat(self.dim, j, k, angle)
+        m = ry_gate._getRMat(self.dim, j, k, angle)
+        m.__name__ = "RY"
+        return m
 
     def RZ(self, j, angle):
         rz_gate = RZ(
             j=j, index=[0], dim=self.dim, wires=1, device=self.device, angle=angle
         )
-        return rz_gate._getRMat(self.dim, j, None, angle)
+        m = rz_gate._getRMat(self.dim, j, None, angle)
+        m.__name__ = "RZ"
+        return m
 
     @property
     def CX(self):
@@ -929,17 +948,23 @@ class Gategen:
     @property
     def CZ(self):
         cz_gate = CZ(dim=self.dim, index=[0, 1], wires=2, device=self.device)
-        return cz_gate.matrix()
+        m = cz_gate.matrix()
+        m.__name__ = "CZ"
+        return m
 
     @property
     def SWAP(self):
         swap_gate = SWAP(dim=self.dim, index=[0, 1], wires=2, device=self.device)
-        return swap_gate.matrix()
+        m = swap_gate.matrix()
+        m.__name__ = "SWAP"
+        return m
 
     @property
     def CCX(self):
         ccx_gate = CCX(dim=self.dim, index=[0, 1, 2], wires=3, device=self.device)
-        return ccx_gate.matrix()
+        m = ccx_gate.matrix()
+        m.__name__ = "CCX"
+        return m
 
     def make(self, matrix):
         def gate_func(dim=2, wires=1, index=None, **kwargs):

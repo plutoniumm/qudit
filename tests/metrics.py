@@ -4,7 +4,7 @@ import sys
 sys.path.append("..")
 
 import numpy as np
-from qudit.tools.metrics import Fidelity, Entropy, Information
+from qudit.tools.metrics import Fidelity, Entropy, Info
 
 
 class TestQuantumMetrics(unittest.TestCase):
@@ -72,20 +72,20 @@ class TestQuantumMetrics(unittest.TestCase):
     def test_relative_entropy(self):
         rho = np.array([[0.8, 0], [0, 0.2]])
         sigma = np.array([[0.5, 0], [0, 0.5]])
-        D = Entropy.relative_entropy(rho, sigma)
+        D = Entropy.relative(rho, sigma)
         expected = 0.8 * np.log2(0.8 / 0.5) + 0.2 * np.log2(0.2 / 0.5)
         self.assertAlmostEqual(D, expected, places=6)
 
-    def test_mutual_information_bell_state():
+    def test_mutual_Info_bell_state():
         psi = np.array([1, 0, 0, 1]) / np.sqrt(2)
         rho = np.outer(psi, psi.conj())
-        I = Information.mutual_information(rho, 2, 2)
+        I = Info.mutual(rho, 2, 2)
         assert np.isclose(I, 2.0, atol=1e-5)
 
-    def test_mutual_information_bell_state():
+    def test_mutual_Info_bell_state():
         psi = np.array([1, 0, 0, 1]) / np.sqrt(2)
         rho = np.outer(psi, psi.conj())
-        I = Information.mutual_information(rho, 2, 2)
+        I = Info.mutual(rho, 2, 2)
         assert np.isclose(I, 2.0, atol=1e-5)
 
 

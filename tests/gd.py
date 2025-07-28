@@ -147,4 +147,4 @@ target /= torch.norm(target)
 
 model = HybridMixed(dim=D_list, wires=2, device=dev)
 
-train(model=model, targ=target.reshape(-1, 1), data=x0, epochs=200, lr=0.1)
+train(model=model, targ=target.reshape(-1, 1), data=x0, lr=0.1)
