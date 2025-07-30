@@ -7,6 +7,8 @@ from typing import Callable
 
 devnull = lambda *args, **kwargs: None
 
+C64 = torch.complex64
+
 class QUBO:
     @staticmethod
     def toIsing(Q: dict):
@@ -35,7 +37,10 @@ class QUBO:
 
         return ham, offset
 
+
 Energy = Callable[[dict, list], float]
+
+
 class QAOA(nn.Module):
     def __init__(
         self,
@@ -88,7 +93,7 @@ class QAOA(nn.Module):
         return x
 
     def forward(self):
-        state = torch.zeros((self.width, 1), dtype=GG.Cplx, device=self.device)
+        state = torch.zeros((self.width, 1), dtype=C64, device=self.device)
         state[0, 0] = 1.0
         h_all = GG.H(
             dim=self.d,
@@ -107,14 +112,12 @@ class QAOA(nn.Module):
                     raise NotImplementedError(f"Gate type '{gtype}' not supported.")
 
             for j in range(self.wires):
-                state = self.gate(
-                    state, GG.RX, index=[j], angle=2 * self.betas[i]
-                )
+                state = self.gate(state, GG.RX, index=[j], angle=2 * self.betas[i])
 
         return state
 
     def getMat(self):
-        H_P = torch.zeros((self.width, self.width), dtype=GG.Cplx, device=self.device)
+        H_P = torch.zeros((self.width, self.width), dtype=C64, device=self.device)
         gg = GG.Gategen(dim=self.d, device=self.device)
         opmat = {
             "I": gg.I,

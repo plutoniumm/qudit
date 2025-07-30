@@ -8,6 +8,7 @@ import torch
 
 C64 = torch.complex64
 
+
 @dataclass
 class Gateless:
     index: Union[None, List[int]]
@@ -60,11 +61,10 @@ class Circuit(nn.Module):
             elif isinstance(self.dim, list):
                 raise ValueError("Cannot auto-determine dimension from multiple wires.")
 
-        return self.gates[dim].make(*args, **kwargs)
+        if self.width >= 10:
+            kwargs["sparse"] = True
 
-    def optimise(self):
-        traced = torch.jit.trace(self, torch.randn(1, self.width, dtype=C64, device=self.device))
-        return traced.eval()
+        return self.gates[dim].make(*args, **kwargs)
 
     def gate(self, gate_or_name, index, **kwargs):
         if "device" not in kwargs:
@@ -102,24 +102,16 @@ class Circuit(nn.Module):
         self.circuit.add_module(pos, gate_instance)
 
     def matrix(self):
-        basis = torch.zeros((self.width, 1), dtype=C64, device=self.device)
+        I = np.eye(self.width, dtype=np.complex64)
+        cols = [self.forward(I[i]).T[0] for i in range(self.width)]
+        res = np.array(cols).T
 
-        columns = []
-        for i in range(self.width):
-            basis[i, 0] = 1.0
-            columns.append(self.forward(basis))
-
-        return torch.cat(columns, dim=1)
+        return torch.from_numpy(res).to(dtype=C64, device=self.device)
 
     def forward(self, x):
         if isinstance(x, np.ndarray):
             x = torch.from_numpy(x).to(dtype=C64, device=self.device)
         elif not isinstance(x, torch.Tensor):
             x = torch.tensor(x, dtype=C64, device=self.device)
-
-        # if x.dim() == 1:
-        #     x = x.view(-1, 1)
-        # elif x.dim() > 2 or (x.dim() == 2 and x.shape[1] != 1):
-        #     raise ValueError(f"Input state has an invalid shape: {x.shape}. Expected (total_dim, 1) or (total_dim,).")
 
         return self.circuit(x)

@@ -24,7 +24,7 @@ import torch
 
 
 def b_pennylane(n, repeats):
-    dev = qml.device("default.qubit", wires=n)
+    dev = qml.device("lightning.qubit", wires=n)
 
     @qml.qnode(dev)
     def ghz_circuit():
@@ -87,7 +87,6 @@ def b_qudit(n, repeats):
     circuit.gate(H, [0])
     for i in range(n - 1):
         circuit.gate(CX, [i, i + 1])
-    circuit = circuit.optimise()
 
     state = torch.zeros(2**n, dtype=torch.complex64)
     state[0] = 1  # |0...0>

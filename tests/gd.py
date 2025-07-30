@@ -39,7 +39,7 @@ class HybridGellMann(Hybrid):
         super().__init__()
         self.circuit = C = Circuit(wires, dim=5, device=dev)
 
-        params = nn.ParameterDict(
+        self.params = params = nn.ParameterDict(
             {
                 "j0k1": nn.Parameter(torch.rand(wires)),
                 "j0k2": nn.Parameter(torch.rand(wires)),
@@ -48,7 +48,8 @@ class HybridGellMann(Hybrid):
         )
 
         for name, (j, k) in zip(params, [(0, 1), (0, 2), (1, 2)]):
-            C.gate(G.GMR, range(wires), j=j, k=k, angle=params[name])
+            for i in range(wires):
+                C.gate(G.GMR, i, j=j, k=k, angle=params[name][i])
 
         C.gate(G.CX, [0, 1])
 
@@ -59,6 +60,7 @@ class HybridGellMann(Hybrid):
 D, wires = 5, 2
 vec = torch.zeros(D**wires, dtype=C64)
 vec[[0, D, 2 * D + 2]] = 1.0
+vec /= np.sqrt(3)
 
 train(
     HybridGellMann(wires=wires),
@@ -72,41 +74,31 @@ print("--------------------------------------")
 class HybridQubit(Hybrid):
     def __init__(self):
         super().__init__()
-        self.circuit = C = Circuit(2, dim=2, device=dev)
-        self.full = full = range(wires)
-        self.wires, self.dim = wires, 2
+        self.wires, self.dim = 2, 2
+
+        self.circuit = C = Circuit(self.wires, dim=self.dim, device=dev)
+        self.full = range(self.wires)
 
         self.angles = nn.ParameterDict(
             {
-                "rx": nn.Parameter(torch.rand(wires)),
-                "ry": nn.Parameter(torch.rand(wires)),
-                "rz": nn.Parameter(torch.rand(wires)),
+                "rx": nn.Parameter(torch.rand(self.wires)),
+                "ry": nn.Parameter(torch.rand(self.wires)),
+                "rz": nn.Parameter(torch.rand(self.wires)),
             }
         )
 
-        C.gate(G.RX, full, angle=self.angles["rx"])
-        C.gate(G.RY, full, angle=self.angles["ry"])
-        C.gate(G.RZ, full, angle=self.angles["rz"])
+        for i in self.full:
+            C.gate(G.RX, i, angle=self.angles["rx"][i])
+            C.gate(G.RY, i, angle=self.angles["ry"][i])
+            C.gate(G.RZ, i, angle=self.angles["rz"][i])
 
         C.gate(G.CX, [0, 1])
-        self.encoder = nn.Linear(200, wires)
+        self.encoder = nn.Linear(200, C.width)
 
     def forward(self, x):
         x = self.encoder(x).flatten()
-
-        rz = G.RZ(
-            dim=self.dim,
-            wires=self.wires,
-            index=self.full,
-            angle=x,
-            device=dev,
-        )
-
-        y = torch.zeros(2**self.wires, dtype=C64, device=dev)
-        y[0] = 1.0
-        x = rz(y)
-
-        return self.circuit(x)
+        x = self.circuit(x)
+        return x.reshape(-1, 1)
 
 
 train(
@@ -126,8 +118,11 @@ class HybridMixed(Hybrid):
 
         self.params = nn.Parameter(torch.rand(2 * wires, device=device) * 2 * np.pi)
 
-        C.gate(G.GMR, self.full, j=1, k=0, angle=self.params[:wires])
-        C.gate(G.GMR, self.full, j=0, k=1, angle=self.params[wires:])
+        for i in range(wires):
+            C.gate(G.GMR, i, j=1, k=0, angle=self.params[i])
+        for i in range(wires):
+            C.gate(G.GMR, i, j=0, k=1, angle=self.params[wires + i])
+
         C.gate(G.CX, [0, 1])
 
     def forward(self, x):
