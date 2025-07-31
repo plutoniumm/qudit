@@ -112,10 +112,6 @@ class SingleDitGate(BaseGate):
     def _getMat(self, **kwargs):
         raise NotImplementedError
 
-    def forward(self, x):
-        U = self._getUnitary(x, self.M_dict)
-        return U @ x
-
     def matrix(self):
         L = self.wires
         U = torch.eye(1, device=self.device)
@@ -400,7 +396,6 @@ class CU(BaseGate):
         wires=2,
         dim=2,
         device="cpu",
-        sparse=False,
         inverse=False,
     ):
         super().__init__(dim, index, wires, inverse, device)
@@ -411,7 +406,6 @@ class CU(BaseGate):
 
         self.control_idx = self.index[0]
         self.itarg = self.index[1]
-        self.sparse = sparse
         self.U_target = U_target.to(device)
 
         self.U = self._getCU()
@@ -471,7 +465,7 @@ def pauli_z(d=2):
 
 class CX(CU):
     def __init__(
-        self, index=[0, 1], wires=2, dim=2, device="cpu", sparse=False, inverse=False
+        self, index=[0, 1], wires=2, dim=2, device="cpu", inverse=False
     ):
         sz = dim if isinstance(dim, int) else dim[index[1]]
         super().__init__(
@@ -480,14 +474,13 @@ class CX(CU):
             wires=wires,
             dim=dim,
             device=device,
-            sparse=sparse,
             inverse=inverse,
         )
 
 
 class CZ(CU):
     def __init__(
-        self, index=[0, 1], wires=2, dim=2, device="cpu", sparse=False, inverse=False
+        self, index=[0, 1], wires=2, dim=2, device="cpu", inverse=False
     ):
         sz = dim if isinstance(dim, int) else dim[index[1]]
         super().__init__(
@@ -496,7 +489,6 @@ class CZ(CU):
             wires=wires,
             dim=dim,
             device=device,
-            sparse=sparse,
             inverse=inverse,
         )
 
@@ -579,10 +571,10 @@ class U(BaseGate):
             d_rest = self.total_dim // self.sub_dim
             psi_flat = psi_perm.reshape(self.sub_dim, d_rest)
 
-            psi_transformed = self.M @ psi_flat
+            psi_ = self.M @ psi_flat
 
             new_shape = [self.dims[i] for i in new_order]
-            psi_perm_transformed = psi_transformed.reshape(*new_shape)
+            psi_perm_transformed = psi_.reshape(*new_shape)
             psi_final = psi_perm_transformed.permute(*inv_order).contiguous()
             return psi_final.view(self.total_dim, 1)
 
@@ -739,14 +731,7 @@ class Gategen:
         m.__name__ = "SWAP"
         return m
 
-    @property
-    def CCX(self):
-        ccx_gate = CCX(dim=self.dim, index=[0, 1, 2], wires=3, device=self.device)
-        m = ccx_gate.matrix()
-        m.__name__ = "CCX"
-        return m
-
-    def make(self, matrix, sparse=False):
+    def make(self, matrix):
         def gate_func(dim=2, wires=1, index=None, **kwargs):
             if index is None:
                 raise ValueError("index parameter is required")
@@ -767,9 +752,7 @@ class Gategen:
             else:
                 pmatrix = torch.tensor(matrix, device=self.device, dtype=C64)
 
-            if sparse:
-                pmatrix = pmatrix.to_sparse()
-
+            pmatrix = pmatrix.to_sparse()
             return U(
                 matrix=pmatrix,
                 dim=dim,

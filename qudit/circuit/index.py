@@ -61,9 +61,6 @@ class Circuit(nn.Module):
             elif isinstance(self.dim, list):
                 raise ValueError("Cannot auto-determine dimension from multiple wires.")
 
-        if self.width >= 10:
-            kwargs["sparse"] = True
-
         return self.gates[dim].make(*args, **kwargs)
 
     def gate(self, gate_or_name, index, **kwargs):
