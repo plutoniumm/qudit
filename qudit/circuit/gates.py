@@ -419,8 +419,6 @@ class CU(BaseGate):
 
     def _getCU(self):
         L = torch.tensor(list(product(*[range(d) for d in self.dims]))).to(self.device)
-        d_target = self.dims[self.itarg]
-        d_control = self.dims[self.control_idx]
         D = int(torch.prod(torch.tensor(self.dims)))
 
         U = torch.zeros((D, D), dtype=C64, device=self.device)
@@ -428,7 +426,7 @@ class CU(BaseGate):
         for l in L:
             isrc = self._flat_index(l)
             if l[self.control_idx] == 1:
-                for t in range(d_target):
+                for t in range(self.dims[self.itarg]):
                     l2 = l.clone()
                     l2[self.itarg] = t
                     idst = self._flat_index(l2)

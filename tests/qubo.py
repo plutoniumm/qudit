@@ -1,12 +1,9 @@
 import sys
 
 sys.path.append("..")
-import qudit.circuit.gates as GG
-import torch.nn as nn
-import numpy as np
-
 from neal import SimulatedAnnealingSampler
 from qudit.algo import QAOA
+import torch as pt
 
 
 def evaluate(Q: dict, solution: list) -> float:
@@ -46,16 +43,16 @@ def vsDwave():
 
 
 def clock():
-    neighbors = [(0,1),(1,2),(3,4),(4,5),(0,3),(1,4),(2,5)]
+    neighbors = [(0, 1), (1, 2), (3, 4), (4, 5), (0, 3), (1, 4), (2, 5)]
     J, g = 1.0, 0.5  # coupling strength, transverse field
 
     ham = []
 
-    for (i,j) in neighbors:
-        ham.append( ( -J, 'ZZ', [i,j] ) )
+    for i, j in neighbors:
+        ham.append((-J, "ZZ", [i, j]))
     for i in range(6):
-        ham.append( ( -g, 'Z', [i] ) )
-        ham.append( ( -g, 'Z', [i] ) )
+        ham.append((-g, "Z", [i]))
+        ham.append((-g, "Z", [i]))
 
     qaoa = QAOA(
         d=3,
@@ -66,14 +63,23 @@ def clock():
         device="cpu",
     )
 
-    def evaluate(qubo, solution: list) -> float:
+    def eval_clock(qubo, solution: list) -> float:
         E = 0.0
-        for i,j in neighbors:
-            D = (solution[i] - solution[j]) % 3
-            E += -J * np.cos(2*np.pi * D / 3)
+        for i, j in neighbors:
+            D = solution[i] - solution[j] % 3
+            E += -J * pt.cos(2 * pt.pi * D / 3)
         for i, s in enumerate(solution):
-            E += -g * 2 * np.cos(2*np.pi * s / 3)
+            E += -g * 2 * pt.cos(2 * pt.pi * s / 3)
 
         return float(E)
 
-    res = qaoa.solve(evaluate, steps=100, lr=0.05)
+    def hook(loss, step):
+        print(f"Step {step}: Loss = {loss:.4f}")
+
+    res = qaoa.solve(eval_clock, steps=10, lr=0.1, hook=hook)
+    print(res)
+
+
+if __name__ == "__main__":
+    vsDwave()
+    clock()

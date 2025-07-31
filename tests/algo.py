@@ -8,11 +8,9 @@ from qudit import Basis, State
 import numpy as np
 
 
-# statiliser = Statiliser(["ZZZII", "IIZZZ", "XIXXI", "IXXIX"])
+statiliser = Statiliser(["ZZZII", "IIZZZ", "XIXXI", "IXXIX"])
 
-# states = statiliser.generate()
-# print(states.round(3))
-
+states = statiliser.generate()
 
 THETA, D, r = 0.75, 5, 2
 Bits, Trits = Basis(2), Basis(3)
@@ -37,6 +35,7 @@ class Ranken(TestCase):
         self.perp = Perp([Psi(i) for i in range(2)])
 
         res = rank(self.system, D, r, tries=2)
+        print(res)
         self.assertIsInstance(res, float)
         self.assertGreater(res, 0)
         self.assertTrue(res - 0.2481 < 1e-4, "Expected value close to 0.2481")

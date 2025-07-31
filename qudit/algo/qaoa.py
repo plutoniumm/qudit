@@ -1,17 +1,17 @@
 import torch.nn as nn
-import numpy as np
-import torch
+import torch as pt
 
 from ..circuit import gates as GG
 from typing import Callable
 
 devnull = lambda *args, **kwargs: None
 
-C64 = torch.complex64
+C64 = pt.complex64
+
 
 class QUBO:
     @staticmethod
-    def toIsing(Q: dict):
+    def toHamiltonian(Q: dict):
         ising = {}
         offset = 0.0
 
@@ -64,13 +64,13 @@ class QAOA(nn.Module):
             self.hamiltonian = hamiltonian
             self.offset = offset
         elif qubo is not None:
-            self.hamiltonian, self.offset = QUBO.toIsing(qubo)
+            self.hamiltonian, self.offset = QUBO.toHamiltonian(qubo)
         else:
             raise ValueError("Either 'hamiltonian' or 'qubo' must be provided.")
 
         self._H_P_matrix = self.getMat()
-        self.gammas = nn.Parameter(torch.rand(layers, device=device) * (2 * np.pi))
-        self.betas = nn.Parameter(torch.rand(layers, device=device) * np.pi)
+        self.gammas = nn.Parameter(pt.rand(layers, device=device) * (2 * pt.pi))
+        self.betas = nn.Parameter(pt.rand(layers, device=device) * pt.pi)
         self.OpMap = {
             "Z": self._RZ,
             "ZZ": self._RZZ,
@@ -93,7 +93,7 @@ class QAOA(nn.Module):
         return x
 
     def forward(self):
-        state = torch.zeros((self.width, 1), dtype=C64, device=self.device)
+        state = pt.zeros((self.width, 1), dtype=C64, device=self.device)
         state[0, 0] = 1.0
         h_all = GG.H(
             dim=self.d,
@@ -117,7 +117,7 @@ class QAOA(nn.Module):
         return state
 
     def getMat(self):
-        H_P = torch.zeros((self.width, self.width), dtype=C64, device=self.device)
+        H_P = pt.zeros((self.width, self.width), dtype=C64, device=self.device)
         gg = GG.Gategen(dim=self.d, device=self.device)
         opmat = {
             "I": gg.I,
@@ -140,14 +140,14 @@ class QAOA(nn.Module):
                 raise NotImplementedError(f"Matrix for '{gtype}' not defined.")
             term = oplist[0]
             for k in range(1, len(oplist)):
-                term = torch.kron(term, oplist[k])
+                term = pt.kron(term, oplist[k])
             H_P += coeff * term
 
         return H_P
 
     def expectation(self):
         final_state = self.forward()
-        exp_val = torch.vdot(
+        exp_val = pt.vdot(
             final_state.squeeze(), (self._H_P_matrix @ final_state).squeeze()
         ).real
 
@@ -155,7 +155,7 @@ class QAOA(nn.Module):
 
     def solve(self, func: Energy, optimizer=None, steps=100, lr=0.1, hook=devnull):
         if optimizer is None:
-            optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+            optimizer = pt.optim.Adam(self.parameters(), lr=lr)
 
         for step in range(steps):
             optimizer.zero_grad()
@@ -164,19 +164,19 @@ class QAOA(nn.Module):
             optimizer.step()
             hook(loss, step)
 
-        with torch.no_grad():
+        with pt.no_grad():
             final_state = self.forward()
-            Pi = (torch.abs(final_state) ** 2).squeeze()
-            maxP = torch.argmax(Pi).item()
+            Pi = (pt.abs(final_state) ** 2).squeeze()
+            maxP = pt.argmax(Pi).item()
             solution = format(maxP, f"0{self.wires}b")
-            solution = [int(bit) for bit in solution]
-            min_energy = func(self.qubo, solution)
 
-        print(f"Solution: {solution}")
-        print(f"Energy:   {min_energy:.5f}")
-        print(f"Proba of Solution:  {Pi[maxP].item():.4f}")
+            solution = [int(bit) for bit in solution]
+            soltensr = [pt.tensor(bit) for bit in solution]
+
+            min_energy = func(self.qubo, soltensr)
+
         return {
             "solution": solution,
             "value": min_energy,
-            "probabilities": Pi.cpu().numpy().flatten(),
+            "probabilities": Pi.cpu().flatten(),
         }

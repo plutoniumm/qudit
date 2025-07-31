@@ -1,37 +1,45 @@
 from scipy.linalg import fractional_matrix_power as fmp
 from ..circuit import gates
-import numpy as np
-import torch
+import torch as pt
 
-Cplx = torch.complex64
+C64 = pt.complex64
 
 
 class QSVT:
     def __init__(self, phis, A, wires, dev):
         self.size = A.shape[0]
         self.wires = wires
-        self.phis = phis
         self.dev = dev
+
+        if not isinstance(A, pt.Tensor):
+            A = pt.from_numpy(A).to(dtype=C64, device=dev)
         self.A = A
+
+        if not isinstance(phis, pt.Tensor):
+            phis = pt.tensor(phis, dtype=C64, device=dev)
+        self.phis = phis
 
         self.U = self.block(A, wires, dev)
 
     def PCP(self, phi):
-        ex = np.exp(1j * phi)
-        arr = np.diag(
-            np.concatenate([np.full(self.size, ex), np.full(self.size, ex.conj())])
-        ).astype(np.complex64)
+        ex = pt.exp(1j * pt.tensor(phi))
+        arr = pt.diag(
+            pt.cat([pt.full((self.size,), ex), pt.full((self.size,), ex.conj())])
+        ).to(dtype=C64, device=self.dev)
 
-        return torch.from_numpy(arr).to(device=self.dev, dtype=Cplx)
+        return arr
 
     def block(self, A, wires, dev):
-        r = lambda x: fmp(x, 0.5).astype(np.complex64)
+        r = lambda x: pt.from_numpy(fmp(x, 0.5)).to(dtype=C64)
 
-        I = np.eye(self.size, dtype=np.complex64)
+        I = pt.eye(self.size, dtype=C64)
 
-        U_A = np.block(
-            [[A, r(I - A.conj().T @ A)], [r(I - A @ A.conj().T), -A.conj().T]]
-        ).astype(np.complex64)
-        U_A = torch.from_numpy(np.ascontiguousarray(U_A)).to(device=dev, dtype=Cplx)
+        # top-right and bottom-left
+        TR = r(I - A.conj().T @ A)
+        BL = r(I - A @ A.conj().T)
+
+        T = pt.cat([A, TR], dim=1)
+        B = pt.cat([BL, -A.conj().T], dim=1)
+        U_A = pt.cat([T, B], dim=0).contiguous().to(device=dev, dtype=C64)
 
         return gates.U(matrix=U_A, dim=self.size, wires=wires, index=[0, 1])

@@ -1,6 +1,5 @@
 from scipy.optimize import minimize
-import numpy as np
-
+import torch as pt
 
 """
 # Statiliser: Usage
@@ -8,33 +7,28 @@ import numpy as np
 statiliser = Statiliser(["ZZZII", "IIZZZ", "XIXXI", "IXXIX"])
 
 states = statiliser.generate()
-print(states.round(3))
+print(states)
 
 statiliser.draw(0)
 statiliser.draw(1)
 """
 
-
 _paulis = {
-    "X": np.array([[0, 1], [1, 0]]),
-    "Y": np.array([[0, -1j], [1j, 0]]),
-    "Z": np.array([[1, 0], [0, -1]]),
-    "I": np.eye(2),
+    "X": pt.tensor([[0, 1], [1, 0]], dtype=pt.cfloat),
+    "Y": pt.tensor([[0, -1j], [1j, 0]], dtype=pt.cfloat),
+    "Z": pt.tensor([[1, 0], [0, -1]], dtype=pt.cfloat),
+    "I": pt.eye(2, dtype=pt.cfloat),
 }
 
 
-# Usage _S(X, I, X, X, I)
-def _S(*args) -> np.ndarray:
+def _S(*args) -> pt.Tensor:
     state = args[0]
     for d in args[1:]:
-        state = np.kron(d, state)
-
+        state = pt.kron(d, state)
     return state
 
 
-# Usage S("XIXXI")
-# literally just call S() string by string
-def S(string: str) -> np.ndarray:
+def S(string: str) -> pt.Tensor:
     paulis = [_paulis[i] for i in string]
     return _S(*paulis)
 
@@ -42,28 +36,28 @@ def S(string: str) -> np.ndarray:
 def GramSchmidt(vectors):
     ortho = []
     for v in vectors:
-        w = v - sum(np.dot(v, np.conj(u)) * u for u in ortho)
-        if np.linalg.norm(w) > 1e-8:
-            ortho.append(w / np.linalg.norm(w))
-
-    return np.array(ortho)
+        w = v - sum((v @ u.conj()) * u for u in ortho)
+        if pt.norm(w) > 1e-8:
+            ortho.append(w / pt.norm(w))
+    return pt.stack(ortho)
 
 
 class Statiliser:
     def __init__(self, stabilisers):
         stabilisers = [S(s) for s in stabilisers]
         self.stabilisers = stabilisers
-        self.sz = int(np.log2(len(stabilisers[0])))
+        self.sz = int(pt.log2(pt.tensor(stabilisers[0].shape[0])).item())
         self.num_states = 2 ** (self.sz - len(stabilisers))
         self.basis = None
 
     def _fun(self, x, mode="real", minimal=1):
-        vec = x if mode == "real" else self._to_complex(x)
-        c1 = sum(np.linalg.norm((g @ vec) - vec) for g in self.stabilisers)
-        # minimise ||x||_1 s.t. ||x||_2 = 1
-        L1 = np.linalg.norm(vec, 1)
-        L2 = 2 * (1 - np.linalg.norm(vec, 2)) ** 2
-        # L1 = L2 = 0
+        vec = pt.tensor(x, dtype=pt.complex64)
+        if mode != "real":
+            vec = self._to_complex(vec)
+
+        c1 = sum(pt.norm(g @ vec - vec).item() for g in self.stabilisers)
+        L1 = pt.norm(vec, p=1).item()
+        L2 = 2 * (1 - pt.norm(vec).item()) ** 2
 
         return c1 + (L1 + L2) * minimal
 
@@ -78,16 +72,19 @@ class Statiliser:
         for _ in range(self.num_states):
             res = minimize(
                 self._fun,
-                x0=np.random.rand(2**self.sz * factor),
+                x0=pt.rand(2**self.sz * factor).numpy(),
                 args=(mode, int(minimal)),
                 method="Powell",
                 tol=tol,
             ).x
-            state = res / np.linalg.norm(res)
+            state = pt.tensor(res, dtype=pt.float32 if mode == "real" else pt.cfloat)
+            if mode != "real":
+                state = self._to_complex(state)
+            state = state / pt.norm(state)
             basis.append(state)
 
-        basis = np.array(GramSchmidt(basis))
-        basis = basis.astype(np.float16)
+        basis = GramSchmidt(basis)
+        basis = basis.to(dtype=pt.float16 if mode == "real" else pt.cfloat)
         self.basis = basis
 
         return basis

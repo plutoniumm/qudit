@@ -60,19 +60,3 @@ print("Output State (GHZ State, non-zero elements shown):")
 non_zero_indices_3 = torch.where(abs(output3) > 1e-6)[0]
 for idx in non_zero_indices_3:
     print(f"  Index {idx.item()}: {output3[idx].item():.3f}")
-
-#
-raise SystemExit
-# class Circuits(TestCase):
-#     def test_bell(self):
-#         HCX = np.array([[1, 0, 0, 1]]) / np.sqrt(2)
-
-#         C = Circuit(2, dim=2)
-#         G = C.gates[2]
-#         C.gate(G.H, [0])
-#         C.gate(G.CX, [0, 1])
-
-#         O = C([1, 0, 0, 0])
-#         self.assertTrue(np.allclose(O, HCX.T, atol=1e-4))
-# if __name__ == "__main__":
-# main()
