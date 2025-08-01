@@ -1,21 +1,6 @@
-from scipy.sparse import kron as skron, csr_matrix
-from sympy.physics.quantum.tensorproduct import TensorProduct
-from sympy import SparseMatrix as Matrix
-from .index import Gate, State, VarGate
+from .index import State
 from typing import Union
-from uuid import uuid4
 import numpy as np
-
-
-def ID() -> str:
-    return str(uuid4()).split("-")[0]
-
-
-def isVar(*args) -> bool:
-    for arg in args:
-        if isinstance(arg, (VarGate, Matrix)):
-            return True
-    return False
 
 
 # <A|b@c@d@e...@n|B>
@@ -33,7 +18,7 @@ def Braket(*args: np.ndarray) -> np.ndarray:
 
 
 # # A ^ B ^ C ^ D ^ ... ^ N
-def Tensor(*args: Union[Gate, State]):
+def Tensor(*args: Union[np.ndarray, State]):
     if len(args) == 0:
         raise ValueError("At least one arg needed")
     if len(args) == 1:
@@ -42,24 +27,6 @@ def Tensor(*args: Union[Gate, State]):
     result = args[0]
     for arg in args[1:]:
         result = np.kron(result, arg)
-
-    return result
-
-
-# # A ^ B ^ C ^ D ^ ... ^ N
-def CTensor(*args: Union["Gate", "VarGate", "State"]):
-    if not args:
-        raise ValueError("At least one arg needed")
-
-    args = list(args)[::-1]
-    if isVar(*args):
-        result = Matrix(args[0])
-        for arg in args[1:]:
-            result = TensorProduct(result, Matrix(arg))
-    else:
-        result = csr_matrix(args[0])
-        for arg in args[1:]:
-            result = skron(result, csr_matrix(arg))
 
     return result
 

@@ -1,14 +1,10 @@
-from scipy.linalg import logm, fractional_matrix_power
+from scipy.linalg import logm, fractional_matrix_power, svdvals
 from qudit.utils import partial
 from typing import List, Union
+from numpy import linalg as LA
 import numpy as np
 
-
-def isSquare(i: Union[np.ndarray, List[np.ndarray]]):
-    if not isinstance(List):
-        return i.ndim == 2 and i.shape[0] == i.shape[1]
-    else:
-        return all([isSquare(j) for j in i])
+MD = LA.multi_dot
 
 
 class Fidelity:
@@ -32,23 +28,43 @@ class Fidelity:
     def channel(
         kraus: List[Union[np.ndarray, List[float]]], rho: np.ndarray
     ) -> np.ndarray:
-        assert isSquare(kraus) and isSquare(rho), "Expected Square matrices"
-
         rho_out = np.zeros_like(rho, dtype=np.complex128)
         for K in kraus:
             rho_out += K @ rho @ K.conj().T
 
         return rho_out
 
+    # @staticmethod
+    # def entanglement(rho: np.ndarray, kraus_ops: List[np.ndarray]) -> float:
+    #     assert (
+    #         rho.ndim == 2 and rho.shape[0] == rho.shape[1]
+    #     ), "rho must be a square matrix"
+
+    #     F_e = sum([np.abs(np.trace(rho @ K)) ** 2 for K in kraus_ops])
+
+    #     return F_e
+
     @staticmethod
-    def entanglement(rho: np.ndarray, kraus_ops: List[np.ndarray]) -> float:
-        assert (
-            rho.ndim == 2 and rho.shape[0] == rho.shape[1]
-        ), "rho must be a square matrix"
+    def entanglement(
+        R_kraus: List[np.ndarray], E_kraus: List[np.ndarray], codes: List[np.ndarray]
+    ) -> float:
+        l = len(codes)
+        R = np.eye(l)
 
-        F_e = sum([np.abs(np.trace(rho @ K)) ** 2 for K in kraus_ops])
+        QR = (1 / np.sqrt(l)) * sum([np.kron(codes[i], R[i]) for i in range(l)])
 
-        return F_e
+        rho = np.outer(QR, QR.conj().T)
+
+        Eks = [np.kron(Ek, R) for Ek in E_kraus]
+        Rks = [np.kron(Rk, R) for Rk in R_kraus]
+
+        rho_new = sum([MD([Ek, rho, Ek.conj().T]) for Ek in Eks])
+        rho_new = sum([MD([Rk, rho_new, Rk.conj().T]) for Rk in Rks])
+
+        rho_new /= np.trace(rho_new)
+
+        fid = np.dot(QR.conj().T, np.dot(rho_new, QR))
+        return np.abs(fid)
 
     @staticmethod
     def cafaro(kraus_ops: List[np.ndarray]) -> float:
@@ -209,3 +225,53 @@ class Info:
         S_AB = Entropy.default(rho_AB)
 
         return S_B - S_AB
+
+
+class Distance:
+    @staticmethod
+    def relative_entropy(
+        rho: np.ndarray, sigma: np.ndarray, base: float = 2.0
+    ) -> float:
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
+
+        eps = 1e-12
+        rho += eps * np.eye(rho.shape[0])
+        sigma += eps * np.eye(sigma.shape[0])
+
+        log_rho = logm(rho)
+        log_sigma = logm(sigma)
+        delta_log = log_rho - log_sigma
+
+        result = np.trace(rho @ delta_log).real  # ensured
+        return float(result / np.log(base))
+
+    @staticmethod
+    def bures(rho: np.ndarray, sigma: np.ndarray) -> float:
+
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
+
+        bures_distance = np.sqrt(2 - 2 * (Fidelity.default(rho, sigma)) ** 0.5)
+
+        return float(bures_distance)
+
+    @staticmethod
+    def jensen_shannon(rho: np.ndarray, sigma: np.ndarray, base: float = 2.0) -> float:
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
+
+        m = 0.5 * (rho + sigma)
+        return 0.5 * (
+            Distance.relative_entropy(rho, m, base)
+            + Distance.relative_entropy(sigma, m, base)
+        )
+
+    @staticmethod
+    def trace_distance(rho: np.ndarray, sigma: np.ndarray) -> float:
+        rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
+        sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
+
+        return 0.5 * np.trace(svdvals(rho - sigma)).real

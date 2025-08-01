@@ -1,9 +1,13 @@
 import sys
 
 sys.path.append("..")
-from qudit import Basis, State, Unity
+from qudit.random import random_unitary, random_state
 from unittest import TestCase, main
+from qudit import Basis, State
+from qudit import dGellMann
 import numpy as np
+
+Unity = lambda d: np.exp(2j * np.pi / d)
 
 
 class States(TestCase):
@@ -21,10 +25,9 @@ class States(TestCase):
     def test_state_construction(self):
         pi = np.pi
         e, rt = np.exp, np.sqrt
-        cos, sin = np.cos, np.sin
 
-        w = Unity(3)
-        Ket = Basis(4)
+        w, Ket = Unity(3), Basis(4)
+
         SV = State(
             w * Ket("0000")
             + w**2 * Ket("1010")
@@ -37,15 +40,41 @@ class States(TestCase):
             + Ket("0112")
             + (5 + 9j) * Ket("1200")
             + 0.67 * Ket("1111")
-            + (9 * cos(pi / 16) + 1j * sin(pi / 5)) * Ket("2222")
+            + (9 * e(1j * pi / 16)) * Ket("2222")
         )
 
         self.assertEqual(SV.shape, (4**4,))
         self.assertTrue(np.iscomplexobj(SV))
 
-        self.assertAlmostEqual(SV[0], 0.0208 + 3.597e-02j, places=3)
+        self.assertAlmostEqual(SV[0], -0.0205 + 3.55e-02j, places=3)
 
-        self.assertAlmostEqual(SV[0], 0.0208 + 3.597e-02j, places=3)
+
+class Random(TestCase):
+    def test_unitary_mean(self):
+        U = random_unitary(20)
+        all = np.concatenate((U.real, U.imag))
+        self.assertLess(abs(np.mean(all)), 0.05)
+
+    def test_state_mean(self):
+        S = random_state(20)
+        all = np.concatenate((S.real, S.imag))
+        self.assertLess(abs(np.mean(all)), 0.05)
+
+
+class GellMann(TestCase):
+    n = 3
+
+    def test_n(self):
+        gm = dGellMann(self.n)
+        # I return identity also so (n^2 - 1) + 1
+        self.assertEqual(len(gm), self.n**2)
+
+    def test_shape(self):
+        gm = dGellMann(self.n)
+
+        for mat in gm:
+            mat = mat.matrix
+            self.assertEqual(mat.shape, (self.n, self.n))
 
 
 if __name__ == "__main__":

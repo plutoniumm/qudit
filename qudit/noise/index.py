@@ -1,40 +1,78 @@
-from functools import cached_property, lru_cache
+from functools import cached_property
 from typing import Any, Union, List
-from ..index import Gate, State
+from ..index import State
 import numpy as np
 
 
-def isSquare(i: Union[np.ndarray, List[np.ndarray]]):
-    if isinstance(list):
-        return all([isSquare(j) for j in i])
-
-    return i.ndim == 2 and i.shape[0] == i.shape[1]
-
-
-class Error(Gate):
+class Error(np.ndarray):
     params: dict[str, Any]
+    correctable: bool = False
+    name: str
+    d: int
 
     def __new__(cls, d: int, O: np.ndarray = None, name: str = "Err", params={}):
-        obj = super().__new__(cls, d, O, name)
+        obj = np.asarray(O).view(cls)
         obj.params = params
+        obj.name = name
+        obj.d = d
+
         return obj
+
+    def __array_finalize__(self, obj):
+        if obj is None:
+            return
+        self.params = getattr(obj, "params", {})
+        self.correctable = getattr(obj, "correctable", False)
+        self.d = getattr(obj, "d", 0)
+        self.name = getattr(obj, "name", "Err")
+
+    def __repr__(self):
+        print(f"Error: {self.name} with params {self.params}")
+        return f"{self.name}({self.params})"
+
+
+def unnull(lst: List[np.ndarray]) -> List[np.ndarray]:
+    return [matrix for matrix in lst if not np.all(np.isclose(matrix, 0, atol=1e-8))]
 
 
 class Channel:
+    correctables: list[Union[int, list[int]]] = []
     ops: list[Error]
     d: int
 
     def __init__(self, ops: list[Error]):
         assert isinstance(ops, list) and len(ops) > 0, "ops must be List[ops]"
-        assert isSquare(ops), "Kraus ops must be square"
-        self.ops = ops
-        self.d = ops[0].d if isinstance(ops[0], Error) else ops[0].shape[0]
 
-    @lru_cache
+        self.ops = unnull(ops)
+        self.d = ops[0].d if isinstance(ops[0], Error) else ops[0].shape[0]
+        self.correctables = []
+
     def run(self, rho: Union[State, np.ndarray]) -> np.ndarray:
         result = [O @ rho @ O.conj().T for O in self.ops]
 
-        return sum(result)
+        return np.sum(result, axis=0)
+
+    def correctable(self):
+        if len(self.correctables) == 0:
+            return []
+        c0 = self.correctables[0]
+
+        if isinstance(c0, int):
+            return [self.ops[i] for i in self.correctables]
+
+        if isinstance(c0, list):
+            Ek = []
+            for set in self.correctables:
+                Ek.append([self.ops[i] for i in set])
+            return Ek
+
+        return Exception("Please don't change correctables")
+
+    def __getitem__(self, key: Union[int, slice]) -> Union[Error, list[Error]]:
+        return self.ops[key]
+
+    def __repr__(self):
+        return f"Channel({len(self.ops)} ops)"
 
     @cached_property
     def isTP(self) -> bool:
@@ -85,3 +123,8 @@ class Channel:
         for n, O in enumerate(self.ops):
             V[n * d : (n + 1) * d, :] = O
         return V
+
+    # Adding the correctable set property, we can use Channel as the class for error operators
+    @property
+    def Ak(self) -> list[Error]:
+        return self.ops

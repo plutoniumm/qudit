@@ -1,20 +1,12 @@
-from sympy import SparseMatrix as Matrix, zeros, eye, simplify
-from sympy.physics.quantum import TensorProduct
 from typing import List, Union
 import numpy.linalg as LA
-from uuid import uuid4
 import numpy as np
-import math as ma
 
 """
   B = Basis(3) will create a qutrit basis
   so B("111") will return State for |111>
   or B(1, 2, 0) will return State for |120>
 """
-
-
-def ID() -> str:
-    return str(uuid4()).split("-")[0]
 
 
 class Basis:
@@ -118,94 +110,3 @@ class State(np.ndarray):
         perp = np.eye(proj.shape[0]) - proj
 
         return State(perp)
-
-
-class Gate(np.ndarray):
-    dits: List[int]
-
-    id: str = ""
-
-    name: str = ""
-    vqc: bool
-    span: int
-    d: int
-
-    def __new__(
-        cls, d: int, O: np.ndarray = None, name: str = "U", dits: List[int] = []
-    ):
-        if isinstance(O, Matrix):
-            return VarGate(d, O, name)
-
-        obj = np.asarray(O, dtype=complex).view(cls)
-
-        obj.span = round(ma.log(O.shape[0], d))
-        obj.name = name if name else f"Gate({d})"
-        obj.d = d
-        obj.dits = dits
-        obj.vqc = False
-        obj.id = ID()
-        return obj
-
-    @property
-    def H(self):
-        return self.conj().T
-
-    def __array_finalize__(self, obj):
-        if obj is None:
-            return
-        self.d = getattr(obj, "d", 0)
-        self.span = getattr(obj, "span", 0)
-        self.name = getattr(obj, "name", "Gate")
-        self.vqc = getattr(obj, "vqc", False)
-        self.dits = getattr(obj, "dits", [])
-
-    def __xor__(self, other: "Gate") -> "Gate":
-        name = f"{self.name}.{getattr(other, 'name', 'U')}"
-
-        return Gate(self.d, np.kron(self, other), name)
-
-    def isUnitary(self):
-        return np.allclose(self @ self.H, np.eye(self.shape[0]))
-
-    def isHermitian(self):
-        return np.allclose(self, self.H)
-
-
-class VarGate(Matrix):
-    def __new__(
-        cls, d: int, O: np.ndarray = None, name: str = "U", dits: List[int] = []
-    ):
-        if O is None:
-            mat = Matrix(np.zeros((d, d), dtype=complex).view(cls))
-            mat.span = 1
-        else:
-            mat = Matrix(O)
-            mat.span = int(np.log(O.shape[0]) / np.log(d))
-        # endif
-
-        mat.name = name if name else f"VarGate({d})"
-        mat.d = d
-        mat.dits = []
-        mat.vqc = True
-
-        if len(dits) > 0:
-            span = max(dits) - min(dits) + 1
-            if span != mat.span:
-                raise ValueError(f"Got span: {span}, expected span: {mat.span}")
-
-        mat.id = ID()
-        return mat
-
-    @property
-    def H(self):
-        return self.conjugate().T
-
-    def __xor__(self, other: "VarGate") -> "VarGate":
-        kron = TensorProduct(self, other)
-        return VarGate(self.d, kron, f"{self.name}.{other.name}")
-
-    def isUnitary(self):
-        return simplify(self * self.H) == eye(self.shape[0])
-
-    def isHermitian(self):
-        return simplify(self - self.H) == zeros(*self.shape)
