@@ -67,11 +67,6 @@ class BaseGate(nn.Module):
     def _apply_inverse(self, M):
         return torch.conj(M).T.contiguous() if self.inverse else M
 
-    # def _infer_dits(self, x):
-    #     if isinstance(self.dims[0], int) and len(set(self.dims)) == 1:
-    #         return int(round(log(x.shape[0], self.dims[0])))
-    #     return len(self.dims)
-
     def _infer_dits(self, x: torch.Tensor) -> int:
         dims: List[int] = self.dims
 
@@ -230,21 +225,36 @@ class ParametrizedRotation(BaseGate):
         return {t: level for t, level in zip(self.index, levels)}
 
     def forward(self, x: torch.Tensor):
-        L = self._infer_dits(x)
-        U_total = torch.eye(1, device=self.device, dtype=C64)
-        for i in range(L):
-            d = self.dims[i]
-            if i in self.index:
-                j_ = self.j_map[i]
-                k_ = self.k_map[i] if self.k_map else 0
-                M_block = self._getRMat(d, j_, k_, self.angle)
-            else:
-                M_block = torch.eye(d, device=self.device)
-            U_total = torch.kron(U_total, M_block)
+        psi = x.view(*self.dims)
 
-        x = x.to(torch.complex64)
-        U_total = U_total.to(torch.complex64)
-        return U_total @ x
+        for i in self.index:
+            # 1. Bring target to the front
+            new_order = [i] + [j for j in range(self.wires) if j != i]
+            psi_perm = psi.permute(*new_order).contiguous()
+
+            # 2. Reshape
+            d_i = self.dims[i]
+            d_rest = self.total_dim // d_i
+            psi_flat = psi_perm.view(d_i, d_rest)
+
+            # 3. small (d_i x d_i) rotation mat
+            j_ = self.j_map[i]
+            k_ = self.k_map[i] if self.k_map is not None else 0
+            M_block = self._getRMat(d_i, j_, k_, self.angle)
+
+            # 4. small gate matrix
+            psi_ = M_block @ psi_flat
+
+            # 5. Reshape back
+            psi_ = psi_.view(*[self.dims[j] for j in new_order])
+
+            # 6. Permute
+            inv_order = [new_order.index(j) for j in range(self.wires)]
+            psi = psi_.permute(*inv_order).contiguous()
+
+        # 7. Return the final
+        return psi.view(self.total_dim, 1)
+
 
 
 class RX(ParametrizedRotation):
@@ -447,14 +457,12 @@ class CU(BaseGate):
     def matrix(self):
         return self.U_matrix
 
-
 def pauli_x(d=2):
     if isinstance(d, list):
         d = d[0]
     X = torch.eye(d, dtype=C64)
     X = X.roll(1, dims=1)
     return X
-
 
 def pauli_z(d=2):
     if isinstance(d, list):
@@ -574,8 +582,8 @@ class U(BaseGate):
             psi_ = self.M @ psi_flat
 
             new_shape = [self.dims[i] for i in new_order]
-            psi_perm_transformed = psi_.reshape(*new_shape)
-            psi_final = psi_perm_transformed.permute(*inv_order).contiguous()
+            psi_ = psi_.reshape(*new_shape)
+            psi_final = psi_.permute(*inv_order).contiguous()
             return psi_final.view(self.total_dim, 1)
 
     def matrix(self):

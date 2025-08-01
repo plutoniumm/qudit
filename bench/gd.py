@@ -8,12 +8,12 @@ import torch
 import numpy as np
 import sympy
 import cirq
-from qiskit.circuit import QuantumCircuit, ParameterVector
+from qiskit.circuit import QuantumCircuit as Qiskitc, ParameterVector
 from qiskit.quantum_info import Statevector
-from qudit.circuit import Circuit
+from qudit.circuit import Circuit as Quditc
 import qudit.circuit.gates as G
-from time import time
 import matplotlib.pyplot as plt
+from time import time
 
 C64 = torch.complex64
 lr = 0.05
@@ -27,7 +27,7 @@ class HybridQubit(nn.Module):
     def __init__(self, n, device):
         super().__init__()
         self.wires, self.dim = n, 2
-        self.circuit = C = Circuit(n, dim=2, device=device)
+        self.circuit = C = Quditc(n, dim=2, device=device)
 
         rx = torch.randn(n, requires_grad=True)
         ry = torch.randn(n, requires_grad=True)
@@ -69,7 +69,7 @@ def b_qiskit(n, r):
     rx = ParameterVector("rx", n)
     ry = ParameterVector("ry", n)
 
-    qc = QuantumCircuit(n)
+    qc = Qiskitc(n)
     for i in range(n):
         qc.rx(rx[i], i)
         qc.ry(ry[i], i)
