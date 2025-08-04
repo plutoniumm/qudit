@@ -1,11 +1,17 @@
-from more_itertools import distinct_permutations as permut
 from .kraus import GAD, Error, Pauli
+from itertools import permutations
 from .index import Channel, Error
 from typing import List
 import numpy as np
 
 C128 = np.complex128
 
+def permut(lst: List[str], n: int) -> List[List[str]]:
+
+    if n > len(lst):
+        raise ValueError("n must be less than or equal to the length of lst")
+
+    return [list(p) for p in set(permutations(lst, n))]
 
 def mkron(args):
     result = args[0]

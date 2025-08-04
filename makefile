@@ -8,7 +8,7 @@ build:
 	twine check dist/*
 
 deploy:
-	twine upload dist/* -u plutoniumm -p $(TOK)
+	twine upload dist/* -u __token__ -p $(TOK)
 	rm -rf build dist qudit.egg-info
 
 test:

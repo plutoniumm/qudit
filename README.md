@@ -1,10 +1,8 @@
-<img src="https://raw.githubusercontent.com/plutoniumm/qudit/v2/docs/_static/icon.svg" alt="icon" width="125" height="125" align="right" name="icon"/>
+<img src="https://raw.githubusercontent.com/plutoniumm/qudit/refs/heads/main/docs/_static/icon.png" alt="icon" width="125" height="125" align="right" name="icon"/>
 
-# Qudit
+### `qudit`
 
-<!-- 147 -->
-
-Sparse Matrix simulations for qudit systems. To make qudit machine learning, qudit error correction, and qudit circuit simulation easier. Qudit is made fully around `numpy` and `scipy` to make it easy to mix and match tools without worrying about type errors.
+High performance simulations for qudit systems. To make qudit machine learning, qudit error correction, and qudit circuit simulation easier. Qudit is made fully around `numpy` and `pytorch` to make it easy to mix and match tools without worrying about type errors.
 
 [![PyPI version](https://badge.fury.io/py/qudit.svg)](https://pypi.org/project/qudit/)
 
@@ -22,38 +20,14 @@ In most cases it should not matter if you mix and match `numpy` with `qudit` sin
 from qudit import Circuit
 import numpy as np
 
-k00 = np.array([1, 0, 0, 0])
-k00 = np.outer(k00, k00)  # |00⟩⟨00|
-
-C = Circuit(2, dim=2)  # 2 quDits with dim 2
-G = C.gates
+C = Circuit(2, dim=2)  # 2 qBits with d=2
+G = C.gates[2]
 
 C.gate(G.H, dits=[0])
 C.gate(G.CX, dits=[0, 1])
 
-U = C.run()
-U @ k00 @ U.T  # Tr = 1
+ket0 = np.zeros(2**2)
+ket0[0] = 1.0  # |00>
+
+print(C(ket0))  # [1. 0. 0. 1.]/rt2
 ```
-
-**Manual matrix version:**
-
-```python
-from qudit import Gategen, Basis
-
-D = Gategen(2)
-Ket = Basis(2)
-
-k00 = Ket(0, 0).density()  # |00><00|
-
-rho = D.CX @ (D.I ^ D.H)
-
-rho @ k00 @ rho.H  # Tr = 1
-```
-
-## Not Done
-
-* Partial Trace
-* Gates: QFT
-* Noise: Kraus, Choi
-* States → Stabiliser
-* Discord
