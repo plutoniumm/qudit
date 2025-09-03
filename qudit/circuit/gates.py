@@ -467,7 +467,7 @@ def pauli_x(d=2):
 def pauli_z(d=2):
     if isinstance(d, list):
         d = d[0]
-    w = torch.exp(2j * torch.pi / d)
+    w = np.exp(2j * torch.pi / d)
     return torch.diag(torch.tensor([w**i for i in range(d)], dtype=C64))
 
 
@@ -730,6 +730,18 @@ class Gategen:
         cz_gate = CZ(dim=self.dim, index=[0, 1], wires=2, device=self.device)
         m = cz_gate.matrix()
         m.__name__ = "CZ"
+        return m
+
+    def CU(self, U_matrix):
+        cu_gate = CU(
+            U_target=U_matrix,
+            index=[0, 1],
+            wires=2,
+            dim=self.dim,
+            device=self.device,
+        )
+        m = cu_gate.matrix()
+        m.__name__ = "CU"
         return m
 
     @property
