@@ -14,7 +14,8 @@ deploy:
 test:
 	cd tests && python algo.py
 	cd tests && python ECC.py
-	cd tests && python circuit.py
+	cd tests && python circuit_M.py
+	cd tests && python circuit_V.py
 	cd tests && python gates.py
 	cd tests && python gd.py
 	cd tests && python metrics.py

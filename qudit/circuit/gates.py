@@ -67,6 +67,9 @@ class BaseGate(nn.Module):
     def _apply_inverse(self, M):
         return torch.conj(M).T.contiguous() if self.inverse else M
 
+    def _dagger(self, M: torch.Tensor) -> torch.Tensor:
+        return torch.conj(M).T
+
     def _infer_dits(self, x: torch.Tensor) -> int:
         dims: List[int] = self.dims
 
@@ -96,6 +99,13 @@ class BaseGate(nn.Module):
             U = torch.kron(U, M)
         return U
 
+    def forward(self, x: torch.Tensor):
+        return self.matrix() @ x
+
+    def forwardd(self, rho: torch.Tensor):
+        U = self.matrix()
+        return U @ rho @ self._dagger(U)
+
 
 class SingleDitGate(BaseGate):
     def __init__(
@@ -118,6 +128,8 @@ class SingleDitGate(BaseGate):
             U = torch.kron(U, M)
         return U
 
+    def forward(self, x: torch.Tensor):
+        return super().forward(x)
 
 class H(SingleDitGate):
     def _getMat(self, **kwargs):
@@ -255,6 +267,22 @@ class ParametrizedRotation(BaseGate):
         # 7. Return the final
         return psi.view(self.total_dim, 1)
 
+    def matrix(self):
+        L = self.wires
+        U = torch.eye(1, device=self.device, dtype=C64)
+        local_blocks = {}
+        for i in self.index:
+            d_i = self.dims[i]
+            j_ = self.j_map[i]
+            k_ = self.k_map[i] if self.k_map is not None else 0
+            local_blocks[i] = self._getRMat(d_i, j_, k_, self.angle)
+        for i in range(L):
+            if i in self.index:
+                M = local_blocks[i]
+            else:
+                M = torch.eye(self.dims[i], device=self.device, dtype=C64)
+            U = torch.kron(U, M)
+        return U
 
 
 class RX(ParametrizedRotation):
@@ -366,11 +394,10 @@ class GMR(ParametrizedRotation):
 
         M = torch.eye(d, device=self.device, dtype=C64)
 
-        if j_ == k_:  # Diagonal rotation: phase rotation with unit modulus
+        if j_ == k_:
             phase = torch.exp(-1j * angle_ * gm_tensor[j_, j_] / 2)
             M[j_, j_] = phase
         else:
-            # Off-diagonal rotation like before
             c, s = torch.cos(angle_ / 2), torch.sin(angle_ / 2)
             M[j_, j_] = c
             M[k_, k_] = c
@@ -460,6 +487,10 @@ class CU(BaseGate):
     def forward(self, x):
         return self.U_matrix @ x
 
+    def forwardd(self, rho: torch.Tensor):
+        U = self.U_matrix
+        return U @ rho @ self._dagger(U)
+
     def matrix(self):
         return self.U_matrix
 
@@ -535,6 +566,10 @@ class SWAP(BaseGate):
     def forward(self, x):
         return self.U_matrix @ x
 
+    def forwardd(self, rho: torch.Tensor):
+        U = self.U_matrix
+        return U @ rho @ self._dagger(U)
+
     def matrix(self):
         return self.U_matrix
 
@@ -591,6 +626,10 @@ class U(BaseGate):
             psi_ = psi_.reshape(*new_shape)
             psi_final = psi_.permute(*inv_order).contiguous()
             return psi_final.view(self.total_dim, 1)
+
+    def forwardd(self, rho: torch.Tensor):
+        U_full = self.matrix()
+        return U_full @ rho @ self._dagger(U_full)
 
     def matrix(self):
         if self.index is None:

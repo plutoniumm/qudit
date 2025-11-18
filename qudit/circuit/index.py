@@ -1,22 +1,37 @@
 from dataclasses import dataclass
-from typing import Union, List
+from typing import Union as U, List
 from . import gates as GG
-
 import torch.nn as nn
+from enum import Enum
 import numpy as np
 import torch
 
+""""
+Most of this file is just 1 line
+
+circuit = nn.Sequential()
+
+Everything else is
+    ifelse gom jabbar
+just to make and cases types work.
+"""
+
 C64, N64 = torch.complex64, np.complex64
+Array = List[int]
+
+class Mode(Enum):
+    VECTOR = "vector"
+    MATRIX = "matrix"
 
 
 @dataclass
 class Gateless:
-    index: Union[None, List[int]]
-    dim: Union[int, List[int]]
+    index: U[None, Array]
+    dim: U[int, Array]
     wires: int
 
     def __init__(
-        self, dim: Union[int, List[int]], wires: int, index: Union[None, List[int]]
+        self, dim: U[int, Array], wires: int, index: U[None, Array]
     ):
         self.index = index
         self.dim = dim
@@ -26,10 +41,15 @@ class Circuit(nn.Module):
     def __init__(
             self,
             wires: int = 2,
-            dim: Union[int, List[int]] = 2,
-            device: str = "cpu"
+            dim: U[int, Array] = 2,
+            device: str = "cpu",
+            mode: U[Mode, str] = Mode.VECTOR,
         ):
         super(Circuit, self).__init__()
+
+        if isinstance(mode, str):
+            mode = mode.lower()
+        self.mode: Mode = Mode(mode)
 
         if isinstance(dim, int):
             self.dims_ = [dim] * wires
@@ -108,15 +128,44 @@ class Circuit(nn.Module):
 
         init = torch.zeros((W, W), dtype=C64, device=self.device)
         for i in range(W):
-            init[i, :] = self.forward(I[i]).T[0]
+            v = self._apply_vector(I[i])
+            if isinstance(v, torch.Tensor) and v.dim() == 2:
+                init[i, :] = v.T[0]
+            else:
+                init[i, :] = v
 
         return init
 
+    def _apply_vector(self, x: torch.Tensor):
+        return self.circuit(x)
+
+    def _apply_matrix(self, out: torch.Tensor):
+        for module in self.circuit:
+            out = module.forwardd(out)
+
+        return out
 
     def forward(self, x):
         if isinstance(x, np.ndarray):
             x = torch.from_numpy(x).to(dtype=C64, device=self.device)
         elif not isinstance(x, torch.Tensor):
             x = torch.tensor(x, dtype=C64, device=self.device)
+        else:
+            x = x.to(dtype=C64, device=self.device)
 
-        return self.circuit(x)
+        if self.mode == Mode.VECTOR:
+            return self._apply_vector(x)
+        else:
+            W = self.width
+            if x.dim() == 1 or (x.dim() == 2 and min(x.shape) == 1):
+                psi = x.reshape(W, -1)
+                if psi.shape[1] != 1:
+                    psi = psi.view(W, 1)
+                rho = psi @ torch.conj(psi).T
+            else:
+                if x.dim() != 2 or x.shape[0] != W or x.shape[1] != W:
+                    raise ValueError(
+                        f"In matrix mode, input must be a (W x W) density matrix or a length-W vector. Got shape {tuple(x.shape)} with W={W}."
+                    )
+                rho = x
+            return self._apply_matrix(rho)
