@@ -243,7 +243,7 @@ class ParametrizedRotation(BaseGate):
             M_block = self._getRMat(d_i, j_, k_, self.angle)
 
             # 4. small gate matrix
-            psi_ = M_block @ psi_flat
+            psi_ = M_block @ psi_flat.to(M_block.dtype)
 
             # 5. Reshape back
             psi_ = psi_.view(*[self.dims[j] for j in new_order])

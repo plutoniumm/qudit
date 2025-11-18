@@ -39,21 +39,7 @@ class TestCircuit(TestCase):
 
         self.assertAlmostEqual(float(np.vdot(data, data).real), 1.0, delta=1e-3)
 
-    def test_DOSE(self):
-        c1 = Circuit(wires=2, dim=2, device=dev)
-        G2 = c1.gates[2]
-        c1.gate(G2.H, [0])
-        c1.gate(G2.CX, [0, 1])
-        x1 = ket0(c1.width)
-
-        print(c1.matrix())
-        raise SystemExit
-        psi = c1(x1)
-        a = 1 / np.sqrt(2)
-        self.assert_state(psi, {0: a + 0j, 3: a + 0j})
-
     def test_bell_state(self):
-        return None
         c1 = Circuit(wires=2, dim=2, device=dev)
         G2 = c1.gates[2]
         c1.gate(G2.H, [0])
@@ -65,7 +51,6 @@ class TestCircuit(TestCase):
         self.assert_state(psi, {0: a + 0j, 3: a + 0j})
 
     def test_mixed_dimension_ent(self):
-        return None
         c2 = Circuit(wires=4, dim=[2, 2, 3, 3], device=dev)
         G2 = c2.gates[2]
         G3 = c2.gates[3]
@@ -78,7 +63,6 @@ class TestCircuit(TestCase):
         self.assert_state(psi, {9: a + 0j, 27: a + 0j})
 
     def test_three_qutrit_ghz(self):
-        return None
         c3 = Circuit(wires=3, dim=3, device=dev)
         G3 = c3.gates[3]
         c3.gate(G3.H, [0])
