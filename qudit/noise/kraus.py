@@ -1,7 +1,6 @@
 from scipy.special._comb import _comb_int as nCr
-from .index import Error, Channel
+from .index import Error
 from typing import List
-from .. import State
 import numpy as np
 
 C128 = np.complex128

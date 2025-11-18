@@ -6,7 +6,7 @@ import torch.nn as nn
 import numpy as np
 import torch
 
-C64 = torch.complex64
+C64, N64 = torch.complex64, np.complex64
 
 
 @dataclass
@@ -22,9 +22,13 @@ class Gateless:
         self.dim = dim
         self.wires = wires
 
-
 class Circuit(nn.Module):
-    def __init__(self, wires, dim=2, device="cpu"):
+    def __init__(
+            self,
+            wires: int = 2,
+            dim: Union[int, List[int]] = 2,
+            device: str = "cpu"
+        ):
         super(Circuit, self).__init__()
 
         if isinstance(dim, int):
@@ -99,11 +103,15 @@ class Circuit(nn.Module):
         self.circuit.add_module(pos, gate_instance)
 
     def matrix(self):
-        I = np.eye(self.width, dtype=np.complex64)
-        cols = [self.forward(I[i]).T[0] for i in range(self.width)]
-        res = np.array(cols).T
+        W = self.width
+        I = torch.eye(W, dtype=C64, device=self.device)
 
-        return torch.from_numpy(res).to(dtype=C64, device=self.device)
+        init = torch.zeros((W, W), dtype=C64, device=self.device)
+        for i in range(W):
+            init[i, :] = self.forward(I[i]).T[0]
+
+        return init
+
 
     def forward(self, x):
         if isinstance(x, np.ndarray):

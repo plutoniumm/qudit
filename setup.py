@@ -5,8 +5,8 @@ with open("readme.md", "r") as fh:
 
 setup(
     name="qudit",
-    version="0.1.0",
-    description="High performance quantum simulations on qudits",
+    version="0.1.1",
+    description="High performance quantum sims on qudits",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="plutoniumm",

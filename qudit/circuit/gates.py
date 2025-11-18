@@ -276,10 +276,10 @@ class RY(ParametrizedRotation):
     def __init__(self, index=[0], dim=2, wires=1, device="cpu", angle=None):
         super().__init__(0, 1, index, dim, wires, device, angle)
 
-    def _getRMat(self, d: int, j: int, k: int, angle_):
+    def _getRMat(self, d: int, j: int, k: int, angle):
         M = torch.eye(d, device=self.device, dtype=C64)
-        cos_hf = torch.cos(angle_ / 2)
-        sin_hf = torch.sin(angle_ / 2)
+        cos_hf = torch.cos(angle / 2)
+        sin_hf = torch.sin(angle / 2)
         M[j, j] = cos_hf
         M[k, k] = cos_hf
         M[j, k] = -sin_hf
@@ -717,6 +717,21 @@ class Gategen:
         m = rz_gate._getRMat(self.dim, j=1, k=0, angle=angle)
         m.__name__ = "RZ"
         return m
+
+    def GMR(self, j, k, angle):
+        gmr_gate = GMR(
+            j=j,
+            k=k,
+            index=[0],
+            dim=self.dim,
+            wires=1,
+            device=self.device,
+            angle=angle,
+        )
+        m = gmr_gate._getRMat(self.dim, j, k, angle)
+        m.__name__ = "GMR"
+        return m
+
 
     @property
     def CX(self):
