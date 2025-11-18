@@ -4,6 +4,31 @@ sys.path.append("..")
 
 import numpy as np
 import matplotlib.pyplot as plt
+# Add early-exit support similar to the GPU benchmark
+import os
+
+def plot_bench(data, output_png="bench_nn.png"):
+    n_range = range(2, 7)
+    LOG_THRESHOLD = 3
+    for name, times in data.items():
+        if times:
+            plt.plot(list(n_range)[: len(times)], times, label=name, marker=".")
+    plt.xticks(list(n_range))
+    plt.xlim(min(n_range), max(n_range))
+    plt.xlabel("dim=$n^n$")
+    plt.ylabel("log (avg ms/run)")
+    plt.axhline(LOG_THRESHOLD, color="red", linestyle="--", label="Log Threshold")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(output_png, dpi=300)
+
+if os.path.exists("bench_nn.json"):
+    with open("bench_nn.json") as f:
+        data = json.load(f)
+    plot_bench(data)
+    sys.exit(0)
+
 from time import perf_counter as bench
 import torch
 import quforge.quforge as qf
@@ -56,10 +81,9 @@ def b_quforge(n, repeats):
         circ(state)
     return (bench() - start) / repeats
 
-
-n_range = range(3, 11)
-LOG_THRESHOLD = 4
-repeats = 10
+n_range = range(2, 7)
+LOG_THRESHOLD = 3
+repeats = 20
 ms = 1e3
 
 backends = {
@@ -93,13 +117,14 @@ for name, times in results.items():
     if times:
         plt.plot(n_range[: len(times)], times, label=name, marker=".")
 
+plt.xticks(list(n_range))
+plt.xlim(min(n_range), max(n_range))
 data = {name: times for name, times in results.items() if times}
 with open("bench_nn.json", "w") as f:
     json.dump(data, f, indent=4)
 
-plt.xlabel("Num Qudits (n), also dim=n")
+plt.xlabel("dim=$n^n$")
 plt.ylabel("log (avg ms/run)")
-plt.title("GHZ Benchmark with dim=n")
 plt.axhline(LOG_THRESHOLD, color="red", linestyle="--", label="Log Threshold")
 plt.legend()
 plt.grid(True)

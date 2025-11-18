@@ -1,10 +1,30 @@
-import sys, json
+import matplotlib.pyplot as plt
+import os, sys, json
+
+def plot_bench(data, output_png="bench_n2_gpu.png"):
+    n_range = range(3, 25)
+    LOG_THRESHOLD = 6
+    for name, times in data.items():
+        if times:
+            plt.plot(list(n_range)[: len(times)], times, label=name, marker=".")
+    plt.xlabel("Num Qubits (n)")
+    plt.ylabel("log (avg ms/run)")
+    plt.title("GHZ Circuit Benchmark")
+    plt.xticks(list(n_range))
+    plt.legend()
+    plt.axhline(LOG_THRESHOLD, color="red", linestyle="--", label="Log Threshold")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(output_png, dpi=300)
+
+if os.path.exists("bench_n2_gpu.json"):
+    with open("bench_n2_gpu.json") as f:
+        data = json.load(f)
+    plot_bench(data)
+    sys.exit(0)
 
 sys.path.append("..")
-import sys
-import json
 import numpy as np
-import matplotlib.pyplot as plt
 from time import perf_counter as bench
 import torch
 import cudaq
@@ -160,20 +180,8 @@ for name in list(backends.keys()):
     if backends[name] is None:
         del backends[name]
 
-for name, times in results.items():
-    if times:
-        plt.plot(n_range[: len(times)], times, label=name, marker=".")
-
 data = {name: times for name, times in results.items() if times}
-with open("bench_n2.json", "w") as f:
+with open("bench_n2_gpu.json", "w") as f:
     json.dump(data, f, indent=4)
 
-plt.xlabel("Num Qubits (n)")
-plt.ylabel("log (avg ms/run)")
-plt.title("GHZ Circuit Benchmark")
-plt.xticks(n_range)
-plt.legend()
-plt.axhline(LOG_THRESHOLD, color="red", linestyle="--", label="Log Threshold")
-plt.grid(True)
-plt.tight_layout()
-plt.savefig("bench_n2.png", dpi=300)
+plot_bench(data)

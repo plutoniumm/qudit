@@ -1,4 +1,26 @@
 import sys, json
+import os
+
+# Early exit if benchmark data already exists
+if os.path.exists("bench_n2.json"):
+    with open("bench_n2.json") as f:
+        data = json.load(f)
+    import matplotlib.pyplot as plt
+    n_range = range(3, 25)
+    LOG_THRESHOLD = 5
+    for name, times in data.items():
+        if times:
+            plt.plot(list(n_range)[: len(times)], times, label=name, marker=".")
+    plt.xlabel("Num Qubits (n)")
+    plt.ylabel("log (avg ms/run)")
+    plt.title("GHZ Circuit Benchmark")
+    plt.xticks(list(n_range))
+    plt.legend()
+    plt.axhline(LOG_THRESHOLD, color="red", linestyle="--", label="Log Threshold")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("bench_n2.png", dpi=300)
+    sys.exit(0)
 
 sys.path.append("..")
 

@@ -1,6 +1,32 @@
-import sys, json
+import sys, json, os
 
 sys.path.append("..")
+
+# Early exit if prior benchmark results exist. Loads JSON, plots, saves PNG, and exits.
+def _early_plot_and_exit():
+    if os.path.exists("bench_sgd.json"):
+        with open("bench_sgd.json") as f:
+            data = json.load(f)
+        import matplotlib.pyplot as plt
+        n_range = range(3, 21)
+        LOG_THRESH = 8
+        for k, ts in data.items():
+            if ts:
+                plt.plot(list(n_range)[: len(ts)], ts, label=k, marker=".")
+        plt.axhline(LOG_THRESH, color="red", linestyle="--", label="Cutoff Threshold")
+        plt.xlabel("Num Qubits (n)")
+        plt.ylabel("log (avg ms/run)")
+        plt.xticks(range(3, 18))
+        plt.yticks(range(0, LOG_THRESH))
+        plt.ylim(0, LOG_THRESH + 1)
+        plt.title("Qubit GD Runtime")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig("bench_sgd.png", dpi=300)
+        sys.exit(0)
+
+_early_plot_and_exit()
 
 import pennylane as qml
 from torch import nn
