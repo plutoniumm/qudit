@@ -365,11 +365,17 @@ class GMR(ParametrizedRotation):
         gm_tensor = torch.tensor(gm, dtype=C64, device=self.device)
 
         M = torch.eye(d, device=self.device, dtype=C64)
-        c, s = torch.cos(angle_ / 2), torch.sin(angle_ / 2)
-        M[j_, j_] = c
-        M[k_, k_] = c
-        M[j_, k_] = -1j * s * gm_tensor[j_, k_]
-        M[k_, j_] = -1j * s * gm_tensor[k_, j_]
+
+        if j_ == k_:  # Diagonal rotation: phase rotation with unit modulus
+            phase = torch.exp(-1j * angle_ * gm_tensor[j_, j_] / 2)
+            M[j_, j_] = phase
+        else:
+            # Off-diagonal rotation like before
+            c, s = torch.cos(angle_ / 2), torch.sin(angle_ / 2)
+            M[j_, j_] = c
+            M[k_, k_] = c
+            M[j_, k_] = -1j * s * gm_tensor[j_, k_]
+            M[k_, j_] = -1j * s * gm_tensor[k_, j_]
         return M
 
 
