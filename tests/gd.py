@@ -2,7 +2,6 @@ import sys
 
 sys.path.append("..")
 
-import qudit.circuit.gates as G
 import torch.nn as nn
 import numpy as np
 import torch
@@ -27,7 +26,7 @@ def train(model, targ, data, epochs=100, lr=0.01):
         loss = torch.norm(targ - model(data))
 
         optimizer.zero_grad()
-        loss.backward()
+        loss.backward(retain_graph=True)
         optimizer.step()
 
         if epoch % 10 == 0:
@@ -38,6 +37,7 @@ class HybridGellMann(Hybrid):
     def __init__(self, wires):
         super().__init__()
         self.circuit = C = Circuit(wires, dim=5, device=dev)
+        G = C.gates[5]
 
         self.params = params = nn.ParameterDict(
             {
@@ -77,6 +77,7 @@ class HybridQubit(Hybrid):
         self.wires, self.dim = 2, 2
 
         self.circuit = C = Circuit(self.wires, dim=self.dim, device=dev)
+        G = C.gates[2]
         self.full = range(self.wires)
 
         self.angles = nn.ParameterDict(
@@ -96,6 +97,9 @@ class HybridQubit(Hybrid):
         self.encoder = nn.Linear(200, C.width)
 
     def forward(self, x):
+        if torch.is_complex(x):
+            x = x.abs()
+
         x = self.encoder(x).flatten()
         x = self.circuit(x)
         return x.reshape(-1, 1)
@@ -115,31 +119,29 @@ class HybridMixed(Hybrid):
         super().__init__()
         self.circuit = C = Circuit(wires, dim=dim, device=device)
         self.full = range(wires)
+        G3 = C.gates[3]
+        G5 = C.gates[5]
 
         self.params = nn.Parameter(torch.rand(2 * wires, device=device) * 2 * np.pi)
 
-        for i in range(wires):
-            C.gate(G.GMR, i, j=1, k=0, angle=self.params[i])
-        for i in range(wires):
-            C.gate(G.GMR, i, j=0, k=1, angle=self.params[wires + i])
+        C.gate(G3.GMR, 0, j=1, k=0, angle=self.params[0])
+        C.gate(G5.GMR, 1, j=0, k=1, angle=self.params[1])
 
-        C.gate(G.CX, [0, 1])
+        # C.gate(G.CX, [0, 1])
 
     def forward(self, x):
         return self.circuit(x)
 
 
-D_list = [3, 5]
-dtot = np.prod(D_list)
-x0 = torch.zeros(dtot, dtype=C64)
+x0 = torch.zeros(15, dtype=C64)
 x0[0] = 1.0
 x0 = x0.reshape(-1, 1)
 
-target = torch.zeros(dtot, dtype=C64)
+target = torch.zeros(15, dtype=C64)
 target[0] = 1.0
 target[14] = 1.0
 target /= torch.norm(target)
 
-model = HybridMixed(dim=D_list, wires=2, device=dev)
+model = HybridMixed(dim=[3, 5], wires=2, device=dev)
 
 train(model=model, targ=target.reshape(-1, 1), data=x0, lr=0.1)

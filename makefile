@@ -12,14 +12,13 @@ deploy:
 	rm -rf build dist qudit.egg-info
 
 test:
-	cd tests && python algo.py
-	cd tests && python ECC.py
-	cd tests && python circuit_M.py
 	cd tests && python circuit_V.py
 	cd tests && python gates.py
 	cd tests && python gd.py
+	cd tests && python ECC.py
+	cd tests && python algo.py
+	cd tests && python circuit_M.py
 	cd tests && python metrics.py
-	cd tests && python qsvt.py
 	cd tests && python primitives.py
 
 

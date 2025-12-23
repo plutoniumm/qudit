@@ -1,6 +1,5 @@
 from typing import List
 import torch.nn as nn
-import numpy as np
 import torch
 
 Hybrid = nn.Module
@@ -27,6 +26,7 @@ class Accel:
 
         return True
 
+    @staticmethod
     def check(devs: List[str]):
         print(f"Checking devices: {devs}")
         if isinstance(devs, str):
@@ -34,5 +34,6 @@ class Accel:
 
         return [Accel._check(dev) for dev in devs]
 
+    @staticmethod
     def available():
         return [d for d in Accel.allowed if Accel._check(d)]
