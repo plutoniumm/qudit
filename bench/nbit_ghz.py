@@ -6,6 +6,7 @@ if os.path.exists("bench_n2.json"):
     with open("bench_n2.json") as f:
         data = json.load(f)
     import matplotlib.pyplot as plt
+
     n_range = range(3, 25)
     LOG_THRESHOLD = 5
     for name, times in data.items():

@@ -10,6 +10,7 @@ import torch
 dev = "cpu"
 C64 = torch.complex64
 
+
 def nonZero(data, tol: float = 1e-5, round: int = 3, name: str = ""):
     indices = torch.where(abs(data) > tol)[0]
     data = np.round(data.cpu().numpy().flatten(), round)
@@ -18,6 +19,7 @@ def nonZero(data, tol: float = 1e-5, round: int = 3, name: str = ""):
         print(f"{name}:")
     for idx in indices:
         print(f" |Ψ⟩[{idx}]: {data[idx]:.3f}")
+
 
 def ket0(size):
     x = torch.zeros(size, dtype=C64, device=dev)
@@ -34,8 +36,12 @@ class TestCircuit(TestCase):
         self.assertSetEqual(nz, exp_idx)
 
         for idx, val in expected.items():
-            self.assertAlmostEqual(float(np.real(data[idx])), float(np.real(val)), delta=tol)
-            self.assertAlmostEqual(float(np.imag(data[idx])), float(np.imag(val)), delta=tol)
+            self.assertAlmostEqual(
+                float(np.real(data[idx])), float(np.real(val)), delta=tol
+            )
+            self.assertAlmostEqual(
+                float(np.imag(data[idx])), float(np.imag(val)), delta=tol
+            )
 
         self.assertAlmostEqual(float(np.vdot(data, data).real), 1.0, delta=1e-3)
 

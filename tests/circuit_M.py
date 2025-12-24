@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append("..")
 
 from unittest import TestCase, main
@@ -7,10 +8,12 @@ import torch
 
 C64 = torch.complex64
 
+
 def ket0(size):
     x = torch.zeros(size, dtype=C64)
     x[0] = 1.0
     return x
+
 
 def toRho(x):
     size = x.numel()
@@ -19,10 +22,7 @@ def toRho(x):
 
 class TestCircuitMatrixMode(TestCase):
     def Close(self, a, b):
-        self.assertTrue(
-            torch.allclose(a, b, rtol=1e-4, atol=1e-4),
-            "Tensors not close"
-        )
+        self.assertTrue(torch.allclose(a, b, rtol=1e-4, atol=1e-4), "Tensors not close")
 
     def test_single_qubit(self):
         cM = Circuit(wires=1, dim=2, mode=Mode.MATRIX)

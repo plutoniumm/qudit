@@ -20,6 +20,7 @@ test:
 	cd tests && python circuit_M.py
 	cd tests && python metrics.py
 	cd tests && python primitives.py
+	cd tests && python draw.py
 
 
 prof:

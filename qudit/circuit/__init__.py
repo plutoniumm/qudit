@@ -1,8 +1,6 @@
-# from .index import *
-# from .gates import *
-
-from .index import *
 from .gates import *
+from .index import *
+from .transform import *
 
 if __name__ == "__main__":
     circuit = Circuit(2, dim=2)

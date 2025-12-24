@@ -59,5 +59,6 @@ class Random(TestCase):
         all = np.concatenate((S.real, S.imag))
         self.assertLess(abs(np.mean(all)), 0.05)
 
+
 if __name__ == "__main__":
     main()

@@ -6,12 +6,14 @@ import numpy as np
 
 C128 = np.complex128
 
+
 def permut(lst: List[str], n: int) -> List[List[str]]:
 
     if n > len(lst):
         raise ValueError("n must be less than or equal to the length of lst")
 
     return [list(p) for p in set(permutations(lst, n))]
+
 
 def mkron(args):
     result = args[0]

@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import os, sys, json
 
+
 def plot_bench(data, output_png="bench_n2_gpu.png"):
     n_range = range(3, 25)
     LOG_THRESHOLD = 6
@@ -16,6 +17,7 @@ def plot_bench(data, output_png="bench_n2_gpu.png"):
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(output_png, dpi=300)
+
 
 if os.path.exists("bench_n2_gpu.json"):
     with open("bench_n2_gpu.json") as f:

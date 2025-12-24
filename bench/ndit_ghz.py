@@ -4,8 +4,10 @@ sys.path.append("..")
 
 import numpy as np
 import matplotlib.pyplot as plt
+
 # Add early-exit support similar to the GPU benchmark
 import os
+
 
 def plot_bench(data, output_png="bench_nn.png"):
     n_range = range(2, 7)
@@ -22,6 +24,7 @@ def plot_bench(data, output_png="bench_nn.png"):
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(output_png, dpi=300)
+
 
 if os.path.exists("bench_nn.json"):
     with open("bench_nn.json") as f:
@@ -80,6 +83,7 @@ def b_quforge(n, repeats):
     for _ in range(repeats):
         circ(state)
     return (bench() - start) / repeats
+
 
 n_range = range(2, 7)
 LOG_THRESHOLD = 3
