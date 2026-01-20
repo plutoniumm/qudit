@@ -4,6 +4,7 @@ TOK=`cat $(FILE)`
 .PHONY: build deploy test prof docs pages
 
 build:
+	rm -rf build dist qudit.egg-info
 	python setup.py bdist_wheel sdist
 	twine check dist/*
 

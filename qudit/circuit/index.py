@@ -20,14 +20,14 @@ class Frame:
     name: str
     index: List[int]
     dim: U[int, Array]
-    params: List
+    params: dict
 
     def __init__(
         self,
         dim: U[int, Array],
         index: List[int],
         name: str,
-        params: List = [],
+        params: dict = {},
     ):
         self.index = index
         self.dim = dim
@@ -35,9 +35,9 @@ class Frame:
         self.params = params
 
     @staticmethod
-    def parse(kwargs) -> List:
-        valid = ['i', 'j', 'k', 'angle', 'type']
-        params = []
+    def parse(kwargs) -> dict:
+        valid = ["i", "j", "k", "angle", "type"]
+        params = {}
 
         for key in valid:
             if key in kwargs:
@@ -48,7 +48,7 @@ class Frame:
                 if isinstance(val, float):
                     val = round(val, 4)
 
-                params.append(f"{key}={val}")
+                params[key] = val
 
         return params
 
@@ -67,10 +67,13 @@ class Frame:
         return Frame(dim=dims, index=index, name=name, params=params)
 
     def __str__(self) -> str:
-        params = ", ".join(self.params)
-        if params:
-            return f"{self.name}({params})"
+        if self.params:
+            items = ", ".join(
+                f"{k}={self.params[k]}"
+                    for k in sorted(self.params)
+            )
 
+            return f"{self.name}({items})"
         return f"{self.name}"
 
 

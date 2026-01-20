@@ -10,3 +10,4 @@ docs/_build
 pnpm-lock.yaml
 package.json
 node_modules/
+docs/
