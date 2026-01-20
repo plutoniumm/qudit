@@ -17,7 +17,7 @@ class GAD:
         obj = np.zeros((d, d), dtype=C128)
         for r in range(k, d):
             a, b = (r - k) / 2, k / 2
-            obj[r - k][r] = np.sqrt(nCr(r, k) * (1 - Y) ** a * Y**b)
+            obj[r - k][r] = nCr(r, k) * (1 - Y)**a * Y**b
 
         return Error(d, np.sqrt(1 - p) * obj, f"A{k}", {"Y": Y, "k": k, "p": p})
 
@@ -26,7 +26,7 @@ class GAD:
         obj = np.zeros((d, d), dtype=C128)
         for r in range(d - k):
             a, b = (d - r - k - 1) / 2, k / 2
-            obj[r + k][r] = np.sqrt(nCr(d - r - 1, k) * (1 - Y) ** a * Y**b)
+            obj[r + k][r] = nCr(d - r - 1, k) * (1 - Y)**a * Y**b
 
         return Error(d, np.sqrt(p) * obj, f"R{k}", {"Y": Y, "k": k, "p": p})
 
