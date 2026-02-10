@@ -2,8 +2,15 @@ from numpy import linalg as LA
 import numpy as np
 
 
-# Peres-Horodecki criterion for separability of density matrices
 def PPT(rho: np.ndarray, sub: int) -> bool:
+    """
+    Peres–Horodecki (PPT) separability test for a bipartite density matrix.
+
+    Performs a blockwise partial transpose on subsystem blocks of size `sub` and checks
+    positivity: $\\rho^{T_B} \succeq 0$.
+
+    Note: current implementation overrides `sub` to 3.
+    """
     side = rho.shape[0]
     sub = 3
     if side % sub != 0:
@@ -14,12 +21,22 @@ def PPT(rho: np.ndarray, sub: int) -> bool:
         for j in range(0, mat0.shape[1], sub):
             mat0[i : i + sub, j : j + sub] = mat0[i : i + sub, j : j + sub].T
 
-    return np.all(np.linalg.eigvals(mat0) >= 0)
+    return bool(np.all(np.linalg.eigvals(mat0) >= 0))
 
 
 class Space:
+    """
+    Linear-algebra helpers for vector spaces and bipartite decompositions.
+    """
+
     @staticmethod
     def gramSchmidt(vectors: np.ndarray) -> np.ndarray:
+        """
+        Gram-Schmidt orthonormalization.
+
+        Given vectors $\{v_i\}$, constructs an orthonormal set $\{u_i\}$ spanning the same
+        subspace (dropping near-zero residuals).
+        """
         ortho = []
         for v in vectors:
             w = v - sum(np.dot(v, np.conj(u)) * u for u in ortho)
@@ -30,8 +47,14 @@ class Space:
 
     @staticmethod
     def schmidtDecompose(state: np.ndarray) -> list:
+        """
+        Schmidt decomposition via SVD.
+
+        Treats `state` as a bipartite coefficient matrix $\Psi$ and returns singular triplets
+        $(\lambda_k, |u_k\\rangle, |v_k\\rangle)$ with $\Psi = \sum_k \lambda_k |u_k\\rangle\langle v_k|$.
+        """
         U, D, V = LA.svd(state)
-        dims = np.min(state.shape)
+        dims = int(np.min(state.shape))
 
         return sorted(
             [(D[k], U[:, k], V.T[:, k]) for k in range(dims)],
@@ -41,4 +64,7 @@ class Space:
 
     @staticmethod
     def schmidtRank(mat: np.ndarray) -> int:
-        return LA.matrix_rank(mat)
+        """
+        Schmidt rank (matrix rank) of a bipartite coefficient matrix.
+        """
+        return int(LA.matrix_rank(mat))

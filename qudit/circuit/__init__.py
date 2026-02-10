@@ -4,9 +4,9 @@ from .transform import *
 
 if __name__ == "__main__":
     circuit = Circuit(2, dim=2)
-    G = circuit.gates
+    G = circuit.gates[2]
 
-    my_cnot = G.make(
+    my_cnot = G.U(
         [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]], name="MyCNOT"
     )
 

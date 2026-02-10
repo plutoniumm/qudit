@@ -1,6 +1,6 @@
 from scipy.linalg import logm, fractional_matrix_power, svdvals
 from qudit.utils import partial
-from typing import List, Union
+from typing import List, Union, Any, Optional
 from numpy import linalg as LA
 import numpy as np
 
@@ -8,9 +8,18 @@ MD = LA.multi_dot
 
 
 class Fidelity:
+    """
+    Fidelity-like functionals for states and channels.
+    """
 
     @staticmethod
     def default(rho: np.ndarray, sigma: np.ndarray) -> float:
+        """
+        Uhlmann fidelity $F(\\rho,\sigma)$.
+
+        For pure statevectors $|\psi\\rangle, |\phi\\rangle$: $F = |\langle\psi|\phi\\rangle|^2$.
+        For density matrices: $F = \\big(\mathrm{Tr}\sqrt{\sqrt{\\rho}\,\sigma\,\sqrt{\\rho}}\\big)^2$.
+        """
         if rho.ndim == 1 and sigma.ndim == 1:
             return float(np.abs(np.vdot(rho, sigma)) ** 2)
 
@@ -22,32 +31,35 @@ class Fidelity:
         sqrt_rho = fractional_matrix_power(rho, 0.5)
         inner = sqrt_rho @ sigma @ sqrt_rho
         fidelity = (np.trace(fractional_matrix_power(inner, 0.5))) ** 2
+
         return float(np.real(fidelity))
 
     @staticmethod
     def channel(
         kraus: List[Union[np.ndarray, List[float]]], rho: np.ndarray
     ) -> np.ndarray:
+        """
+        Apply a quantum channel given by Kraus operators.
+
+        Computes $\mathcal{E}(\\rho)=\sum_k K_k\,\\rho\,K_k^\dagger$.
+        """
         rho_out = np.zeros_like(rho, dtype=np.complex128)
         for K in kraus:
-            rho_out += K @ rho @ K.conj().T
+            K_arr = np.asarray(K)
+            rho_out += K_arr @ rho @ K_arr.conj().T
 
         return rho_out
-
-    # @staticmethod
-    # def entanglement(rho: np.ndarray, kraus_ops: List[np.ndarray]) -> float:
-    #     assert (
-    #         rho.ndim == 2 and rho.shape[0] == rho.shape[1]
-    #     ), "rho must be a square matrix"
-
-    #     F_e = sum([np.abs(np.trace(rho @ K)) ** 2 for K in kraus_ops])
-
-    #     return F_e
 
     @staticmethod
     def entanglement(
         R_kraus: List[np.ndarray], E_kraus: List[np.ndarray], codes: List[np.ndarray]
     ) -> float:
+        """
+        Entanglement fidelity for an encode-noise-recovery pipeline.
+
+        Builds a purification $|QR\\rangle$ from `codes`, applies noise $\mathcal{E}$ and recovery
+        $\mathcal{R}$ via Kraus sets, and returns $\langle QR|\\rho'|QR\\rangle$.
+        """
         l = len(codes)
         R = np.eye(l)
 
@@ -68,6 +80,11 @@ class Fidelity:
 
     @staticmethod
     def cafaro(kraus_ops: List[np.ndarray]) -> float:
+        """
+        Cafaro-style entanglement fidelity proxy for a channel.
+
+        Uses $F_e=\sum_k |\mathrm{Tr}(K_k)|^2 / N^2$ for $N\\times N$ Kraus operators.
+        """
         N = kraus_ops[0].shape[0]
         for K in kraus_ops:
             assert K.shape == (N, N)
@@ -77,64 +94,95 @@ class Fidelity:
 
     @staticmethod
     def negativity(rho: np.ndarray, dim_A: int, dim_B: int) -> float:
+        """
+        Negativity of a bipartite state via the partial transpose.
+
+        Computes $\mathcal{N}(\\rho)=\\tfrac{\|\\rho^{T_B}\|_1-1}{2}$ using the trace norm.
+        """
         rho_reshaped = rho.reshape(dim_A, dim_B, dim_A, dim_B)
         rho_pt = np.transpose(rho_reshaped, axes=(0, 3, 2, 1))
         rho_pt = rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
         singular_values = np.linalg.svd(rho_pt, compute_uv=False)
         trace_norm = np.sum(singular_values)
-        return (trace_norm - 1) / 2
+        return float((trace_norm - 1) / 2)
 
 
 class Entropy:
+    """
+    Common entropy functionals for probability vectors and density matrices.
+    """
 
     @staticmethod
-    def default(*args):
-        return Entropy.neumann(*args)
+    def default(*args: Any) -> float:
+        """
+        Default entropy (alias for von Neumann entropy).
+        """
+        return float(Entropy.neumann(*args))  # type: ignore[attr-defined]
 
     @staticmethod
     def tsallis(rho: np.ndarray, q: float = 2.0, base: float = 2.0) -> float:
+        """
+        Tsallis entropy $S_q$ for a state (typically density matrix).
+
+        For eigenvalues $\{\lambda_i\}$: $S_q = \\frac{1-\sum_i \lambda_i^q}{q-1}$.
+        """
         if q == 1:
-            return Entropy.neumann(rho, base=base)
+            return float(Entropy.neumann(rho, base=base))
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
-        return (1 - np.sum(eigenvalues**q)) / (q - 1)
+        return float((1 - np.sum(eigenvalues**q)) / (q - 1))
 
     @staticmethod
     def shannon(probs: np.ndarray, base: float = 2.0) -> float:
+        """
+        Shannon entropy $H(p)=-\sum i p_i \log p_i$ for a probability vector.
+        """
         probs = probs[probs > 1e-12]
-        return -np.sum(probs * np.log(probs) / np.log(base))
+        return float(-np.sum(probs * np.log(probs) / np.log(base)))
 
     @staticmethod
     def renyi(rho: np.ndarray, alpha: float = 2.0, base: float = 2.0) -> float:
+        """
+        Renyi entropy $S_\\alpha$ for a density matrix.
+
+        For eigenvalues $\{\lambda_i\}$: $S_\\alpha = \\frac{1}{1-\\alpha}\log\sum i \lambda_i^\\alpha$.
+        """
         if alpha == 1:
-            return Entropy.neumann(
-                rho, base=base
-            )  # renyi entropy with alpha=1 is the same as von Neumann entropy
+            return float(Entropy.neumann(rho, base=base))
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
-        return np.log(np.sum(eigenvalues**alpha)) / ((1 - alpha) * np.log(base))
+        return float(np.log(np.sum(eigenvalues**alpha)) / ((1 - alpha) * np.log(base)))
 
     @staticmethod
     def hartley(probs: np.ndarray, base: float = 2.0) -> float:
+        """
+        Hartley entropy $H_0=\log |\mathrm{supp}(p)|$ for a probability vector.
+        """
         support_size = np.count_nonzero(probs > 1e-12)
-        return np.log(support_size) / np.log(base)
+        return float(np.log(support_size) / np.log(base))
 
     @staticmethod
     def neumann(rho: np.ndarray, base: float = 2.0) -> float:
+        """
+        von Neumann entropy $S(\\rho)=-\mathrm{Tr}(\\rho\log\\rho)$.
+        """
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
-        return -np.sum(eigenvalues * np.log(eigenvalues) / np.log(base))
+        return float(-np.sum(eigenvalues * np.log(eigenvalues) / np.log(base)))
 
     @staticmethod
     def unified(
         rho: np.ndarray, q: float = 2.0, alpha: float = 2.0, base: float = 2.0
     ) -> float:
+        """
+        Unified $(q,\\alpha)$-entropy family (interpolates Tsallis/Renyi cases).
+        """
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         eigenvalues = np.linalg.eigvalsh(rho)
@@ -142,14 +190,17 @@ class Entropy:
         s = np.sum(eigenvalues**alpha)
 
         if abs(q - 1.0) < 1e-8:
-            return np.log(s) / ((1 - alpha) * np.log(base))  # renyi
+            return float(np.log(s) / ((1 - alpha) * np.log(base)))  # renyi
         elif abs(alpha - 1.0) < 1e-8:
-            return (1 - np.sum(eigenvalues**q)) / ((q - 1))  # tsallis
+            return float((1 - np.sum(eigenvalues**q)) / (q - 1))  # tsallis
         else:
-            return ((s ** ((1 - q) / (1 - alpha))) - 1) / (1 - q)
+            return float(((s ** ((1 - q) / (1 - alpha))) - 1) / (1 - q))
 
     @staticmethod
     def relative(rho: np.ndarray, sigma: np.ndarray, base: float = 2.0) -> float:
+        """
+        Quantum relative entropy $D(\\rho\|\sigma)=\mathrm{Tr}[\\rho(\log\\rho-\log\sigma)]$.
+        """
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
@@ -158,8 +209,8 @@ class Entropy:
         rho += eps * np.eye(rho.shape[0])
         sigma += eps * np.eye(sigma.shape[0])
 
-        log_rho = logm(rho)
-        log_sigma = logm(sigma)
+        log_rho = np.asarray(logm(rho))
+        log_sigma = np.asarray(logm(sigma))
         delta_log = log_rho - log_sigma
 
         result = np.trace(rho @ delta_log).real
@@ -167,6 +218,9 @@ class Entropy:
 
     @staticmethod
     def conditional(rho: np.ndarray, dA: int, dB: int) -> float:
+        """
+        Conditional entropy $S(A|B)=S(AB)-S(A)$ for a bipartite state.
+        """
         assert rho.shape == (
             dA * dB,
             dA * dB,
@@ -180,13 +234,24 @@ class Entropy:
 
 
 class Info:
+    """
+    Information-theoretic quantities derived from entropies.
+    """
 
     @staticmethod
     def conditional(rho: np.ndarray, dA: int, dB: int, true_case: bool = True) -> float:
-        if true_case:
+        """
+        Conditional entropy (two conventions; controlled by `true_case`).
 
+        - If `true_case=True`, computes the measurement-induced conditional entropy on B given a
+          computational basis projective measurement on A.
+        - Otherwise returns $S(AB)-S(A)$.
+        """
+        if true_case:
+            d = dA
             projectors = [np.outer(b, b) for b in np.eye(d)]
             S_cond = 0
+
             for P in projectors:
                 Pi = np.kron(P, np.eye(dB))
                 prob = np.trace(Pi @ rho)
@@ -194,18 +259,25 @@ class Info:
                     rho_cond = Pi @ rho @ Pi / prob
                     rho_B = partial.trace(rho_cond, dA, dB, keep="B")
                     S_cond += prob * Entropy.default(rho_B)
+
             return S_cond
         else:
-
             assert rho.shape == (dA * dB, dA * dB)
+
             rho_A = partial.trace(rho, dA, dB, keep="A")
             S_A = Entropy.default(rho_A)
             S_AB = Entropy.default(rho)
+
             return S_AB - S_A
 
     @staticmethod
     def mutual(rho: np.ndarray, dA: int, dB: int) -> float:
+        """
+        Quantum mutual information $I(A:B)=S(A)+S(B)-S(AB)$.
+        """
+
         assert rho.shape == (dA * dB, dA * dB)
+
         rho_A = partial.trace(rho, dA, dB, keep="A")
         rho_B = partial.trace(rho, dA, dB, keep="B")
         S_A = Entropy.default(rho_A)
@@ -215,6 +287,9 @@ class Info:
 
     @staticmethod
     def coherent(rho_AB: np.ndarray, dA: int, dB: int) -> float:
+        """
+        Coherent information $I_c(A\\rangle B)=S(B)-S(AB)$.
+        """
         assert rho_AB.shape == (
             dA * dB,
             dA * dB,
@@ -228,10 +303,17 @@ class Info:
 
 
 class Distance:
+    """
+    Distances/divergences between quantum states.
+    """
+
     @staticmethod
     def relative_entropy(
         rho: np.ndarray, sigma: np.ndarray, base: float = 2.0
     ) -> float:
+        """
+        Relative entropy distance $D(\\rho\|\sigma)$ (same as `Entropy.relative`).
+        """
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
@@ -240,8 +322,8 @@ class Distance:
         rho += eps * np.eye(rho.shape[0])
         sigma += eps * np.eye(sigma.shape[0])
 
-        log_rho = logm(rho)
-        log_sigma = logm(sigma)
+        log_rho = np.asarray(logm(rho))
+        log_sigma = np.asarray(logm(sigma))
         delta_log = log_rho - log_sigma
 
         result = np.trace(rho @ delta_log).real  # ensured
@@ -249,7 +331,9 @@ class Distance:
 
     @staticmethod
     def bures(rho: np.ndarray, sigma: np.ndarray) -> float:
-
+        """
+        Bures distance $D_B(\\rho,\sigma)=\sqrt{2-2\sqrt{F(\\rho,\sigma)}}$.
+        """
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
@@ -260,6 +344,11 @@ class Distance:
 
     @staticmethod
     def jensen_shannon(rho: np.ndarray, sigma: np.ndarray, base: float = 2.0) -> float:
+        """
+        Quantum Jensen-Shannon divergence (symmetric, smoothed version of relative entropy).
+
+        Uses $\\tfrac12(D(\\rho\|m)+D(\sigma\|m))$ with $m=(\\rho+\sigma)/2$.
+        """
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
 
@@ -271,6 +360,9 @@ class Distance:
 
     @staticmethod
     def trace_distance(rho: np.ndarray, sigma: np.ndarray) -> float:
+        """
+        Trace distance $\\tfrac12\|\\rho-\sigma\|_1$ via singular values.
+        """
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
 

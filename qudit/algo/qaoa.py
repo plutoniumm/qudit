@@ -10,8 +10,26 @@ C64 = pt.complex64
 
 
 class QUBO:
+    """
+    QUBO (Quadratic Unconstrained Binary Optimization) problems defined by a matrix `Q` to minimize the function:
+
+    $f(x) = \sum_{i} Q[i, i] \\times x[i] + \sum_{i < j} Q[i, j] \\times x[i] \\times x[j]$
+
+    where x[i] are binary variables (0 or 1). The `toHamiltonian` method converts this QUBO representation into a Hamiltonian suitable for quantum algorithms like QAOA.
+    """
+
     @staticmethod
     def toHamiltonian(Q: dict):
+        """
+        Convert a QUBO problem defined by matrix Q into a Hamiltonian representation.
+
+        Function iterates over `Q` constructs Hamiltonian in terms of Pauli Z ops. Linear terms are (where $i = j$) and quadratic terms are (where $i \\neq j$). The resulting Hamiltonian is `list[tuple]`, where
+
+        ```py
+        # (coefficient, gate_type, indices)
+        type Term = tuple[float, str, list[int]]
+        ```
+        """
         ising = {}
         offset = 0.0
 
@@ -42,6 +60,19 @@ Energy = Callable[[dict, list], float]
 
 
 class QAOA(nn.Module):
+    """
+    Quantum Approximate Optimization Algorithm (QAOA) implementation for qudits.
+
+    QAOA has a known structure, and therefore instead of being built on circuit, inherits directly from `nn.Module`. The `forward` method constructs the QAOA state based on the provided Hamiltonian, and the `expectation` method computes the expectation value of the Hamiltonian with respect to the current state.
+    """
+
+    d: int
+    wires: int
+    qubo: dict = None
+    hamiltonian: list = None
+    offset: float = 0.0
+    device: str
+
     def __init__(
         self,
         d: int,
@@ -77,6 +108,10 @@ class QAOA(nn.Module):
         }
 
     def gate(self, x, gate_class, index, **kwargs):
+        """
+        Helper function to apply a gate to the state `x` using the specified `gate_class` and `index`. Additional parameters for the gate can be passed via `kwargs`.
+        """
+
         gate = gate_class(
             dim=self.d, wires=self.wires, index=index, device=self.device, **kwargs
         )
@@ -117,6 +152,10 @@ class QAOA(nn.Module):
         return state
 
     def getMat(self):
+        """
+        Construct Hamiltonian matrix from `self.hamiltonian`.
+        """
+
         H_P = pt.zeros((self.width, self.width), dtype=C64, device=self.device)
         gg = GG.Gategen(dim=self.d, device=self.device)
         opmat = {
@@ -146,6 +185,11 @@ class QAOA(nn.Module):
         return H_P
 
     def expectation(self):
+        """
+        Compute the expectation value of the Hamiltonian with respect to the current state.
+
+        ExpVal $\langle\psi|H|\psi\\rangle$, where $|\psi\\rangle$ is the state obtained from the `forward` method, and H is the Hamiltonian matrix constructed in `getMat`. The offset is added to the computed expectation value to account for any constant terms in the Hamiltonian.
+        """
         final_state = self.forward()
         exp_val = pt.vdot(
             final_state.squeeze(), (self._H_P_matrix @ final_state).squeeze()

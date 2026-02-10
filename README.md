@@ -31,3 +31,66 @@ ket0[0] = 1.0  # |00>
 
 print(C(ket0))  # [1. 0. 0. 1.]/rt2
 ```
+
+## Contributing
+Qudit has a small shell scripts used to generate documentation and run tests. If you want to contribute, please fork the repo and make a pull request with your changes. The running script is `do`.
+
+### `./do` helper script
+
+The repository includes a small `./do` helper for common workflows (build, tests, docs, etc.).
+
+```bash
+./do help
+```
+
+#### Commands
+
+- `./do build`
+  - Builds `sdist` + `wheel` and runs `twine check dist/*`.
+- `./do deploy`
+  - Uploads `dist/*` to PyPI via `twine upload` using an API token.
+  - Token is read from `FILE` (defaults to `.vscode/token.env`).
+- `./do test`
+  - Runs the Python test scripts in `./tests`.
+- `./do prof`
+  - Profiles `./tests/bench_fast.py` with `cProfile` and opens `snakeviz`.
+- `./do head`
+  - Runs `python ./view/headers.py` (used by the docs pipeline).
+- `./do docs dev`
+  - Runs the docs dev server (`npm run dev`).
+- `./do docs build`
+  - Builds the docs (`npm run build`).
+
+#### Common workflows
+
+```bash
+# run test scripts
+./do test
+
+# build packages locally
+./do build
+
+# build docs
+./do docs build
+
+# docs dev server
+./do docs dev
+```
+
+#### PyPI token setup (for `deploy`)
+
+Create a file containing only your PyPI API token (no `export`, no quotes):
+
+- default location: `.vscode/token.env`
+- or specify a different file via `FILE=path/to/token.env`
+
+Example:
+
+```bash
+FILE=.vscode/token.env ./do deploy
+```
+
+## Acknowledgements
+Many many thanks to [Sai Sakunthala](https://github.com/Sai-sakunthala) and [R-Phoenix](https://github.com/R-Phoenix) for testing and fixing bugs!
+
+This library is built on top of pytorch, and takes ideas from Qiskit, Cirq, and QuDiet.

@@ -4,7 +4,7 @@ sys.path.append("..")
 
 import matplotlib.pyplot as plt
 
-# Early exit if prior benchmark results exist. Loads JSON, plots, saves PNG, and exits.
+
 def _early_plot_and_exit():
     if os.path.exists("bench_sgd.json"):
         with open("bench_sgd.json") as f:

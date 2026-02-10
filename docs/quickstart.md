@@ -1,6 +1,6 @@
 # Qudit Quickstart
 
-Get up and running with `qudit`, a Python library for working with *d*-level quantum systems (qudits): circuits, error correction, and QML style workflows.
+Get up and running with `qudit`, a Python library for working with *d*-level quantum systems (qudits): with circuits, error correction, and QML style workflows.
 
 ## Installation
 I recommend using a virtual environment (e.g., `venv` or `conda`) to manage your Python dependencies since `qudit` will install `torch` which may conflict with any existing global installations. Install from PyPI:
@@ -76,3 +76,48 @@ Should you choose to print the circuit with `print(C.draw())`, you will see a ni
 ```
 
 Which shows us we start with two dits of dimension two, apply a Hadamard gate to the first qudit, and then a CNOT gate between the first and second qudit.
+
+## Citation
+
+::: code-group
+
+```txt [text]
+M. Seksaria, A. Mishra and A. Prabhakar, "qudit: High-Performance Simulator for Qudit Systems," 2025 Supercomputing India (SCI), Bangalore, India, 2025, pp. 1-7, doi: 10.1109/SCI68648.2025.11333840. keywords: {Quantum system;Machine learning algorithms;Codes;Qubit;Machine learning;Probabilistic logic;Libraries;Error correction;Integrated circuit modeling;Quantum simulation},
+```
+
+```bib [ref.bib]
+@INPROCEEDINGS{11333840,
+  author={Seksaria, Manav and Mishra, Abhyuday and Prabhakar, Anil},
+  booktitle={2025 Supercomputing India (SCI)},
+  title={qudit: High-Performance Simulator for Qudit Systems},
+  year={2025},
+  volume={},
+  number={},
+  pages={1-7},
+  keywords={Quantum system;Machine learning algorithms;Codes;Qubit;Machine learning;Probabilistic logic;Libraries;Error correction;Integrated circuit modeling;Quantum simulation},
+  doi={10.1109/SCI68648.2025.11333840}
+}
+```
+
+```txt [RIS]
+TY  - CONF
+TI  - qudit: High-Performance Simulator for Qudit Systems
+T2  - 2025 Supercomputing India (SCI)
+SP  - 1
+EP  - 7
+AU  - M. Seksaria
+AU  - A. Mishra
+AU  - A. Prabhakar
+PY  - 2025
+DO  - 10.1109/SCI68648.2025.11333840
+JO  - 2025 Supercomputing India (SCI)
+IS  -
+SN  -
+VO  -
+VL  -
+JA  - 2025 Supercomputing India (SCI)
+Y1  - 9-13 Dec. 2025
+ER  -
+```
+
+:::

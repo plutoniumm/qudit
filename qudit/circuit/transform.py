@@ -1,6 +1,7 @@
 from typing import List
 from enum import Enum
 
+
 class Marker(Enum):
     CONTROL = "●"
     L = "╰"
@@ -9,12 +10,10 @@ class Marker(Enum):
     PIPE = "─"
     START = "┤"
 
+
 class Table:
     def __init__(self, circ):
-        drawing: List[str] = [
-            f"|0> [{d}] {Marker.START.value}"
-                for d in circ.dims_
-        ]
+        drawing: List[str] = [f"|0> [{d}] {Marker.START.value}" for d in circ.dims_]
         self.fig = drawing
         self.wires = len(drawing)
 

@@ -1,13 +1,22 @@
+# GENERIC
 local/
 .DS_Store
+.vscode
+
+# PYTHON
 **/__pycache__/
+qudit.egg-info
+tests/test.py
+
+# NODE
 dist
 build/
-qudit.egg-info
-program.prof
-.vscode
-docs/_build
 pnpm-lock.yaml
 package.json
 node_modules/
-docs/
+docs/.vitepress/cache/
+
+# CUSTOM/HYBRID
+docs/code
+docs/tests
+docs/public/dumps

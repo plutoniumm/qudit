@@ -7,11 +7,9 @@ import numpy as np
 import torch
 
 from qudit.circuit import tensorise
-from qudit.ml import Accel, Hybrid
 from torch.optim import Adam
+from qudit.ml import Hybrid
 from qudit import Circuit
-
-print(f"Using device: {Accel.available()}")
 
 C64 = torch.complex64
 dev = "cpu"

@@ -1,3 +1,4 @@
+from typing import List, Optional, Sequence, Union
 from scipy.optimize import minimize
 import torch as pt
 
@@ -21,20 +22,37 @@ _paulis = {
 }
 
 
-def _S(*args) -> pt.Tensor:
+def _S(*args: pt.Tensor) -> pt.Tensor:
+    """
+    Kron product of a sequence of operators.
+
+    The ordering here matches the original implementation: starting from the
+    first argument, each subsequent operator is kron'd on the *left*.
+    """
     state = args[0]
+
     for d in args[1:]:
         state = pt.kron(d, state)
+
     return state
 
 
 def S(string: str) -> pt.Tensor:
+    """
+    Convert a Pauli string (e.g. ``"XIIZ"``) into its operator tensor.
+    """
     paulis = [_paulis[i] for i in string]
+
     return _S(*paulis)
 
 
-def GramSchmidt(vectors):
-    ortho = []
+def GramSchmidt(vectors: Sequence[pt.Tensor]) -> pt.Tensor:
+    """
+    Orthonormalise a list/sequence of vectors using Gram-Schmidt.
+
+    Vectors with (near-)zero residual norm are dropped.
+    """
+    ortho: List[pt.Tensor] = []
     for v in vectors:
         w = v - sum((v @ u.conj()) * u for u in ortho)
         if pt.norm(w) > 1e-8:
@@ -43,14 +61,36 @@ def GramSchmidt(vectors):
 
 
 class Statiliser:
-    def __init__(self, stabilisers):
-        stabilisers = [S(s) for s in stabilisers]
-        self.stabilisers = stabilisers
+    """
+    Statiliser is a class that generates a basis of states stabilized by a given set of stabilizers. Stabilizers are represented as strings of Paulis (e.g., "ZZZII", "IIZZZ", "XIXXI", "IXXIX").
+
+    `generate` uses gradient-free optimization to find states that are stabilized by the provided stabilizers, and then applies the Gram-Schmidt process to ensure the resulting states form an orthonormal basis.
+    """
+
+    stabilisers: List[pt.Tensor]
+    sz: int
+    num_states: int
+    basis: Optional[pt.Tensor]
+
+    def __init__(self, stabilisers: Sequence[Union[str, pt.Tensor]]):
+        """
+        Create a generator for the subspace stabilised by ``stabilisers``.
+        """
+        stabilisers = [S(s) if isinstance(s, str) else s for s in stabilisers]
+        self.stabilisers = list(stabilisers)
         self.sz = int(pt.log2(pt.tensor(stabilisers[0].shape[0])).item())
         self.num_states = 2 ** (self.sz - len(stabilisers))
         self.basis = None
 
-    def _fun(self, x, mode="real", minimal=1):
+    def _fun(self, x, mode: str = "real", minimal: int = 1) -> float:
+        """
+        Objective used by the optimiser.
+
+        Combines:
+        # - stabiliser constraint violation: $||g|\psi\\rangle - |\psi\\rangle||$ summed over g
+        - small L1 penalty to prefer sparse-ish solutions (optional) which may help in finding vectors closer to their canonical form
+        - L2 penalty to encourage normalisation
+        """
         vec = pt.tensor(x, dtype=pt.complex64)
         if mode != "real":
             vec = self._to_complex(vec)
@@ -59,14 +99,25 @@ class Statiliser:
         L1 = pt.norm(vec, p=1).item()
         L2 = 2 * (1 - pt.norm(vec).item()) ** 2
 
-        return c1 + (L1 + L2) * minimal
+        return float(c1 + (L1 + L2) * minimal)
 
-    def _to_complex(self, vec):
+    def _to_complex(self, vec: pt.Tensor) -> pt.Tensor:
+        """
+        Interpret a real tensor as concatenated real/imag parts.
+        """
         l = len(vec)
         return vec[: l // 2] + 1j * vec[l // 2 :]
 
-    def generate(self, mode="real", tol=1e-6, minimal=True):
-        basis = []
+    def generate(
+        self,
+        mode: str = "real",
+        tol: float = 1e-6,
+        minimal: bool = True,
+    ) -> pt.Tensor:
+        """
+        Generate an orthonormal basis for the stabilised subspace.
+        """
+        basis: List[pt.Tensor] = []
         factor = 2 if mode == "complex" else 1
 
         for _ in range(self.num_states):
@@ -83,8 +134,8 @@ class Statiliser:
             state = state / pt.norm(state)
             basis.append(state)
 
-        basis = GramSchmidt(basis)
-        basis = basis.to(dtype=pt.float16 if mode == "real" else pt.cfloat)
-        self.basis = basis
+        basis_t = GramSchmidt(basis)
+        basis_t = basis_t.to(dtype=pt.float16 if mode == "real" else pt.cfloat)
+        self.basis = basis_t
 
-        return basis
+        return basis_t

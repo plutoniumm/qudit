@@ -77,7 +77,9 @@ class TestCircuit(TestCase):
         x3 = ket0(c3.width)
         psi = c3(x3)
         a = 1 / np.sqrt(3)
-        self.assert_state(psi, {0: a + 0j, 17: a + 0j, 18: a + 0j})
+
+        expected = {0: a + 0j, 13: a + 0j, 26: a + 0j}
+        self.assert_state(psi, expected)
 
 
 if __name__ == "__main__":

@@ -7,9 +7,21 @@ C128 = np.complex128
 
 
 class GAD:
+    """
+    Generalized amplitude damping (GAD) Kraus operators for a $d$-level system.
+
+    Provides Kraus operators $\{A_k, R_k\}$ parameterized by environment excitation
+    probability $p$ and damping parameter $Y$.
+    """
 
     @staticmethod
-    def A(order: int, d: int, Y: float, p: float = 0.0):
+    def A(order: int, d: int, Y: float, p: float = 0.0) -> Error:
+        """
+        Construct the GAD lowering Kraus operator $A_k$.
+
+        This operator maps population from $|r\\rangle$ to $|r-k\\rangle$ with weights
+        determined by $(Y,p)$.
+        """
         k = order
         assert isinstance(k, int) and k >= 0, "k must be int>=0"
         assert isinstance(d, int) and d > 0, "d must be int>0"
@@ -17,39 +29,63 @@ class GAD:
         obj = np.zeros((d, d), dtype=C128)
         for r in range(k, d):
             a, b = (r - k) / 2, k / 2
-            obj[r - k][r] = nCr(r, k) * (1 - Y)**a * Y**b
+            obj[r - k][r] = nCr(r, k) * (1 - Y) ** a * Y**b
 
         return Error(d, np.sqrt(1 - p) * obj, f"A{k}", {"Y": Y, "k": k, "p": p})
 
     @staticmethod
-    def R(k: int, d: int, Y: float, p: float = 0.0):
+    def R(k: int, d: int, Y: float, p: float = 0.0) -> Error:
+        """
+        Construct the GAD raising Kraus operator $R_k$.
+
+        This operator maps population from $|r\\rangle$ to $|r+k\\rangle$ with weights
+        determined by $(Y,p)$.
+        """
         obj = np.zeros((d, d), dtype=C128)
         for r in range(d - k):
             a, b = (d - r - k - 1) / 2, k / 2
-            obj[r + k][r] = nCr(d - r - 1, k) * (1 - Y)**a * Y**b
+            obj[r + k][r] = nCr(d - r - 1, k) * (1 - Y) ** a * Y**b
 
         return Error(d, np.sqrt(p) * obj, f"R{k}", {"Y": Y, "k": k, "p": p})
 
 
 class Pauli:
+    """
+    Single-qubit Pauli error operators as Kraus operators.
+
+    Each method returns $\sqrt{p}\,\sigma$ for $\sigma \in \{X,Y,Z\}$ and an identity
+    term $\sqrt{1-\sum p_i}\,I$.
+    """
+
     @staticmethod
-    def X(p: float):
+    def X(p: float) -> Error:
+        """
+        Return the bit-flip Kraus operator $\sqrt{p}\,X$.
+        """
         x = np.sqrt(p) * np.array([[0, 1], [1, 0]], dtype=C128)
         return Error(2, x, "X", {"p": p})
 
     @staticmethod
-    def Y(p: float):
+    def Y(p: float) -> Error:
+        """
+        Return the phase+bit-flip Kraus operator $\sqrt{p}\,Y$.
+        """
         y = np.sqrt(p) * np.array([[0, -1j], [1j, 0]], dtype=C128)
         return Error(2, y, "Y", {"p": p})
 
     @staticmethod
-    def Z(p: float):
+    def Z(p: float) -> Error:
+        """
+        Return the phase-flip Kraus operator $\sqrt{p}\,Z$.
+        """
         z = np.sqrt(p) * np.array([[1, 0], [0, -1]], dtype=C128)
         return Error(2, z, "Z", {"p": p})
 
     @staticmethod
-    def I(ps: List[float]):
-
+    def I(ps: List[float]) -> Error:
+        """
+        Return the identity Kraus operator $\sqrt{1-\sum_i p_i}\,I$.
+        """
         p = np.sqrt(1 - np.sum(ps))
         i = p * np.array([[1, 0], [0, 1]], dtype=C128)
 
