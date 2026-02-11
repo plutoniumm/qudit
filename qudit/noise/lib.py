@@ -1,7 +1,7 @@
-from .kraus import GAD, Error, Pauli
+from typing import List, Any, Sequence, Optional
 from itertools import permutations
 from .index import Channel, Error
-from typing import List, Any, Sequence, Optional
+from .kraus import GAD, Pauli
 import numpy as np
 
 C128 = np.complex128
