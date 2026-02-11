@@ -7,7 +7,7 @@ import torch
 C64 = torch.complex64
 
 
-class Gate:
+class Operator:
     """
     Generic gate class wrapping a complex matrix/tensor with a name and optional parameters/metadata.
 
@@ -40,59 +40,61 @@ class Gate:
             return self.name
 
     def __xor__(self, other: Any) -> Any:
-        # Gate ^ Gate
-        if isinstance(other, Gate):
+        # Operator ^ Operator
+        if isinstance(other, Operator):
             tensor = torch.kron(self.tensor, other.tensor)
             name = f"{self.name} ^ {other.name}"
             params = self.params + other.params
-            return Gate(tensor, name, params)
+            return Operator(tensor, name, params)
 
-        # Gate ^ Unitary
+        # Operator ^ Unitary
         if isinstance(other, Unitary):
             tensor = torch.kron(self.tensor, other.matrix())
             name = f"{self.name} ^ {other.name}"
             params = self.params + list(other.params)
-            return Gate(tensor, name, params)
+            return Operator(tensor, name, params)
 
-        # Gate ^ Tensor
+        # Operator ^ Tensor
         if isinstance(other, torch.Tensor):
             tensor = torch.kron(self.tensor, other)
             name = f"{self.name} ^ Tensor"
-            return Gate(tensor, name)
+            return Operator(tensor, name)
 
-        # Gate ^ State
+        # Operator ^ State
         if isinstance(other, State):
             tensor = torch.kron(self.tensor, other.tensor if hasattr(other, "tensor") else other)  # type: ignore[arg-type]
             return State(tensor)  # type: ignore[call-arg]
 
-        raise TypeError("Can only tensor product with Gate, Unitary, Tensor, or State")
+        raise TypeError(
+            "Can only tensor product with Operator, Unitary, Tensor, or State"
+        )
 
-    def __rxor__(self, other: Any) -> Union["Gate", Any]:
+    def __rxor__(self, other: Any) -> Union["Operator", Any]:
         if isinstance(other, Unitary):
             tensor = torch.kron(other.matrix(), self.tensor)
             name = f"{other.name} ^ {self.name}"
             params = list(other.params) + list(self.params)
-            return Gate(tensor, name, params)
+            return Operator(tensor, name, params)
 
         return NotImplemented
 
     def __matmul__(self, other: Any) -> Any:
-        # Gate @ State
+        # Operator @ State
         if isinstance(other, State):
             return State(self.tensor @ (other.tensor if hasattr(other, "tensor") else other))  # type: ignore[call-arg]
-        # Gate @ Gate
-        elif isinstance(other, Gate):
+        # Operator @ Operator
+        elif isinstance(other, Operator):
             tensor = self.tensor @ other.tensor
             name = f"{self.name} @ {other.name}"
             params = self.params + other.params
-            return Gate(tensor, name, params)
-        # Gate @ Tensor
+            return Operator(tensor, name, params)
+        # Operator @ Tensor
         elif isinstance(other, torch.Tensor):
             tensor = self.tensor @ other
             name = f"{self.name} @ Tensor"
-            return Gate(tensor, name)
+            return Operator(tensor, name)
         else:
-            raise TypeError("Can only apply to State or compose with another Gate")
+            raise TypeError("Can only apply to State or compose with another Operator")
 
     def __rmatmul__(self, other: Any) -> Any:
         matmul = getattr(other, "__matmul__", None)
@@ -100,12 +102,14 @@ class Gate:
         if callable(matmul):
             return matmul(self)
 
-        raise TypeError(f"Operator '@' not supported between {type(other)} and Gate")
+        raise TypeError(
+            f"Operator '@' not supported between {type(other)} and Operator"
+        )
 
 
 def tensorise(m: Any, device: str = "cpu", dtype: torch.dtype = C64) -> torch.Tensor:
     """
-    Convert common array-likes (Tensor/ndarray/list/Gate) into a torch complex tensor.
+    Convert common array-likes (Tensor/ndarray/list/Operator) into a torch complex tensor.
     """
     if isinstance(m, torch.Tensor):
         return m.to(device=device, dtype=dtype)
@@ -113,7 +117,7 @@ def tensorise(m: Any, device: str = "cpu", dtype: torch.dtype = C64) -> torch.Te
         return torch.from_numpy(m).to(device, non_blocking=True).type(dtype)
     elif isinstance(m, list):
         return torch.tensor(m, device=device, dtype=dtype)
-    elif isinstance(m, Gate):
+    elif isinstance(m, Operator):
         return m.tensor.to(device=device, dtype=dtype)
     else:
         raise TypeError(
@@ -241,21 +245,21 @@ class Unitary(nn.Module):
         # State
         if isinstance(other, State):
             return State(self.forward(other.tensor if hasattr(other, "tensor") else other))  # type: ignore[call-arg]
-        # Gate
-        elif isinstance(other, Gate):
+        # Operator
+        elif isinstance(other, Operator):
             U_full = self.matrix()
             mat = U_full @ tensorise(other.tensor, device=self.device)
             name = f"{self.name} @ {other.name}"
             params = list(self.params) + list(other.params)
-            return Gate(mat, name, params)
+            return Operator(mat, name, params)
         # Tensor-like
         elif isinstance(other, torch.Tensor):
             U_full = self.matrix()
             mat = U_full @ other.to(device=self.device, dtype=C64)
             name = f"{self.name} @ Tensor"
-            return Gate(mat, name)
+            return Operator(mat, name)
         else:
-            raise TypeError("Can only apply Unitary to State, Gate, or Tensor")
+            raise TypeError("Can only apply Unitary to State, Operator, or Tensor")
 
 
 class Gategen:
@@ -270,37 +274,15 @@ class Gategen:
         self.dim = dim
         self.device = device
 
-    def asU(
-        self,
-        m: torch.Tensor,
-        index: Union[int, List[int]],
-        wires: int,
-        dim: Union[int, List[int]],
-        name: Optional[str] = None,
-        params: Optional[list] = None,
-    ) -> Unitary:
-        """
-        Wrap a target-space matrix as an embedded Unitary acting on given wire indices.
-        """
-        return Unitary(
-            m,
-            index=index,  # type: ignore[arg-type]
-            wires=wires,
-            dim=dim,
-            device=self.device,
-            name=name or "U",
-            params=params,
-        )
-
     @property
-    def I(self) -> Gate:
+    def I(self) -> Operator:
         """
         Identity gate on one qudit such that $I|k\\rangle = |k\\rangle$ for all states $|k\\rangle$.
         """
-        return Gate(torch.eye(self.dim, dtype=C64, device=self.device), "I")
+        return Operator(torch.eye(self.dim, dtype=C64, device=self.device), "I")
 
     @property
-    def H(self) -> Gate:
+    def H(self) -> Operator:
         """
         Hadamard/DFT gate (H for d=2, discrete Fourier transform for $d$>2) such that $H|k\\rangle = \\frac{1}{\sqrt{d}} \sum_{j=0}^{d-1} \omega^{jk} |j\\rangle$ where $\omega = e^{2\\pi i / d}$.
         """
@@ -313,23 +295,24 @@ class Gategen:
             w = np.exp(2j * torch.pi / d)
             idx = torch.arange(d, device=self.device)
             m = (w ** torch.outer(idx, idx)) / np.sqrt(d)
-        return Gate(m.to(dtype=C64), "H")
+        return Operator(m.to(dtype=C64), "H")
 
     @property
-    def X(self) -> Gate:
+    def X(self) -> Operator:
         """
         Generalized X (cyclic shift) gate as $X|k\\rangle = |k+1 \mod d\\rangle$ (Pauli-X for $d=2$).
         """
         if self.dim == 2:
             m = torch.tensor([[0, 1], [1, 0]], dtype=C64, device=self.device)
         else:
-            m = torch.roll(torch.eye(self.dim, dtype=C64, device=self.device), shifts=-1, dims=1)
+            m = torch.roll(
+                torch.eye(self.dim, dtype=C64, device=self.device), shifts=-1, dims=1
+            )
 
-        return Gate(m, "X")
-
+        return Operator(m, "X")
 
     @property
-    def Z(self) -> Gate:
+    def Z(self) -> Operator:
         """
         Generalized Z (phase) gate: diag(ω^k) as $Z|k\\rangle = \omega^k |k\\rangle$ where $\omega = e^{2\\pi i / d}$ (Pauli-Z for $d=2$).
         """
@@ -340,10 +323,10 @@ class Gategen:
             w = np.exp(2j * torch.pi / d)
             idx = torch.arange(d, device=self.device)
             m = torch.diag(w**idx)
-        return Gate(m, "Z")
+        return Operator(m, "Z")
 
     @property
-    def Y(self) -> Gate:
+    def Y(self) -> Operator:
         """
         Generalized Y (up to phase), built from Z and X (Pauli-Y for d=2) as $Y = Z X / i$ such that $Y|k\\rangle = -i \omega^k |k+1 \mod d\\rangle$.
         """
@@ -352,7 +335,7 @@ class Gategen:
             m = torch.tensor([[0, -1j], [1j, 0]], dtype=C64, device=self.device)
         else:
             m = torch.matmul(self.Z.tensor, self.X.tensor) / 1j
-        return Gate(m, "Y")
+        return Operator(m, "Y")
 
     def inCircuit(self, kwargs: dict) -> bool:
         """
@@ -369,7 +352,7 @@ class Gategen:
         *,
         matrix: bool = False,
         **kwargs: Any,
-    ) -> Union[Gate, Unitary]:
+    ) -> Union[Operator, Unitary]:
         """
         Generalized rotation from a Gell-Mann generator (symmetric/asymmetric/diagonal). Gell-Mann gates are described by their type (sym/asym/diag) and the indices j, k specifying the generator.
 
@@ -427,30 +410,31 @@ class Gategen:
         ]
 
         if matrix:
-            return Gate(m, gate_name, params=gate_params)
+            return Operator(m, gate_name, params=gate_params)
 
         if not self.inCircuit(kwargs):
             raise TypeError(
                 f"{gate_name} missing circuit kwargs (index/wires/dim). "
-                f"Call with matrix=True for standalone Gate."
+                f"Call with matrix=True for standalone Operator."
             )
 
         index = kwargs.pop("index")
         wires = kwargs.pop("wires")
         dim = kwargs.pop("dim")
         name = kwargs.pop("name", None)
-        return self.asU(
+        return Unitary(
             m,
             index=index,
             wires=wires,
             dim=dim,
+            device=self.device,
             name=name or gate_name,
             params=gate_params,
         )
 
     def RX(
         self, angle: Any, *, matrix: bool = False, **kwargs: Any
-    ) -> Union[Gate, Unitary]:
+    ) -> Union[Operator, Unitary]:
         """
         Rotation in the (0,1) symmetric subspace (qubit-like Rx when d=2) as $RX(\\theta) = GMR_{\\text{sym}}(0,1,\\theta)$.
         """
@@ -458,7 +442,7 @@ class Gategen:
 
     def RY(
         self, angle: Any, *, matrix: bool = False, **kwargs: Any
-    ) -> Union[Gate, Unitary]:
+    ) -> Union[Operator, Unitary]:
         """
         Rotation in the (0,1) asymmetric subspace (qubit-like Ry when d=2) as $RY(\\theta) = GMR_{\\text{asym}}(0,1,\\theta)$.
         """
@@ -466,7 +450,7 @@ class Gategen:
 
     def RZ(
         self, angle: Any, *, matrix: bool = False, **kwargs: Any
-    ) -> Union[Gate, Unitary]:
+    ) -> Union[Operator, Unitary]:
         """
         Diagonal generator rotation (qubit-like Rz when d=2) as $RZ(\\theta) = GMR_{\\text{diag}}(0,0,\\theta)$.
         """
@@ -474,20 +458,18 @@ class Gategen:
 
     def CU(
         self, U_target: Any = None, *, matrix: bool = False, **kwargs: Any
-    ) -> Union[Gate, Unitary]:
+    ) -> Union[Operator, Unitary]:
         """
         Controlled-unitary: apply target block when control is in a chosen computational state such that when $U_target$ is a dxd unitary matrix, $CU = |0\\rangle\\langle 0| \\otimes I + |1\\rangle\\langle 1| \\otimes U$ (generalized CNOT for $U=X$ and $d=2$).
         """
         d = self.dim
 
         U_mat = tensorise(
-            U_target.tensor if isinstance(U_target, Gate) else U_target,
+            U_target.tensor if isinstance(U_target, Operator) else U_target,
             device=self.device,
         )
         if U_mat.shape != (d, d):
-            raise ValueError(
-                f"U_target must be a ({d},{d}) matrix, got {U_mat.shape}."
-            )
+            raise ValueError(f"U_target must be a ({d},{d}) matrix, got {U_mat.shape}.")
 
         I = torch.eye(d, device=self.device, dtype=C64)
         blocks = [I]
@@ -497,37 +479,38 @@ class Gategen:
         m = torch.block_diag(*blocks)
         gate_name = "CU"
 
-        target_name = U_target.name if isinstance(U_target, Gate) else None
+        target_name = U_target.name if isinstance(U_target, Operator) else None
         gate_params: List[Tuple[str, Any]] = [
             ("target", target_name),
             ("dim", d),
         ]
 
         if matrix:
-            return Gate(m, gate_name, params=gate_params)
+            return Operator(m, gate_name, params=gate_params)
 
         index = kwargs.pop("index")
         wires = kwargs.pop("wires")
         dim = kwargs.pop("dim")
         name = kwargs.pop("name", None)
-        return self.asU(
+        return Unitary(
             m,
             index=index,
             wires=wires,
             dim=dim,
+            device=self.device,
             name=name or gate_name,
             params=gate_params,
         )
 
     @property
-    def CX(self) -> Gate:
+    def CX(self) -> Operator:
         """
         Controlled-X (generalized CNOT) as a standalone dense gate as $CX = CU(X)$ where the target is the generalized X/shift gate.
         """
         return self.CU(self.X, matrix=True)  # type: ignore[return-value]
 
     @property
-    def SWAP(self) -> Gate:
+    def SWAP(self) -> Operator:
         """
         SWAP gate exchanging two d-dimensional subsystems such that $SWAP|a,b\\rangle = |b,a\\rangle$.
         """
@@ -538,7 +521,7 @@ class Gategen:
                 row = i * d + j
                 col = j * d + i
                 m[col, row] = 1.0
-        return Gate(m, "SWAP")
+        return Operator(m, "SWAP")
 
     def U(self, matrix: Any, **kwargs: Any) -> Callable[[Any, int, Any], Unitary]:
         t = tensorise(matrix, device=self.device)

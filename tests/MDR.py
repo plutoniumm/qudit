@@ -9,19 +9,21 @@ outDir = "../docs/tests"
 load = unittest.defaultTestLoader.loadTestsFromTestCase
 C64 = torch.complex64
 
+
 class Result(unittest.TestResult):
     def __init__(self):
         super().__init__()
         self.rows = []
+        self._pending = {}
 
     def addSuccess(self, test):
-        self.rows.append(self._row(test, "PASS"))
+        self._pending[test] = ("PASS", None)
 
     def addFailure(self, test, err):
-        self.rows.append(self._row(test, "FAIL", err=err))
+        self._pending[test] = ("FAIL", err)
 
     def addError(self, test, err):
-        self.rows.append(self._row(test, "ERROR", err=err))
+        self._pending[test] = ("ERROR", err)
 
     def startTest(self, test):
         super().startTest(test)
@@ -34,6 +36,9 @@ class Result(unittest.TestResult):
             "_mdr_elapsed",
             (time.perf_counter() - start) if start is not None else None,
         )
+
+        status, err = self._pending.pop(test, ("PASS", None))
+        self.rows.append(self._row(test, status, err=err))
         super().stopTest(test)
 
     def _row(self, test, status, err=None):
@@ -42,20 +47,19 @@ class Result(unittest.TestResult):
         if status == "PASS":
             msg = "✓"
         else:
-            try:
-                if err is not None:
-                    formatted = fmx(*err)
-                    msg = (formatted[-1] or "").strip() or "".join(formatted).strip()
-                else:
-                    msg = "Test failed"
-            except Exception:
-                msg = "Test failed"
+            msg = "Test failed"
+            if err is not None:
+                formatted = fmx(*err)
+                formatted = [line.strip() for line in formatted if line.strip()]
+
+                if formatted:
+                    msg = formatted[-1]
 
         return {
             "name": test._testMethodName,
             "desc": test.shortDescription() or "",
             "result": msg,
-            "time": round(float(elapsed), 5)
+            "time": float(elapsed),
         }
 
 
@@ -99,7 +103,7 @@ class Exam:
             f.write("|----------|-------------|--------|----------------|\n")
             for r in result.rows:
                 tname = r["name"].replace("test_", "")
-                taken = f"{r.get('time', 0.0):.6f}"
+                taken = f"{r.get('time', 0.0):.4f}"
                 res = str(r.get("result", ""))
                 desc = str(r.get("desc", "")).replace("\n", " ").replace("|", "\|")
                 res = res.replace("\n", " ")

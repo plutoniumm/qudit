@@ -1,4 +1,4 @@
-from .gates import Unitary, Gategen, Gate
+from .gates import Unitary, Gategen, Operator
 from typing import Union as U, List, Any, Optional, Dict
 from dataclasses import dataclass
 import torch.nn as nn
@@ -161,7 +161,7 @@ class Circuit(nn.Module):
         """
         Append a gate acting on `index` to the circuit with optionally params
 
-        Gate may be of type Unitary, Gate, torch.Tensor, or a callable factory for an embedded Unitary.
+        Operator may be of type Unitary, Operator, torch.Tensor, or a callable factory for an embedded Unitary.
 
         The gate is added to the circuit as an nn.Module and a Frame is recorded for display/logging.
         """
@@ -174,7 +174,7 @@ class Circuit(nn.Module):
         self.operations.append(Frame.create(gate_in, dims, idx_list, **kwargs))
 
         Instance: Any = None
-        if isinstance(gate_in, (torch.Tensor, Gate)):
+        if isinstance(gate_in, (torch.Tensor, Operator)):
             Instance = Unitary(
                 matrix=gate_in,
                 index=idx_list,
