@@ -47,8 +47,8 @@ class Operator:
             params = self.params + other.params
             return Operator(tensor, name, params)
 
-        # Operator ^ Unitary
-        if isinstance(other, Unitary):
+        # Operator ^ Gate
+        if isinstance(other, Gate):
             tensor = torch.kron(self.tensor, other.matrix())
             name = f"{self.name} ^ {other.name}"
             params = self.params + list(other.params)
@@ -66,11 +66,11 @@ class Operator:
             return State(tensor)  # type: ignore[call-arg]
 
         raise TypeError(
-            "Can only tensor product with Operator, Unitary, Tensor, or State"
+            "Can only tensor product with Operator, Gate, Tensor, or State"
         )
 
     def __rxor__(self, other: Any) -> Union["Operator", Any]:
-        if isinstance(other, Unitary):
+        if isinstance(other, Gate):
             tensor = torch.kron(other.matrix(), self.tensor)
             name = f"{other.name} ^ {self.name}"
             params = list(other.params) + list(self.params)
@@ -150,7 +150,7 @@ def gell_mann(j: int, k: int, d: int, device: str = "cpu") -> torch.Tensor:
     return m
 
 
-class Unitary(nn.Module):
+class Gate(nn.Module):
     """
     Parameterized unitary acting on a subset of wires, embedded into the full Hilbert space. A generic container class which handles all the reshaping/permuting logic to apply a target-space unitary to the correct subset of wires in a larger system.
 
@@ -259,7 +259,7 @@ class Unitary(nn.Module):
             name = f"{self.name} @ Tensor"
             return Operator(mat, name)
         else:
-            raise TypeError("Can only apply Unitary to State, Operator, or Tensor")
+            raise TypeError("Can only apply Gate to State, Operator, or Tensor")
 
 
 class Gategen:
@@ -352,7 +352,7 @@ class Gategen:
         *,
         matrix: bool = False,
         **kwargs: Any,
-    ) -> Union[Operator, Unitary]:
+    ) -> Union[Operator, Gate]:
         """
         Generalized rotation from a Gell-Mann generator (symmetric/asymmetric/diagonal). Gell-Mann gates are described by their type (sym/asym/diag) and the indices j, k specifying the generator.
 
@@ -422,7 +422,7 @@ class Gategen:
         wires = kwargs.pop("wires")
         dim = kwargs.pop("dim")
         name = kwargs.pop("name", None)
-        return Unitary(
+        return Gate(
             m,
             index=index,
             wires=wires,
@@ -434,7 +434,7 @@ class Gategen:
 
     def RX(
         self, angle: Any, *, matrix: bool = False, **kwargs: Any
-    ) -> Union[Operator, Unitary]:
+    ) -> Union[Operator, Gate]:
         """
         Rotation in the (0,1) symmetric subspace (qubit-like Rx when d=2) as $RX(\\theta) = GMR_{\\text{sym}}(0,1,\\theta)$.
         """
@@ -442,7 +442,7 @@ class Gategen:
 
     def RY(
         self, angle: Any, *, matrix: bool = False, **kwargs: Any
-    ) -> Union[Operator, Unitary]:
+    ) -> Union[Operator, Gate]:
         """
         Rotation in the (0,1) asymmetric subspace (qubit-like Ry when d=2) as $RY(\\theta) = GMR_{\\text{asym}}(0,1,\\theta)$.
         """
@@ -450,7 +450,7 @@ class Gategen:
 
     def RZ(
         self, angle: Any, *, matrix: bool = False, **kwargs: Any
-    ) -> Union[Operator, Unitary]:
+    ) -> Union[Operator, Gate]:
         """
         Diagonal generator rotation (qubit-like Rz when d=2) as $RZ(\\theta) = GMR_{\\text{diag}}(0,0,\\theta)$.
         """
@@ -458,7 +458,7 @@ class Gategen:
 
     def CU(
         self, U_target: Any = None, *, matrix: bool = False, **kwargs: Any
-    ) -> Union[Operator, Unitary]:
+    ) -> Union[Operator, Gate]:
         """
         Controlled-unitary: apply target block when control is in a chosen computational state such that when $U_target$ is a dxd unitary matrix, $CU = |0\\rangle\\langle 0| \\otimes I + |1\\rangle\\langle 1| \\otimes U$ (generalized CNOT for $U=X$ and $d=2$).
         """
@@ -492,7 +492,7 @@ class Gategen:
         wires = kwargs.pop("wires")
         dim = kwargs.pop("dim")
         name = kwargs.pop("name", None)
-        return Unitary(
+        return Gate(
             m,
             index=index,
             wires=wires,
@@ -523,15 +523,15 @@ class Gategen:
                 m[col, row] = 1.0
         return Operator(m, "SWAP")
 
-    def U(self, matrix: Any, **kwargs: Any) -> Callable[[Any, int, Any], Unitary]:
+    def U(self, matrix: Any, **kwargs: Any) -> Callable[[Any, int, Any], Gate]:
         t = tensorise(matrix, device=self.device)
 
         name = kwargs.get("name") or "U"
 
-        def factory(dim: Any, wires: int, index: Any, **kwargs: Any) -> Unitary:
-            """Create a Unitary instance for given system dimensions/wires and target index set."""
+        def factory(dim: Any, wires: int, index: Any, **kwargs: Any) -> Gate:
+            """Create a Gate instance for given system dimensions/wires and target index set."""
             params = kwargs.get("params")
-            return Unitary(
+            return Gate(
                 t, index, wires, dim, device=self.device, name=name, params=params
             )
 
