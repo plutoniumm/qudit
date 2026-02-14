@@ -65,9 +65,7 @@ class Operator:
             tensor = torch.kron(self.tensor, other.tensor if hasattr(other, "tensor") else other)  # type: ignore[arg-type]
             return State(tensor)  # type: ignore[call-arg]
 
-        raise TypeError(
-            "Can only tensor product with Operator, Gate, Tensor, or State"
-        )
+        raise TypeError("Can only tensor product with Operator, Gate, Tensor, or State")
 
     def __rxor__(self, other: Any) -> Union["Operator", Any]:
         if isinstance(other, Gate):

@@ -1,6 +1,7 @@
-from .gates import Gate, Gategen, Operator
 from typing import Union as U, List, Any, Optional, Dict
+from .gates import Gate, Gategen, Operator
 from dataclasses import dataclass
+from .utils import LittleEndian
 import torch.nn as nn
 from enum import Enum
 import numpy as np
@@ -112,6 +113,7 @@ class Circuit(nn.Module):
     dim: U[int, Array]
     width: int
     wires: int
+    flip: bool
     device: str
     circuit: nn.Sequential
     operations: List[Frame]
@@ -124,6 +126,7 @@ class Circuit(nn.Module):
         dim: U[int, Array] = 2,
         device: str = "cpu",
         mode: U[Mode, str] = Mode.VECTOR,
+        flip: bool = False,
     ):
         """
         Initialize a circuit with `wires` subsystems of local dimension(s) `dim` on `device`.
@@ -145,6 +148,7 @@ class Circuit(nn.Module):
         self.width = int(np.prod(self.dims_))
         self.wires = wires
         self.device = device
+        self.flip = flip
 
         self.circuit = nn.Sequential()
         self.operations = []
@@ -217,7 +221,7 @@ class Circuit(nn.Module):
                 rho = module.forwardd(rho)  # type: ignore[attr-defined]
             return rho
 
-    def matrix(self) -> torch.Tensor:
+    def matrix(self, littleEndian=False) -> torch.Tensor:
         """
         Materialize the full unitary matrix by acting on the computational basis vectors.
         """
@@ -225,7 +229,10 @@ class Circuit(nn.Module):
         I = torch.eye(W, dtype=C64, device=self.device)
         cols = []
         for i in range(W):
-            cols.append(self.circuit(I[i]))
+            res = self.circuit(I[i])
+            if littleEndian:
+                res = LittleEndian(res, self.dims_)
+
         return torch.cat(cols, dim=1)
 
     def draw(self, mode: str = "ascii") -> Any:
