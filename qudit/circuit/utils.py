@@ -1,6 +1,7 @@
 from typing import Union, List
 import torch as pt
 
+
 def to_mixed(num: int, bases: List[int]) -> List[int]:
     assert len(bases) >= 1
 
@@ -32,7 +33,6 @@ def fr_mixed(digits: List[int], bases: List[int]) -> int:
         num = num * b + d
 
     return num
-
 
 
 def LittleEndian(

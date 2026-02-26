@@ -207,26 +207,64 @@ class Gate(nn.Module):
 
         self.rest_size = self.total_dim // self.target_size
 
+    def _left(self, tensor: torch.Tensor) -> torch.Tensor:
+        """
+        Generalized core logic: applies the embedded unitary U to the first dimension of a tensor.
+        Handles both 1D statevectors (D,) and 2D matrices (D, 1) or (D, D).
+        """
+        # Determine any trailing dimensions (e.g., the second D in a density matrix)
+        trailing_dims = list(tensor.shape[1:])
+
+        # Reshape to (*self.dims, *trailing_dims).
+        # Using contiguous() prevents view errors if the tensor was previously transposed.
+        psi = tensor.contiguous().view(*self.dims, *trailing_dims)
+
+        # Permute target wires to the front, keep trailing dimensions at the end
+        trailing_axes = list(range(self.wires, self.wires + len(trailing_dims)))
+        perm = self.perm + trailing_axes
+        psi = psi.permute(*perm)
+
+        # Flatten for matrix multiplication: (target_size, rest_size * prod(trailing_dims))
+        trailing_size = int(np.prod(trailing_dims)) if trailing_dims else 1
+        psi_flat = psi.reshape(self.target_size, self.rest_size * trailing_size)
+
+        # Apply the target unitary
+        psi_out = self.U @ psi_flat
+
+        # Reshape back to the permuted structure
+        current_dims = [self.dims[i] for i in self.perm]
+        psi_out = psi_out.view(*current_dims, *trailing_dims)
+
+        # Inverse permute to original wire order
+        inv_perm = self.inv_perm + trailing_axes
+        psi_final = psi_out.permute(*inv_perm).contiguous()
+
+        return psi_final.view(self.total_dim, *trailing_dims)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Apply the embedded unitary to a statevector (reshaping/permuting wires as needed) as $\\rho \\rightarrow U |\psi \\rangle$
+        Apply the embedded unitary to a statevector: \rho \rightarrow U |\psi \rangle
         """
-        psi = x.view(*self.dims)
-        psi = psi.permute(*self.perm)
-        psi_flat = psi.reshape(self.target_size, self.rest_size)
-        psi_out = self.U @ psi_flat
-        current_dims = [self.dims[i] for i in self.perm]
-        psi_out = psi_out.view(*current_dims)
-        psi_final = psi_out.permute(*self.inv_perm).contiguous()
-
-        return psi_final.view(self.total_dim, 1)
+        out = self._left(x)
+        # Ensure it outputs a column vector (D, 1) to match your original API behavior
+        return out.view(self.total_dim, 1)
 
     def forwardd(self, rho: torch.Tensor) -> torch.Tensor:
         """
-        Apply the unitary channel to a density matrix as $\\rho \\rightarrow U \\rho U^\dagger$.
+        Apply the unitary channel to a density matrix as \rho \rightarrow U \rho U^\dagger.
+        Optimized to avoid full matrix materialization.
         """
-        U = self.matrix()
-        return U @ rho @ U.conj().T
+        # 1. Apply U on the left: U \rho
+        rho_prime = self._left(rho)
+
+        # 2. Conjugate transpose the result: (U \rho)^\dagger
+        rho_prime_dagger = rho_prime.conj().T
+
+        # 3. Apply U on the left again: U (U \rho)^\dagger
+        out_dagger = self._left(rho_prime_dagger)
+
+        # 4. Conjugate transpose back to get: (U (U \rho)^\dagger)^\dagger = U \rho U^\dagger
+        return out_dagger.conj().T
 
     def matrix(self) -> torch.Tensor:
         """

@@ -84,6 +84,9 @@ class Code:
         self.dits = int(n)
         self.gates = Gategen(self.dim)
 
+    def toTensor(self):
+        return self.codewords
+
     @staticmethod
     def isValid(code):
         import numpy as np

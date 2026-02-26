@@ -10,6 +10,8 @@ High performance simulations for qudit systems. To make qudit machine learning, 
 pip install qudit
 ```
 
+> WARNING: Error correction is currently broken and is being worked on. Currently anything inside `qudit.noise` or `qudit.qec` should be considered volatile.
+
 ## Quickstart
 
 In most cases it should not matter if you mix and match `pytorch` with `qudit` since most abstractions are built on top of `pytorch` tensors. The following is two examples to do the same thing, one using the `Circuit` class and the other manually using the matrices.
@@ -45,7 +47,7 @@ The repository includes a small `./do` helper for common workflows (build, tests
 
 ### Caveats
 - `qudit` does not, and will not support openQASM in the near future since hardware is not a goal. There are plans for some amount of interoperability with other qudit simulators, however that will be a long term goal and not a near term one. We will first make qudit stable.
-- 
+-
 
 #### Commands
 

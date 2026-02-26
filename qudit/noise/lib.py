@@ -1,6 +1,7 @@
 from typing import List, Any, Sequence, Optional, Union
-from .index import Channel, Error, Multiplex
+from .index import Channel, Multiplex
 from itertools import permutations
+from ..circuit.gates import Gate
 from .kraus import GAD, Pauli
 import numpy as np
 
@@ -37,62 +38,77 @@ def ungroup(lst: List[List[Any]]) -> List[Any]:
 
 class IID:
     @staticmethod
-    def AD(n: int, y: float) -> Multiplex:
+    def AD(n: int, y: float) -> "Multiplex":
         A0 = np.array([[1, 0], [0, np.sqrt(1 - y)]])
         A1 = np.array([[0, np.sqrt(y)], [0, 0]])
-        I2 = np.eye(2)
 
         channel_list = []
         for i in range(n):
-            A, B = (n - i - 1) * [I2], i * [I2]
-            Is = "I" * n
-            nA = Is[: n - i - 1] + "A_0" + Is[n - i :]
-            nB = Is[: n - i - 1] + "A_1" + Is[n - i :]
-            print(nA, nB)
+            g0 = Gate(
+                A0,
+                index=[i],
+                wires=n,
+                dim=2,
+                name=f"A0_{i}",
+                params=[("y", y), ("i", i)],
+            )
+            g1 = Gate(
+                A1,
+                index=[i],
+                wires=n,
+                dim=2,
+                name=f"A1_{i}",
+                params=[("y", y), ("i", i)],
+            )
 
-            E0 = A + [A0] + B
-            E1 = A + [A1] + B
-
-            A = Error(2, mkron(E0), name=nA, params={"y": y, "i": i})
-            B = Error(2, mkron(E1), name=nB, params={"y": y, "i": i})
-
-            channel_list.append(Channel([A, B]))
+            channel_list.append(Channel([[g0], [g1]]))
 
         return Multiplex(channel_list)
 
     @staticmethod
-    def GAD(n: int, y: float, p: float) -> Multiplex:
+    def GAD(n: int, y: float, p: float) -> "Multiplex":
         A0 = np.sqrt(1 - p) * np.array([[1, 0], [0, np.sqrt(1 - y)]])
         A1 = np.sqrt(1 - p) * np.array([[0, np.sqrt(y)], [0, 0]])
 
         R0 = np.sqrt(p) * np.array([[np.sqrt(1 - y), 0], [0, 1]])
         R1 = np.sqrt(p) * np.array([[0, 0], [np.sqrt(y), 0]])
 
-        I2 = np.eye(2)
-
         channel_list = []
         for i in range(n):
-            A, B = (n - i - 1) * [I2], i * [I2]
-            Is = "I" * n
-            nA0 = Is[: n - i - 1] + "A_0" + Is[n - i :]
-            nA1 = Is[: n - i - 1] + "A_1" + Is[n - i :]
-            nR0 = Is[: n - i - 1] + "R_0" + Is[n - i :]
-            nR1 = Is[: n - i - 1] + "R_1" + Is[n - i :]
+            gA0 = Gate(
+                A0,
+                index=[i],
+                wires=n,
+                dim=2,
+                name=f"A0_{i}",
+                params=[("y", y), ("p", p), ("i", i)],
+            )
+            gA1 = Gate(
+                A1,
+                index=[i],
+                wires=n,
+                dim=2,
+                name=f"A1_{i}",
+                params=[("y", y), ("p", p), ("i", i)],
+            )
+            gR0 = Gate(
+                R0,
+                index=[i],
+                wires=n,
+                dim=2,
+                name=f"R0_{i}",
+                params=[("y", y), ("p", p), ("i", i)],
+            )
+            gR1 = Gate(
+                R1,
+                index=[i],
+                wires=n,
+                dim=2,
+                name=f"R1_{i}",
+                params=[("y", y), ("p", p), ("i", i)],
+            )
 
-            A0 = Error(
-                2, mkron(A + [A0] + B), name=nA0, params={"y": y, "p": p, "i": i}
-            )
-            A1 = Error(
-                2, mkron(A + [A1] + B), name=nA1, params={"y": y, "p": p, "i": i}
-            )
-            R0 = Error(
-                2, mkron(A + [R0] + B), name=nR0, params={"y": y, "p": p, "i": i}
-            )
-            R1 = Error(
-                2, mkron(A + [R1] + B), name=nR1, params={"y": y, "p": p, "i": i}
-            )
-
-            channel_list.append(Channel([A0, A1, R0, R1]))
+            channel_list.append(Channel([[gA0], [gA1], [gR0], [gR1]]))
 
         return Multiplex(channel_list)
 
@@ -114,7 +130,7 @@ class Process:
         order: int = 1,
         group: bool = False,
         iid: bool = False,
-    ) -> Union[Channel, Multiplex]:
+    ) -> Union[Channel, "Multiplex"]:
         """
         Build an $n$-site generalized amplitude damping channel.
 
@@ -129,30 +145,38 @@ class Process:
             assert d == 2, "IID GAD is only implemented for qubits (d=2)"
             return IID.GAD(n, Y, p)
 
-        def _op_gen(error_word: Sequence[str]) -> Any:
-            temp: list[Any] = []
-            for tag in error_word:
-                order = int(tag[-1])
-                if "a" in tag:
-                    temp.append(GAD.A(order, d, Y, p))
-                elif "r" in tag:
-                    temp.append(GAD.R(order, d, Y, p))
-                else:
-                    raise ValueError(f"Unknown tag {tag} in error word {error_word}")
-            return mkron(temp)
+        def _op_gen(error_word: Sequence[str]) -> Optional[list[Gate]]:
+            gates = []
+            for i, tag in enumerate(error_word):
+                ord_val = int(tag[-1])
+                m = GAD.A(ord_val, d, Y, p) if "a" in tag else GAD.R(ord_val, d, Y, p)
+
+                if np.allclose(m, 0, atol=1e-8):
+                    return None  # The whole tensor product is 0
+
+                # If it's not the identity, append the local gate
+                if not np.allclose(m, np.eye(d), atol=1e-8):
+                    gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"{tag}_{i}"))
+            return gates
 
         keys = list(permut(["a0", "a1", "r0", "r1"] * n, n))
-        Ak = [_op_gen(key) for key in keys]
+
+        Ak = []
+        valid_keys = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+                valid_keys.append(key)
 
         Ek: list[list[int]] = [[] for _ in range((order + 1) * 2 - 1)]
-        for key in keys:
+        for idx, key in enumerate(valid_keys):
             s = np.sum([int(Em[-1]) for Em in key])
-            if s <= order and not np.all(np.isclose(Ak[keys.index(key)], 0, atol=1e-8)):
-
+            if s <= order:
                 if any("r" in i and int(i[-1]) > 0 for i in key):
-                    Ek[2 * s - 1].append(keys.index(key))
+                    Ek[2 * s - 1].append(idx)
                 else:
-                    Ek[2 * s - 0].append(keys.index(key))
+                    Ek[2 * s - 0].append(idx)
 
         op_ch = Channel(Ak)
         op_ch.correctables = Ek if group else ungroup(Ek)  # type: ignore[assignment]
@@ -162,7 +186,7 @@ class Process:
     @staticmethod
     def AD(
         d: int, n: int, Y: float, order: int = 1, group: bool = False, iid: bool = False
-    ) -> Union[Channel, Multiplex]:
+    ) -> Union[Channel, "Multiplex"]:
         """
         Build an $n$-site (pure) amplitude damping channel.
 
@@ -175,19 +199,31 @@ class Process:
             assert d == 2, "IID AD is only implemented for qubits (d=2)"
             return IID.AD(n, Y)
 
-        def _op_gen(error_word: Sequence[str]) -> Any:
-            """Map a word of 'a0','a1',... tags to a tensor-product Kraus operator."""
-            individual = [GAD.A(int(tag[-1]), d, Y) for tag in error_word]
-            return mkron(individual)
+        def _op_gen(error_word: Sequence[str]) -> Optional[list[Gate]]:
+            gates = []
+            for i, tag in enumerate(error_word):
+                m = GAD.A(int(tag[-1]), d, Y)
+                if np.allclose(m, 0, atol=1e-8):
+                    return None
+                if not np.allclose(m, np.eye(d), atol=1e-8):
+                    gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"{tag}_{i}"))
+            return gates
 
         keys = list(permut(["a0", "a1"] * n, n))
-        Ak = [_op_gen(key) for key in keys]
+
+        Ak = []
+        valid_keys = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+                valid_keys.append(key)
 
         Ek: list[list[int]] = [[] for _ in range(order + 1)]
-        for key in keys:
+        for idx, key in enumerate(valid_keys):
             s = np.sum([int(Em[-1]) for Em in key])
-            if s <= order and not np.all(np.isclose(Ak[keys.index(key)], 0, atol=1e-8)):
-                Ek[s].append(keys.index(key))
+            if s <= order:
+                Ek[s].append(idx)
 
         op_ch = Channel(Ak)
         op_ch.correctables = Ek if group else ungroup(Ek)  # type: ignore[assignment]
@@ -221,18 +257,33 @@ class Process:
         }
         weight = {"I": 0, "X": 1, "Y": 1, "Z": 1}
 
-        def _op_gen(word: Sequence[str]) -> Any:
-            """Map a Pauli word to the tensor-product Kraus operator."""
-            return mkron([funcs[gate](p) for gate in word])
+        def _op_gen(word: Sequence[str]) -> Optional[list[Gate]]:
+            gates = []
+            for i, gate_str in enumerate(word):
+                m = funcs[gate_str](p)
+                if np.allclose(m, 0, atol=1e-8):
+                    return None
+                if gate_str != "I" and not np.allclose(m, np.eye(2), atol=1e-8):
+                    gates.append(
+                        Gate(m, index=[i], wires=n, dim=2, name=f"{gate_str}_{i}")
+                    )
+            return gates
 
-        keys = permut((["I"] + paulis) * n, n)
-        Ak = [_op_gen(key) for key in keys]
+        keys = list(permut((["I"] + paulis) * n, n))
+
+        Ak = []
+        valid_keys = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+                valid_keys.append(key)
 
         Ek: list[list[int]] = [[] for _ in range(order + 1)]
-        for key in keys:
+        for idx, key in enumerate(valid_keys):
             s = np.sum([weight[i] for i in key])
-            if s <= order and not np.all(np.isclose(Ak[keys.index(key)], 0, atol=1e-8)):
-                Ek[s].append(keys.index(key))
+            if s <= order:
+                Ek[s].append(idx)
 
         op_ch = Channel(Ak)
         op_ch.correctables = Ek if group else ungroup(Ek)  # type: ignore[assignment]
