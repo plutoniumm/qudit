@@ -28,9 +28,9 @@ $$\begin{aligned}
 &+ (5 + 9i)|1200\rangle + 0.67|1111\rangle + 9 e^{i\frac{\pi}{5}}|2222\rangle
 \end{aligned}$$
 
-```python
-from qudit import State, Basis
+::: code-group
 
+```python [Example]
 SV = State(
     w * Ket("0000")
     + w**2 * Ket("1010")
@@ -47,9 +47,8 @@ SV = State(
 )
 ```
 
-Assuming the following preliminaries exist:
-
-```python
+```python [imports]
+from qudit import State, Basis
 import numpy as np
 
 Unity = lambda d: np.exp(2j * np.pi / d)
@@ -58,6 +57,8 @@ pi = np.pi
 
 w, Ket = Unity(3), Basis(4)
 ```
+
+:::
 
 ### Properties of states
 States contain several properties, and methods for information and manipulation
@@ -85,7 +86,9 @@ We use the operations
 
 For example, for a qubit system:
 
-```python
+::: code-group
+
+```python [Example]
 Ket = Basis(2)
 G = Gategen(2)
 
@@ -100,6 +103,14 @@ psi = G.RY(np.pi/2) @ psi
 print(psi) # results in |1>
 ```
 
+
+```python [imports]
+from qudit import Basis
+from qudit.circuit import Gategen
+```
+
+:::
+
 The above system creates $RY(\pi/2)|+\rangle = |1\rangle$.
 
 ### Three-qudit GHZ
@@ -107,7 +118,9 @@ Similarly we can start with $|000\rangle$ and apply a Hadamard on the first qubi
 
 $|\text{GHZ}\rangle = \frac{|000\rangle + |111\rangle}{\sqrt{2}}$.
 
-```python
+::: code-group
+
+```python [Example]
 Ket = Basis(2)
 G = Gategen(2)
 
@@ -120,6 +133,14 @@ CX2 = G.I ^ G.CX
 psi = CX2 @ (CX1 @ (HII @ psi))
 print(psi)
 ```
+
+
+```python [imports]
+from qudit import Basis
+from qudit.circuit import Gategen
+```
+
+:::
 
 ## Gategen Generics
 Gates are made up of two interoperable classes `Unitary` and `Gate`, both of which interop with each other, states, and tensors. The following gates are available in `Gategen` for a given dimension `d` in the circuit-less form:

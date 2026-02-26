@@ -33,6 +33,7 @@ build() {
   cd "$root";
 
   rm -rf build dist qudit.egg-info;
+  black ./**/*.py;
   python setup.py bdist_wheel sdist;
   twine check dist/*;
 }

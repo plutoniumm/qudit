@@ -79,18 +79,40 @@ class Fidelity:
         return np.abs(fid)
 
     @staticmethod
-    def cafaro(kraus_ops: List[np.ndarray]) -> float:
+    def bare_qubit(
+        R_kraus: List[np.ndarray], E_kraus: List[np.ndarray], state: np.ndarray
+    ) -> float:
+        """
+        Fidelity for a bare qubit under noise and recovery.
+
+        The noise channel and recovery are applied to the state via Kraus operators, and the fidelity is computed as $\langle\psi|\\rho'|\psi\\rangle$ where $\\rho' = \\sum_k R_k \\, \\sum_l E_l \\, |\\psi\\rangle\\langle\\psi| \\, E_l^\dagger \\, R_k^\dagger$.
+        """
+
+        rho = np.outer(state, state.conj().T)
+
+        rho = sum([MD([Ek, rho, Ek.conj().T]) for Ek in E_kraus])
+        rho = sum([MD([Rk, rho, Rk.conj().T]) for Rk in R_kraus])
+
+        return np.abs(MD([state.conj().T, rho, state]))
+
+    @staticmethod
+    def cafaro(
+        R_kraus: List[np.ndarray], E_kraus: List[np.ndarray], codes: List[np.ndarray]
+    ) -> float:
         """
         Cafaro-style entanglement fidelity proxy for a channel.
 
-        Uses $F_e=\sum_k |\mathrm{Tr}(K_k)|^2 / N^2$ for $N\\times N$ Kraus operators.
+        Uses $F_e = \\frac{1}{d|\mathcal{C}|} \sum_{k,l} |\sum_i \langle i|R_k E_l|i\\rangle|^2$ where $\{|i\\rangle\}$ are the codewords.
         """
-        N = kraus_ops[0].shape[0]
-        for K in kraus_ops:
-            assert K.shape == (N, N)
+        f_ent = 0.0
+        for Al in E_kraus:
+            for Rk in R_kraus:
+                f_ent += (
+                    np.sum([MD([state.conj().T, Rk, Al, state]) for state in codes])
+                    ** 2
+                )
 
-        F_e = sum(np.abs(np.trace(K)) ** 2 for K in kraus_ops)
-        return F_e / (N**2)
+        return np.real(f_ent / (len(codes) ** 2))
 
     @staticmethod
     def negativity(rho: np.ndarray, dim_A: int, dim_B: int) -> float:

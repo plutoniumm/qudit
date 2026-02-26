@@ -1,5 +1,5 @@
+from typing import Any, Union, Optional
 from functools import cached_property
-from typing import Any, Union, List, Optional
 from ..index import State
 import numpy as np
 
@@ -49,16 +49,6 @@ class Error(np.ndarray):
         return f"{self.name}({self.params})"
 
 
-def unnull(lst: List[np.ndarray]) -> List[np.ndarray]:
-    """
-    Filter out (approximately) zero operators.
-
-    Drops any matrix $A$ with $\|A\| \\approx 0$ (elementwise up to tolerance),
-    useful to clean Kraus lists.
-    """
-    return [matrix for matrix in lst if not np.all(np.isclose(matrix, 0, atol=1e-8))]
-
-
 class Channel:
     """
     A quantum channel represented in Kraus form.
@@ -75,7 +65,7 @@ class Channel:
     def __init__(self, ops: list[Error]):
         assert isinstance(ops, list) and len(ops) > 0, "ops must be List[ops]"
 
-        self.ops = unnull(ops)  # type: ignore[assignment]
+        self.ops = [op for op in ops if not np.all(np.isclose(op, 0, atol=1e-8))]
         self.d = ops[0].d if isinstance(ops[0], Error) else int(ops[0].shape[0])
         self.correctables = []
 
@@ -83,6 +73,13 @@ class Channel:
         """
         Apply the channel in Kraus form: $\\rho \mapsto \sum_k E_k\\rho E_k^{\dagger}$.
         """
+        if isinstance(rho, State):
+            if not rho.isDensity:
+                rho = rho.density()
+
+        if isinstance(rho, np.ndarray) and rho.ndim == 1:
+            rho = np.outer(rho, rho.conj())
+
         rho_arr: Any = getattr(rho, "tensor", rho)
         result = [O @ rho_arr @ O.conj().T for O in self.ops]
 
@@ -189,3 +186,42 @@ class Channel:
         """
         Alias for the Kraus list $\{E_k\}$"""
         return self.ops
+
+
+class Multiplex:
+    """
+    Container class for multiple channels, e.g. for different noise models or parameter regimes. Allows us to run multiple channels on a state successively.
+
+    In general, for a channel collection $\{\Phi_i\}$, we can apply them in sequence as $\Phi_n \circ \cdots \circ \Phi_1(\\rho)$.
+    """
+
+    channels: list[Channel]
+
+    def __init__(self, channels: list[Union[Channel, "Multiplex"]]):
+        assert (
+            isinstance(channels, list) and len(channels) > 0
+        ), "channels must be List[Channel]"
+
+        clist: list[Channel] = []
+        for ch in channels:
+            if isinstance(ch, Multiplex):
+                clist.extend(ch.channels)
+            else:
+                clist.append(ch)
+
+        self.channels = clist
+
+    def run(self, rho: Union[State, np.ndarray]) -> np.ndarray:
+        """
+        Apply the channels in sequence: $\\rho \mapsto \Phi_n \circ \cdots \circ \Phi_1(\\rho)$.
+        """
+        result = rho
+        for channel in self.channels:
+            result = channel.run(result)
+        return result
+
+    def __getitem__(self, key: Union[int, slice]) -> Union[Channel, list[Channel]]:
+        return self.channels[key]
+
+    def __repr__(self) -> str:
+        return f"Multiplex({len(self.channels)} channels)"

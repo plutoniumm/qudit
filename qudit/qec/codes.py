@@ -12,12 +12,14 @@ Pauli = {
     "Z": pt.tensor([[1, 0], [0, -1]], dtype=C64),
 }
 
+
 def composite(stabilizer: list[str]) -> pt.Tensor:
     mat = Pauli[stabilizer[0]]
     for p in stabilizer[1:]:
         mat = pt.kron(mat, Pauli[p])
 
     return mat
+
 
 def Projector(stabilizers: list[pt.Tensor]) -> pt.Tensor:
     dim = stabilizers[0].shape[0]
@@ -29,6 +31,7 @@ def Projector(stabilizers: list[pt.Tensor]) -> pt.Tensor:
 
     return P
 
+
 def SVD_RRF(P: pt.Tensor, target_rank=2) -> pt.Tensor:
     # 1. Gaussian Random Matrix Omega (N x rank)
     Omega = pt.randn((P.shape[0], target_rank), dtype=pt.float32).to(pt.complex64)
@@ -39,9 +42,10 @@ def SVD_RRF(P: pt.Tensor, target_rank=2) -> pt.Tensor:
 
     # 3. Orthonormalize Y using QR decomposition
     # Q(N, target_rank), => orthonormal basis 4 for colspace of Y
-    Q = LA.qr(Y, mode="complete")[0]
+    Q = LA.qr(Y, mode="reduced")[0]
 
     return Q.T  # rows=vectors
+
 
 def SVD_RRF_np(P, target_rank=2):
     import scipy.linalg as SLA
@@ -49,12 +53,12 @@ def SVD_RRF_np(P, target_rank=2):
 
     P = P.cpu().numpy()
     Omega = np.random.normal(size=(P.shape[0], target_rank))
-    print(Omega)
 
     Y = P @ Omega
     Q = SLA.qr(Y, mode="economic", overwrite_a=True, check_finite=False)[0]
 
     return pt.from_numpy(Q.T)  # rows=vectors
+
 
 class Code:
     """
@@ -83,6 +87,7 @@ class Code:
     @staticmethod
     def isValid(code):
         import numpy as np
+
         norms = pt.norm(code, dim=1)
         if not pt.allclose(norms, pt.ones_like(norms)):
             print("Norms:", np.round(norms, 2))
@@ -94,8 +99,16 @@ class Code:
             print("Orthogonality check:", np.round(ortho, 2))
             raise ValueError("Codewords are not orthogonal!")
 
+    def __getitem__(self, idx):
+        return self.codewords[idx]
+
+    def __len__(self):
+        return self.codewords.shape[0]
+
     @staticmethod
-    def fromStabilizers(stabilizers: list[str] | list[list[str]], method="svd") -> "Code":
+    def fromStabilizers(
+        stabilizers: list[str] | list[list[str]], method="svd", numpy=False
+    ) -> "Code":
         """
         We may get `["XXY", "ZZI"]`, or `[["X", "X", "Y"], ["Z", "Z", "I"]]`. In the first case we need to split the strings into lists of characters, in the second case we can directly use the lists.
 
@@ -103,22 +116,23 @@ class Code:
 
         SVD is more stable but may be slower for large codes, while RRF is faster but may be less stable. For small codes, SVD is usually preferred.
         """
-        assert method in ["svd", "rrf"], "Only 'svd' and 'rrf' methods are supported for code construction"
+        assert method in [
+            "svd",
+            "rrf",
+        ], "Only 'svd' and 'rrf' methods are supported for code construction"
         if isinstance(stabilizers[0], str):
             stabilizers = [list(s) for s in stabilizers]
 
         proj = Projector([composite(s) for s in stabilizers])
 
         if method == "svd":
-            U, S, Vh = LA.svd(proj)
+            _, S, Vh = LA.svd(proj)
             code = Vh[pt.isclose(S, pt.tensor(1.0))]
-        else:
-            try:
-                code = SVD_RRF(proj)
-                Code.isValid(code)
-            except Exception as e:
-                print("RRF using PyTorch failed, fallback NumPy")
+        else:  # rrf
+            if numpy:
                 code = SVD_RRF_np(proj)
+            else:
+                code = SVD_RRF(proj)
 
         Code.isValid(code)
         return Code(code)

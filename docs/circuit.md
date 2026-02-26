@@ -187,12 +187,10 @@ This enables gradient-based optimization when the circuit is used inside a `torc
 
 Minimal pattern:
 
-```python
-import torch
-import torch.nn as nn
-from qudit import Circuit
+::: code-group
 
-class Learnable(nn.Module):
+```python [Example]
+class Learnable(Hybrid):
     def __init__(self, wires=2, dim=2, device="cpu"):
         super().__init__()
         self.c = Circuit(wires=wires, dim=dim, device=device)
@@ -205,6 +203,15 @@ class Learnable(nn.Module):
     def forward(self, x):
         return self.c(x)
 ```
+
+```python [imports]
+from qudit import Circuit
+from qudit.ml import Hybrid
+import torch.nn as nn
+import torch
+```
+
+:::
 
 > [!TIP]
 > - Prefer creating the circuit once in `__init__` and calling it in `forward`.
