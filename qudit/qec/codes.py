@@ -71,6 +71,7 @@ class Code:
     gates: Gategen
     dim: int
     dits: int
+    width: int
 
     def __init__(self, codewords: pt.Tensor):
         assert codewords.ndim >= 2, "Codewords must be at least 2D tensors"

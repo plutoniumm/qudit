@@ -1,100 +1,122 @@
-from scipy import linalg as LA
-import numpy.linalg as la
-import numpy as np
+from ..noise import Channel
+from ..circuit import Gate
+from typing import List
+import torch as pt
+import math
 
-MD = la.multi_dot
-
+C64 = pt.complex64
 
 class Recovery:
     """
-    Construct common approximate/analytic recovery maps for a code subspace.
-
-    Each method returns a list of recovery Kraus operators $\{R_k\}$ intended to
-    (approximately) invert a given error channel on the code projector $P$.
+    Construct common approximate/analytic recovery maps for a code subspace
+    using PyTorch and localized qudit Gates.
     """
 
     @staticmethod
-    def leung(
-        error_kraus: list[np.ndarray], codes: list[np.ndarray]
-    ) -> list[np.ndarray]:
+    def _get_Ek_mat(word: List[Gate], total_dim: int, device: pt.device, dtype: pt.dtype) -> pt.Tensor:
         """
-        Leung recovery via polar decomposition.
-
-        Given code states $\{|\psi_i\\rangle\}$, form the projector
-        $P=\sum_i |\psi_i\\rangle\langle\psi_i|$ and set
-        $R_k = P\,U_k^\dagger$ where $U_k$ comes from the polar decomposition of $E_k P$.
+        Efficiently materializes the full d^n x d^n matrix for a Kraus word
+        by passing an identity matrix through the localized _left() calls.
         """
-        P = sum([np.outer(state, state.conj().T) for state in codes])
-        Rks = []
-        for Ek in error_kraus:
-            Uk, _ = LA.polar(np.dot(Ek, P), side="right")
-            Rks.append(np.dot(P, Uk.conj().T))
-
-        return Rks
+        Ek_mat = pt.eye(total_dim, dtype=dtype, device=device)
+        for g in word:
+            # _left applies the gate to the appropriate subsystem
+            Ek_mat = g._left(Ek_mat)
+        return Ek_mat
 
     @staticmethod
-    def cafaro(
-        error_kraus: list[np.ndarray], codes: list[np.ndarray]
-    ) -> list[np.ndarray]:
-        """
-        Cafaro recovery using code-state normalizations.
+    def leung(channel: Channel, codes: List[pt.Tensor]) -> Channel:
+        device = codes[0].device
+        dtype = codes[0].dtype
+        first_gate = channel.ops[0][0]
+        n = first_gate.wires
+        d = first_gate.dims[0] if hasattr(first_gate, 'dims') else 2
+        total_dim = codes[0].numel()
 
-        Builds $R_k$ as a sum over code basis states with coefficients normalized by
-        $\sqrt{\langle\psi|E_k^\dagger E_k|\psi\\rangle}$.
-        """
-        Rks = []
-        for Ek in error_kraus:
-            Rks.append(
-                sum(
-                    [
-                        np.dot(np.outer(state, state.conj().T), Ek.conj().T)
-                        / np.sqrt(MD([state.conj().T, Ek.conj().T, Ek, state]))
-                        for state in codes
-                    ]
-                )
-            )
-        return Rks
+        # Construct Projector P
+        P = pt.zeros((total_dim, total_dim), dtype=dtype, device=device)
+        for c in codes:
+            c_col = c.view(total_dim, 1)
+            P += c_col @ c_col.conj().T
 
-    @staticmethod
-    def petz(kraus: list[np.ndarray], codes: list[np.ndarray]) -> list[np.ndarray]:
-        """
-        Petz recovery (transpose channel) restricted to the code.
+        R_gates = []
+        for i, word in enumerate(channel.ops):
+            Ek_mat = Recovery._get_Ek_mat(word, total_dim, device, dtype)
 
-        With code projector $P$, define $\mathcal{E}(P)=\sum_k E_k P E_k^\dagger$ and
-        $\mathcal{R}_\\text{Petz}$ Kraus operators $R_k = P E_k^\dagger\,\mathcal{E}(P)^{-1/2}$.
-        """
-        P = sum([np.outer(state, state.conj().T) for state in codes])
-        channel = sum([MD([Ek, P, Ek.conj().T]) for Ek in kraus])
-        norm = LA.fractional_matrix_power(channel, -0.5)
+            # Polar decomposition of Ek * P via SVD
+            A = Ek_mat @ P
+            U, S, Vh = pt.linalg.svd(A, full_matrices=False)
+            Uk = U @ Vh  # Unitary from polar decomp
 
-        return [MD([P, Ek.conj().T, norm]) for Ek in kraus]
+            Rk_mat = P @ Uk.conj().T
+
+            # Wrap full recovery matrix in a global Gate
+            rg = Gate(Rk_mat, index=list(range(n)), wires=n, dim=d, name=f"R_leung_{i}")
+            R_gates.append([rg])
+
+        return Channel(R_gates)
 
     @staticmethod
-    def dutta(
-        error_kraus: list[np.ndarray], codes: list[np.ndarray]
-    ) -> list[np.ndarray]:
-        """
-        Dutta recovery for ensembles of error operators.
+    def cafaro(channel: Channel, codes: List[pt.Tensor]) -> Channel:
+        device = codes[0].device
+        dtype = codes[0].dtype
+        first_gate = channel.ops[0][0]
+        n = first_gate.wires
+        d = first_gate.dims[0] if hasattr(first_gate, 'dims') else 2
+        total_dim = codes[0].numel()
 
-        Expects a list of error-sets (each set may carry probabilities) and produces
-        normalized recovery operators by averaging syndrome overlaps on the code.
-        """
-        Rks = []
-        for Eks in error_kraus:
-            Rk = []
-            for i in codes:
-                chis = []
-                for En in Eks:
-                    chis.append(
-                        sum([MD([i.conj().T, Em.conj().T, En, i]) for Em in Eks])
-                    )
-                X_av = np.average(chis, weights=[Eks[j].P for j in range(len(chis))])
+        R_gates = []
+        for i, word in enumerate(channel.ops):
+            Ek_mat = Recovery._get_Ek_mat(word, total_dim, device, dtype)
+            Rk_mat = pt.zeros((total_dim, total_dim), dtype=dtype, device=device)
 
-                Rk.append(
-                    sum([np.outer(i, np.dot(Em, i).conj().T) for Em in Eks]) / X_av
-                )
+            for c in codes:
+                c_col = c.view(total_dim, 1)
+                overlap = (c_col.conj().T @ Ek_mat.conj().T @ Ek_mat @ c_col).squeeze().real
 
-            Rk = np.sum(Rk, axis=0)
-            Rks.append(Rk / np.sqrt(np.linalg.eigvalsh(np.dot(Rk.conj().T, Rk))[-1]))
+                if overlap > 1e-12:
+                    proj = c_col @ c_col.conj().T
+                    Rk_mat += (proj @ Ek_mat.conj().T) / math.sqrt(overlap)
 
-        return Rks
+            rg = Gate(Rk_mat, index=list(range(n)), wires=n, dim=d, name=f"R_cafaro_{i}")
+            R_gates.append([rg])
+
+        return Channel(R_gates)
+
+    @staticmethod
+    def petz(channel: Channel, codes: List[pt.Tensor]) -> Channel:
+        device = codes[0].device
+        first_gate = channel.ops[0][0]
+        n = first_gate.wires
+        d = first_gate.dims[0] if hasattr(first_gate, 'dims') else 2
+        total_dim = codes[0].numel()
+
+        # 1. Code Projector P
+        P = pt.zeros((total_dim, total_dim), dtype=C64, device=device)
+        for c in codes:
+            c_col = c.view(total_dim, 1)
+            P += c_col @ c_col.conj().T
+
+        # 2. E(P) using the channel's efficient run method
+        E_P = channel.run(P)
+
+        # 3. Pseudo-inverse square root of E(P): E(P)^{-1/2}
+        L, V = pt.linalg.eigh(E_P)
+        L_inv_sqrt = pt.zeros_like(L)
+        mask = L > 1e-12
+        L_inv_sqrt[mask] = 1.0 / pt.sqrt(L[mask])
+
+        L, V = L.to(C64), V.to(C64)
+        L_inv_sqrt = L_inv_sqrt.to(C64)
+        norm = V @ pt.diag(L_inv_sqrt) @ V.conj().T
+
+        # 4. Construct R_k = P @ E_k^\dagger @ norm
+        R_gates = []
+        for i, word in enumerate(channel.ops):
+            Ek_mat = Recovery._get_Ek_mat(word, total_dim, device, C64)
+            Rk_mat = P @ Ek_mat.conj().T @ norm
+
+            rg = Gate(Rk_mat, index=list(range(n)), wires=n, dim=d, name=f"R_petz_{i}")
+            R_gates.append([rg])
+
+        return Channel(R_gates)

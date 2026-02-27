@@ -77,18 +77,21 @@ class Channel:
         Executes localized gate operations via `forwardd`.
         """
         # Convert State to density matrix if needed
-        if hasattr(rho, "isDensity") and not rho.isDensity:
-            rho = rho.density()
+        if hasattr(rho, "isDensity"):
+            if not rho.isDensity:
+                rho = rho.density()
+        else:
+            if isinstance(rho, pt.Tensor) and rho.ndim == 1:
+                rho = rho.view(-1, 1) @ pt.conj(rho.view(1, -1))
+                rho = rho.to(pt.complex64)
 
         tensor_rho = getattr(rho, "tensor", rho)
 
-        # Handle numpy arrays
         if isinstance(tensor_rho, np.ndarray):
             if tensor_rho.ndim == 1:
                 tensor_rho = np.outer(tensor_rho, tensor_rho.conj())
             tensor_rho = pt.from_numpy(tensor_rho)
 
-        # Ensure correct type/device
         device = self.ops[0][0].device if len(self.ops[0]) > 0 else "cpu"
         tensor_rho = tensor_rho.to(device=device, dtype=C64)
 
