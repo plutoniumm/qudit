@@ -1,47 +1,57 @@
 from MDR import Exam, load, Question
 import sys
-import numpy as np
-from numpy import linalg as LA
+import torch as pt
 
 sys.path.append("..")
 from qudit.noise import Process, Channel
-from qudit.tools import Fidelity
 from qudit.qec import Recovery
+from qudit.qec.lib import Leung
 
+def to_rho(x):
+    size = x.numel()
+    return (x.view(size, 1) @ pt.conj(x.view(1, size))).to(pt.complex64)
+
+fid = lambda rho, sigma: pt.real(pt.trace(rho @ sigma)).item()
 
 class QEC(Question):
     """
     Error-correction tests using the MDR framework.
     """
 
-    code = np.array(
-        [
-            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0],
-            [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0.0],
-        ],
-        dtype=np.complex64,
-    )
-    code /= LA.norm(code, axis=1)[:, None]
+    def test_petz_ad(self):
+        """Test Petz recovery on AD noise using Leung codewords (from testnoise0.py)."""
 
-    ops = Process.GAD(2, 4, Y=0.01, p=0.001)
-    kraus = None
+        n = 4
+        state0, state1 = Leung().toTensor()
+        rho0, rho1 = to_rho(state0), to_rho(state1)
 
-    def test_petz_recovery(self):
-        rec = Recovery.petz(self.ops, self.code)
-        fid = Fidelity.entanglement(rec, self.ops, self.code)
+        noise = Process.AD(d=2, n=n, Y=0.1, order=3)
+
+        noisy0 = noise.run(rho0)
+        noisy1 = noise.run(rho1)
+
+        rec = Recovery.petz(noise, [state0, state1])
+
+        clean0 = rec.run(noisy0)
+        clean1 = rec.run(noisy1)
+
+        fid0_noisy = fid(rho0, noisy0)
+        fid0_clean = fid(rho0, clean0)
+
+        fid1_noisy = fid(rho1, noisy1)
+        fid1_clean = fid(rho1, clean1)
 
         self.assertAlmostEqual(
-            fid, 0.98, places=2, msg="Petz recovery fidelity mismatch"
+            fid0_clean, 0.9889, places=2, msg="Petz AD recovery fidelity mismatch for codeword 0"
         )
-
-    def test_leung_recovery(self):
-        Ek = self.ops.correctable()
-
-        rec = Recovery.leung(Ek, self.code)
-        fid = Fidelity.entanglement(rec, self.ops, self.code)
-
         self.assertAlmostEqual(
-            fid, 0.91, places=2, msg="Leung recovery fidelity mismatch"
+            fid1_clean, 0.9889, places=2, msg="Petz AD recovery fidelity mismatch for codeword 1"
+        )
+        self.assertGreater(
+            fid0_clean, fid0_noisy, msg="Recovery should improve fidelity for codeword 0"
+        )
+        self.assertGreater(
+            fid1_clean, fid1_noisy, msg="Recovery should improve fidelity for codeword 1"
         )
 
 
