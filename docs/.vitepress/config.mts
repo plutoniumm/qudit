@@ -30,6 +30,9 @@ export default defineConfig({
           { text: 'Circuit', link: '/circuit' },
           { text: 'QUBO', link: '/qubo' },
           { text: 'Error Correction', link: '/qec' },
+          { text: 'Noise Channels', link: '/noise' },
+          { text: 'Metrics', link: '/metrics' },
+          { text: 'Algorithms', link: '/algo' },
         ]
       },
       {

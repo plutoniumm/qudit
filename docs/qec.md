@@ -1,169 +1,216 @@
 # Quantum Error Correction (QEC)
 
-`qudit` includes a small set of QEC-oriented primitives for:
+`qudit` provides an end-to-end QEC workflow using PyTorch Gate-based channels throughout:
 
-- constructing noise processes (channels),
-- computing recovery maps,
-- and evaluating how well a code performs under noise + recovery.
+1. Define a code subspace (built-in or from stabilizers)
+2. Apply a noise channel to encoded states
+3. Construct a recovery map
+4. Measure how well recovery works
 
-The main entry points are:
-
-- `qudit.noise.Process` for building noise channels,
-- `qudit.noise.Recovery` for building recovery channels,
-- `qudit.tools.Fidelity` for computing performance metrics.
-
-This page shows the typical workflow used in the test suite (see `tests/ECC.py`):
-
-1) define a code subspace,
-2) define a noise process acting on the physical system,
-3) compute a recovery (Petz or Leung),
-4) evaluate entanglement fidelity.
-
-## Code representation
-
-A (subspace) code is represented as an array of codewords, one per logical basis state.
-In the tests, the code is a 2-dimensional codespace embedded in a 16-dimensional physical Hilbert space (so: `k=2`, `n=16`).
-
-- Shape: `(k, n)`
-- Each row is a codeword statevector.
-- Codewords should be normalized.
-
-Example (from `tests/ECC.py`):
+Main imports:
 
 ```python
-import numpy as np
-from numpy import linalg as LA
-
-code = np.array(
-    [
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0],
-        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0.0],
-    ],
-    dtype=np.complex64,
-)
-
-# normalize each codeword
-code /= LA.norm(code, axis=1)[:, None]
+from qudit.qec import Recovery
+from qudit.qec.lib import Dutta3, Leung, Perfect
+from qudit.noise import Process
 ```
 
-## Noise processes (`Process`)
+---
 
-Noise is constructed using `qudit.noise.Process`. A `Process` is a channel acting on the physical system.
+## Code representation (`Code`)
 
-A common pattern is to build a parameterized channel (e.g. a damping channel) and then derive recovery operations from it.
+A `Code` wraps a `torch.Tensor` of shape `(k, d^n)` where each row is one logical codeword as a statevector in the $d^n$-dimensional physical Hilbert space.
 
-### Example: generalized amplitude damping
+| Property/Method | Description |
+| --- | --- |
+| `code.codewords` | Raw `torch.Tensor` of shape `(k, d^n)` |
+| `code.dim` | Number of logical codewords $k$ |
+| `code.dits` | Number of physical qudits $n$ |
+| `code[i]` | $i$-th codeword as a 1D tensor |
+| `code.toTensor()` | Returns all codewords as a tensor (indexable) |
+| `Code.isValid(codewords)` | Assert normalization and mutual orthogonality |
+| `Code.fromStabilizers(stabs)` | Construct code from Pauli stabilizer strings |
+
+### Built-in codes
+
+Three standard amplitude-damping codes are provided in `qudit.qec.lib`:
+
+| Code | Description |
+| --- | --- |
+| `Dutta3()` | 3-qubit permutation-invariant code; smallest single-AD-error-correcting code |
+| `Leung()` | 4-qubit code; standard single-AD-error correction |
+| `Perfect()` | [[5,1,3]] 5-qubit perfect code; corrects any single-qubit error |
+
+```python
+from qudit.qec.lib import Leung, Dutta3, Perfect
+
+code = Leung()
+state0, state1 = code.toTensor()  # two codeword tensors
+
+print(state0.shape)  # torch.Size([16])  (2^4 = 16)
+print(state1.norm()) # 1.0
+```
+
+### From stabilizers
+
+`Code.fromStabilizers` constructs the codespace projector from a list of Pauli stabilizer generators and extracts codewords via SVD or randomized range finding:
+
+```python
+from qudit.qec.codes import Code
+
+code = Code.fromStabilizers(["ZZZII", "IIZZZ", "XIXXI", "IXXIX"])
+print(len(code))  # 2  (= 2^(5-4))
+```
+
+---
+
+## Noise channels (`Process`)
+
+`Process` builds multi-qudit noise channels as `Channel` objects with correctable subsets pre-labeled. The channel applies $\Phi(\rho) = \sum_k E_k\rho E_k^\dagger$ where each $E_k$ is a sequence of local `Gate` operators embedded in the full Hilbert space.
 
 ```python
 from qudit.noise import Process
 
-# Example from tests:
-# local dimension d=2, number of physical particles/wires n=4
-# (so total physical state dimension is 2**4 = 16)
-ops = Process.GAD(2, 4, Y=0.01, p=0.001)
+noise = Process.AD(d=2, n=4, Y=0.1, order=3)
 ```
 
-> Notes
-> - The exact meaning of parameters like `Y` and `p` is channel-specific.
-> - The first two positional arguments typically determine the local dimension and number of physical subsystems.
+| Process | Description |
+| --- | --- |
+| `Process.AD(d, n, Y, order)` | Amplitude damping; only lowering operators |
+| `Process.GAD(d, n, Y, p, order)` | Generalized AD; lowering + raising operators |
+| `Process.Pauli(n, paulis, p, order)` | Pauli channel over `{I,X,Y,Z}` words |
 
-### Correctable operators
-
-For recovery constructions that start from an error set, use:
+Applying a channel to a density matrix:
 
 ```python
-Ek = ops.correctable()
+import torch as pt
+
+def to_rho(psi):
+    N = psi.numel()
+    return (psi.view(N, 1) @ psi.view(1, N).conj()).to(pt.complex64)
+
+state0, state1 = Leung().toTensor()
+rho0 = to_rho(state0)
+
+noisy0 = noise.run(rho0)
 ```
 
-This returns operators suitable for recovery synthesis (e.g. Leung recovery, below).
+---
 
 ## Recovery maps (`Recovery`)
 
-`qudit.noise.Recovery` constructs a recovery channel for a given noise process and code.
+`Recovery` constructs a recovery `Channel` from a noise channel and a list of codeword tensors. All three constructors have the same signature:
+
+```python
+Recovery.petz(channel, codewords)   -> Channel
+Recovery.leung(channel, codewords)  -> Channel
+Recovery.cafaro(channel, codewords) -> Channel
+```
+
+where `codewords` is `List[pt.Tensor]` (each codeword as a 1D tensor).
 
 ### Petz recovery
 
-Petz recovery is built directly from the channel and code:
+The Petz recovery map minimizes a distinguishability measure and is given by:
 
-```python
-from qudit.noise import Recovery
-from qudit.tools import Fidelity
+$$\mathcal{R}_\mathrm{Petz}: R_k = P\,E_k^\dagger\,[\mathcal{E}(P)]^{-1/2}$$
 
-rec = Recovery.petz(ops, code)
-fid = Fidelity.entanglement(rec, ops, code)
-print(fid)
+where $P = \sum_i |\bar{i}\rangle\langle\bar{i}|$ is the code projector.
+
+::: code-group
+
+```python [Example]
+state0, state1 = Leung().toTensor()
+rho0 = to_rho(state0)
+
+noise = Process.AD(d=2, n=4, Y=0.1, order=3)
+noisy0 = noise.run(rho0)
+
+rec = Recovery.petz(noise, [state0, state1])
+clean0 = rec.run(noisy0)
+
+fid = pt.real(pt.trace(rho0 @ clean0)).item()
+print(f"Fidelity after recovery: {fid:.4f}")  # ~0.9889
 ```
 
-In the test suite this achieves high entanglement fidelity for the provided parameters.
+```python [imports]
+from qudit.qec import Recovery
+from qudit.qec.lib import Leung
+from qudit.noise import Process
+import torch as pt
+
+def to_rho(psi):
+    N = psi.numel()
+    return (psi.view(N, 1) @ psi.view(1, N).conj()).to(pt.complex64)
+```
+
+:::
 
 ### Leung recovery
 
-Leung recovery is built from a correctable error set and a code:
+The Leung map uses a polar decomposition: for each $k$, factor $E_k P = U_k \Sigma_k V_k^\dagger$ and set $R_k = P U_k^\dagger$:
 
 ```python
-Ek = ops.correctable()
-rec = Recovery.leung(Ek, code)
-fid = Fidelity.entanglement(rec, ops, code)
-print(fid)
+rec = Recovery.leung(noise, [state0, state1])
 ```
 
-## Fidelity metrics (`Fidelity`)
+### Cafaro recovery
 
-`qudit.tools.Fidelity` provides helper metrics for evaluating code + recovery performance.
-
-### Entanglement fidelity
-
-Entanglement fidelity is commonly used for QEC benchmarking because it captures average performance on the entire codespace.
+The Cafaro map normalizes codeword projections by the overlap $\langle\bar{i}|E_k^\dagger E_k|\bar{i}\rangle$:
 
 ```python
-from qudit.tools import Fidelity
-
-fid = Fidelity.entanglement(rec, ops, code)
+rec = Recovery.cafaro(noise, [state0, state1])
 ```
 
-Interpretation:
+---
 
-- `fid = 1.0` indicates perfect correction on the codespace (for the modeled noise).
-- lower values indicate residual noise after recovery.
+## End-to-end example
 
-## End-to-end example (mirrors `tests/ECC.py`)
+::: code-group
 
-```python
-import numpy as np
-from numpy import linalg as LA
+```python [Example]
+state0, state1 = Leung().toTensor()
+rho0, rho1 = to_rho(state0), to_rho(state1)
 
-from qudit.noise import Recovery, Process
-from qudit.tools import Fidelity
+noise = Process.AD(d=2, n=4, Y=0.1, order=3)
 
-# Define a 2D codespace inside a 16D physical space
-code = np.array(
-    [
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0],
-        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0.0],
-    ],
-    dtype=np.complex64,
-)
-code /= LA.norm(code, axis=1)[:, None]
+noisy0 = noise.run(rho0)
+noisy1 = noise.run(rho1)
 
-# Noise model
-ops = Process.GAD(2, 4, Y=0.01, p=0.001)
+rec = Recovery.petz(noise, [state0, state1])
 
-# Petz recovery
-rec_petz = Recovery.petz(ops, code)
-fid_petz = Fidelity.entanglement(rec_petz, ops, code)
+clean0 = rec.run(noisy0)
+clean1 = rec.run(noisy1)
 
-# Leung recovery
-Ek = ops.correctable()
-rec_leung = Recovery.leung(Ek, code)
-fid_leung = Fidelity.entanglement(rec_leung, ops, code)
+fid = lambda r, s: pt.real(pt.trace(r @ s)).item()
 
-print("Petz entanglement fidelity:", fid_petz)
-print("Leung entanglement fidelity:", fid_leung)
+print("Noisy  fidelity |0L>:", fid(rho0, noisy0))
+print("Recovered fidelity |0L>:", fid(rho0, clean0))
+print("Noisy  fidelity |1L>:", fid(rho1, noisy1))
+print("Recovered fidelity |1L>:", fid(rho1, clean1))
 ```
 
-## Practical tips
+```python [imports]
+from qudit.qec import Recovery
+from qudit.qec.lib import Leung
+from qudit.noise import Process
+import torch as pt
 
-- Ensure your `code` rows are normalized; many recovery/fidelity computations assume valid statevectors.
-- Keep shapes consistent:
-  - the codeword length must match the physical Hilbert space dimension of the channel.
-- If you change the number of physical subsystems or the local dimension in `Process.*`, update the code embedding dimension accordingly.
+def to_rho(psi):
+    N = psi.numel()
+    return (psi.view(N, 1) @ psi.view(1, N).conj()).to(pt.complex64)
+```
+
+:::
+
+> [!NOTE]
+> `Recovery` returns a `Channel` object;  apply it via `.run(rho)` exactly as you would any noise channel.
+
+---
+
+## Practical notes
+
+- Codeword tensors must be `torch.Tensor` (1D, on the same device). Call `.toTensor()` on a `Code` and unpack the rows.
+- `Process.AD(order=3)` labels correctable Kraus words up to 3-photon-loss order; `Recovery.petz` uses all Kraus words regardless of `correctables`.
+- For large codes the Petz pseudo-inverse can be slow; try `Recovery.cafaro` as a faster approximation.
+- To validate a custom code before running QEC, use `Code.isValid(code.toTensor())`.
