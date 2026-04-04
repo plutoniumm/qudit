@@ -70,6 +70,8 @@ class Channel:
         ), "ops must be a list of Gate lists"
         self.ops = ops
         self.correctables = []
+        first = ops[0][0]
+        self.d: int = first.total_dim
 
     def run(self, rho: Union["State", pt.Tensor, np.ndarray]) -> pt.Tensor:
         """
@@ -139,17 +141,31 @@ class Channel:
     def __repr__(self) -> str:
         return f"Channel({len(self.ops)} Kraus operators)"
 
+    def _materialize(self, word: "list[Gate]") -> pt.Tensor:
+        """
+        Materialize the full $d \\times d$ matrix for a Kraus word by passing
+        an identity matrix through each gate's $\\_left()$ call.
+        """
+        first = self.ops[0][0]
+        mat = pt.eye(self.d, dtype=C64, device=first.device)
+        for g in word:
+            mat = g._left(mat)
+
+        return mat
+
     @cached_property
     def isTP(self) -> bool:
         """
-        Check trace-preservation (TP) via $\sum_k E_k^{\dagger}E_k = I$ (approx.).
+        Check trace-preservation (TP) via $\sum_k E_k^{\\dagger}E_k = I$ (approx.).
         """
-        ti = [E.conj().T @ E for kraus_word in self.ops for E in kraus_word]
-        sum_ti = np.sum(ti, axis=0)
-        d = self.ops[0][0].d if len(self.ops[0]) > 0 else 1
-        identity = np.eye(d, dtype=complex)
+        first = self.ops[0][0]
+        total = pt.zeros((self.d, self.d), dtype=C64, device=first.device)
+        for word in self.ops:
+            Ek = self._materialize(word)
+            total += Ek.conj().T @ Ek
+        identity = pt.eye(self.d, dtype=C64, device=first.device)
 
-        return bool(np.allclose(sum_ti, identity, atol=1e-8))
+        return bool(pt.allclose(total, identity, atol=1e-8))
 
     @cached_property
     def isCP(self) -> bool:
@@ -206,10 +222,8 @@ class Channel:
         r = K
         V = np.zeros((d * r, d), dtype=complex)
         for n, O in enumerate(self.ops):
-            E = np.eye(d, dtype=complex)
-            for g in O:
-                E = g.matrix @ E
-            V[n * d : (n + 1) * d, :] = E
+            Ek = self._materialize(O).numpy()
+            V[n * d : (n + 1) * d, :] = Ek
 
         return V
 

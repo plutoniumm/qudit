@@ -2,28 +2,6 @@ from numpy import linalg as LA
 import numpy as np
 
 
-def PPT(rho: np.ndarray, sub: int) -> bool:
-    """
-    Peres–Horodecki (PPT) separability test for a bipartite density matrix.
-
-    Performs a blockwise partial transpose on subsystem blocks of size `sub` and checks
-    positivity: $\\rho^{T_B} \succeq 0$.
-
-    Note: current implementation overrides `sub` to 3.
-    """
-    side = rho.shape[0]
-    sub = 3
-    if side % sub != 0:
-        raise ValueError(f"Matrix side ({side}) not divisible by sub ({sub})")
-
-    mat0 = rho.copy()
-    for i in range(0, mat0.shape[0], sub):
-        for j in range(0, mat0.shape[1], sub):
-            mat0[i : i + sub, j : j + sub] = mat0[i : i + sub, j : j + sub].T
-
-    return bool(np.all(np.linalg.eigvals(mat0) >= 0))
-
-
 class Space:
     """
     Linear-algebra helpers for vector spaces and bipartite decompositions.
@@ -68,3 +46,25 @@ class Space:
         Schmidt rank (matrix rank) of a bipartite coefficient matrix.
         """
         return int(LA.matrix_rank(mat))
+
+    @staticmethod
+    def PPT(rho: np.ndarray, sub: int) -> bool:
+        """
+        Peres–Horodecki (PPT) separability test for a bipartite density matrix.
+
+        Performs a blockwise partial transpose on subsystem blocks of size `sub` and checks
+        positivity: $\\rho^{T_B} \succeq 0$.
+
+        Note: current implementation overrides `sub` to 3.
+        """
+        side = rho.shape[0]
+        sub = 3
+        if side % sub != 0:
+            raise ValueError(f"Matrix side ({side}) not divisible by sub ({sub})")
+
+        mat0 = rho.copy()
+        for i in range(0, mat0.shape[0], sub):
+            for j in range(0, mat0.shape[1], sub):
+                mat0[i : i + sub, j : j + sub] = mat0[i : i + sub, j : j + sub].T
+
+        return bool(np.all(np.linalg.eigvals(mat0) >= 0))

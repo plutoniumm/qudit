@@ -95,7 +95,8 @@ class State(np.ndarray):
         """
         if not self.isDensity:
             return True
-        tr = np.trace(self**2).real
+        tr = np.real(np.trace(np.matmul(self, self)))
+
         return bool(np.isclose(tr, 1.0))
 
     @property

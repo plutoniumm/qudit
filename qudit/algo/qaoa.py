@@ -102,6 +102,10 @@ class QAOA(nn.Module):
         self._H_P_matrix = self.getMat()
         self.gammas = nn.Parameter(pt.rand(layers, device=device) * (2 * pt.pi))
         self.betas = nn.Parameter(pt.rand(layers, device=device) * pt.pi)
+        self.gg = GG.Gategen(dim=d, device=device)
+        self._H_factory = self.gg.U(self.gg.H, name="H")
+        self._CX_factory = self.gg.U(self.gg.CX, name="CX")
+
         self.OpMap = {
             "Z": self._RZ,
             "ZZ": self._RZZ,
@@ -118,26 +122,22 @@ class QAOA(nn.Module):
         return gate.forward(x)
 
     def _RZ(self, x, angle, indices):
-        return self.gate(x, GG.RZ, index=indices, angle=angle)
+        return self.gate(x, self.gg.RZ, index=indices, angle=angle)
 
     def _RZZ(self, x, angle, indices):
-        x = self.gate(x, GG.CX, index=indices)
-        x = self.gate(x, GG.RZ, index=[indices[1]], angle=angle)
-        x = self.gate(x, GG.CX, index=indices)
+        x = self.gate(x, self._CX_factory, index=indices)
+        x = self.gate(x, self.gg.RZ, index=[indices[1]], angle=angle)
+        x = self.gate(x, self._CX_factory, index=indices)
 
         return x
 
     def forward(self):
         state = pt.zeros((self.width, 1), dtype=C64, device=self.device)
         state[0, 0] = 1.0
-        h_all = GG.H(
-            dim=self.d,
-            wires=self.wires,
-            index=list(range(self.wires)),
-            device=self.device,
-        )
 
-        state = h_all.forward(state)
+        for j in range(self.wires):
+            state = self.gate(state, self._H_factory, index=[j])
+
         for i in range(self.layers):
             for coeff, gtype, indices in self.hamiltonian:
                 angle = 2 * self.gammas[i] * coeff
@@ -147,7 +147,7 @@ class QAOA(nn.Module):
                     raise NotImplementedError(f"Gate type '{gtype}' not supported.")
 
             for j in range(self.wires):
-                state = self.gate(state, GG.RX, index=[j], angle=2 * self.betas[i])
+                state = self.gate(state, self.gg.RX, index=[j], angle=2 * self.betas[i])
 
         return state
 
@@ -159,9 +159,9 @@ class QAOA(nn.Module):
         H_P = pt.zeros((self.width, self.width), dtype=C64, device=self.device)
         gg = GG.Gategen(dim=self.d, device=self.device)
         opmat = {
-            "I": gg.I,
-            "Z": gg.Z,
-            "X": gg.X,
+            "I": gg.I.tensor,
+            "Z": gg.Z.tensor,
+            "X": gg.X.tensor,
         }
         for coeff, gtype, indices in self.hamiltonian:
             oplist = []

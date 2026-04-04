@@ -248,11 +248,11 @@ class Entropy:
             dA * dB,
         ), "Input must be a square matrix of shape (dA*dB, dA*dB)"
 
-        rho_A = partial.trace(rho, dA, dB, keep="A")
-        S_A = Entropy.default(rho_A)
+        rho_B = partial.trace(rho, dA, dB, keep="B")
+        S_B = Entropy.default(rho_B)
         S_AB = Entropy.default(rho)
 
-        return S_AB - S_A
+        return S_AB - S_B
 
 
 class Info:
@@ -286,11 +286,11 @@ class Info:
         else:
             assert rho.shape == (dA * dB, dA * dB)
 
-            rho_A = partial.trace(rho, dA, dB, keep="A")
-            S_A = Entropy.default(rho_A)
+            rho_B = partial.trace(rho, dA, dB, keep="B")
+            S_B = Entropy.default(rho_B)
             S_AB = Entropy.default(rho)
 
-            return S_AB - S_A
+            return S_AB - S_B
 
     @staticmethod
     def mutual(rho: np.ndarray, dA: int, dB: int) -> float:
@@ -381,11 +381,11 @@ class Distance:
         )
 
     @staticmethod
-    def trace_distance(rho: np.ndarray, sigma: np.ndarray) -> float:
+    def trace(rho: np.ndarray, sigma: np.ndarray) -> float:
         """
         Trace distance $\\tfrac12\|\\rho-\sigma\|_1$ via singular values.
         """
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
 
-        return 0.5 * np.trace(svdvals(rho - sigma)).real
+        return float(0.5 * np.sum(svdvals(rho - sigma)))

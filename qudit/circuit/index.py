@@ -1,5 +1,5 @@
 from typing import Union as U, List, Any, Optional, Dict
-from .gates import Gate, Gategen, Operator
+from .gates import Gate, Gategen, Operator, NoisyGate
 from dataclasses import dataclass
 from .utils import LittleEndian
 import torch.nn as nn
@@ -13,11 +13,13 @@ Array = List[int]
 
 class Mode(Enum):
     """
-    Execution mode for the circuit: statevector (VECTOR) or density-matrix (MATRIX).
+    Execution mode for the circuit: statevector (VECTOR), density-matrix (MATRIX),
+    or noisy density-matrix (NOISY).
     """
 
     VECTOR = "vector"
     MATRIX = "matrix"
+    NOISY = "noisy"
 
 
 @dataclass
@@ -119,6 +121,7 @@ class Circuit(nn.Module):
     operations: List[Frame]
     gates: Dict[int, Gategen]
     gate_gen: Any
+    noise_config: Optional[Dict[str, Any]]
 
     def __init__(
         self,
@@ -127,6 +130,7 @@ class Circuit(nn.Module):
         device: str = "cpu",
         mode: U[Mode, str] = Mode.VECTOR,
         flip: bool = False,
+        noise: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize a circuit with `wires` subsystems of local dimension(s) `dim` on `device`.
@@ -160,6 +164,16 @@ class Circuit(nn.Module):
 
         if isinstance(self.dim, int):
             self.gate_gen = self.gates[self.dim]
+
+        # Noisy mode setup
+        if self.mode == Mode.NOISY:
+            if noise is None:
+                raise ValueError("Circuit(mode='noisy') requires a noise config dict.")
+            self.noise_config = noise
+            self._noise_pairs: List[List[NoisyGate]] = []
+            self._noise_module_list = nn.ModuleList()
+        else:
+            self.noise_config = None
 
     def gate(self, gate_in: Any, index: Any, **kwargs: Any) -> None:
         """
@@ -196,6 +210,52 @@ class Circuit(nn.Module):
         pos = str(len(self.circuit))
         self.circuit.add_module(pos, Instance)
 
+        if self.mode == Mode.NOISY:
+            pair: List[NoisyGate] = []
+            cfg = self.noise_config
+            noise_type = cfg["type"]
+
+            for wire in idx_list:
+                param = self._q_noise(wire)
+
+                ng = NoisyGate(
+                    noise_type=noise_type,
+                    param=param,
+                    index=[wire],
+                    wires=self.wires,
+                    dims=self.dims_,
+                    device=self.device,
+                )
+                pair.append(ng)
+                self._noise_module_list.append(ng)
+
+            self._noise_pairs.append(pair)
+
+
+    def _q_noise(self, wire: int) -> Any:
+        """
+        Extract the noise parameter for a given wire from self.noise_config.
+        Supports scalar (same rate for all wires) or list (per-wire rates).
+        For "pauli" type, returns [px, py, pz] as a tensor.
+        """
+        cfg = self.noise_config
+        noise_type = cfg["type"]
+        if noise_type == "pauli":
+            px = cfg.get("px", 0.0)
+            py = cfg.get("py", 0.0)
+            pz = cfg.get("pz", 0.0)
+
+            return torch.tensor([px, py, pz], dtype=torch.float32, device=self.device)
+
+        for k, v in cfg.items():
+            if k == "type":
+                continue
+            if isinstance(v, list):
+                return v[wire]
+            return v
+
+        raise ValueError(f"Cannot extract noise param from config: {cfg}")
+
     def forward(self, x: Any) -> torch.Tensor:
         """
         Apply the circuit to a statevector or density matrix depending on `self.mode`.
@@ -209,16 +269,25 @@ class Circuit(nn.Module):
 
         if self.mode == Mode.VECTOR:
             return self.circuit(x)
-        else:  # Density matrix logic
-            W = self.width
-            if x.dim() == 1 or (x.dim() == 2 and min(x.shape) == 1):
-                psi = x.reshape(W, 1)
-                rho = psi @ psi.conj().T
-            else:
-                rho = x
 
-            for module in self.circuit:  # type: ignore[assignment]
-                rho = module.forwardd(rho)  # type: ignore[attr-defined]
+        W = self.width
+        if x.dim() == 1 or (x.dim() == 2 and min(x.shape) == 1):
+            psi = x.reshape(W, 1)
+            rho = psi @ psi.conj().T
+        else:
+            rho = x
+
+        if self.mode == Mode.NOISY:
+            for gate, noise_gates in zip(self.circuit, self._noise_pairs):
+                rho = gate.forwardd(rho)
+                for ng in noise_gates:
+                    rho = ng.forwardd(rho)
+
+            return rho
+        else:
+            for module in self.circuit:
+                rho = module.forwardd(rho)
+
             return rho
 
     def matrix(self, littleEndian=False) -> torch.Tensor:
@@ -233,7 +302,24 @@ class Circuit(nn.Module):
             if littleEndian:
                 res = LittleEndian(res, self.dims_)
 
+            cols.append(res.reshape(-1, 1))
+
         return torch.cat(cols, dim=1)
+
+    def expectation(self, operator: Any, state: torch.Tensor) -> torch.Tensor:
+        """
+        Compute $\\langle\\psi|O|\\psi\\rangle$ (VECTOR mode) or $\\mathrm{Tr}(O\\rho)$ (MATRIX mode)
+        where $|\\psi\\rangle$ / $\\rho$ is the output of `forward(state)`.
+        """
+        pass
+
+    def sample(self, state: torch.Tensor, shots: int = 1024) -> dict:
+        """
+        Sample `shots` bitstring outcomes from $p(x) = |\\langle x|\\psi\\rangle|^2$
+        where $|\\psi\\rangle = \\mathrm{forward}(\\mathrm{state})$.
+        Returns `dict[bitstring, count]`.
+        """
+        pass
 
     def draw(self, mode: str = "ascii") -> Any:
         """
