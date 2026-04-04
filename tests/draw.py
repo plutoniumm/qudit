@@ -1,14 +1,22 @@
+from MDR import Exam, load, Question
 import sys
 
 sys.path.append("..")
 
 from qudit import Circuit
 import numpy as np
-import unittest
 
 
-class TestDraw(unittest.TestCase):
+class CircuitDraw(Question):
+    """
+    Circuit visualization tests: ASCII diagram rendering via $\\mathrm{draw()}$.
+    """
+
     def test_draw_matches_expected(self):
+        """
+        $\\mathrm{draw()}$ produces the expected ASCII circuit diagram for a
+        mixed-dimension $[2,2,3,3]$ circuit with $H, R_Y, X, CX$ gates
+        """
         solution = """
 |0> [2] ┤─H──RY(angle=1.5708)─┤
 |0> [2] ┤─X───────────────────┤
@@ -16,18 +24,22 @@ class TestDraw(unittest.TestCase):
 |0> [3] ┤───╰U────────────────┤
 """.strip()
 
-        c2 = Circuit(wires=4, dim=[2, 2, 3, 3], device="cpu")
-        G2 = c2.gates[2]
-        G3 = c2.gates[3]
-        c2.gate(G2.H, [0])
-        c2.gate(G2.RY, [0], angle=np.pi / 2)
-        c2.gate(G2.X, [1])
-        c2.gate(G3.X, [2])
-        c2.gate(G3.CX, [2, 3])
+        c = Circuit(wires=4, dim=[2, 2, 3, 3], device="cpu")
+        G2 = c.gates[2]
+        G3 = c.gates[3]
+        c.gate(G2.H, [0])
+        c.gate(G2.RY, [0], angle=np.pi / 2)
+        c.gate(G2.X, [1])
+        c.gate(G3.X, [2])
+        c.gate(G3.CX, [2, 3])
 
-        fig = c2.draw()
-        self.assertEqual(fig, solution)
+        self.assertEqual(c.draw(), solution)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    runner = Exam(
+        name="Qudit Draw Tests",
+        desc="Validation of ASCII circuit diagram rendering",
+        file="draw.md",
+    )
+    runner.run(load(CircuitDraw))

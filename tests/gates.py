@@ -189,7 +189,8 @@ class D2_Gates(Question):
 
     def test_RX(self):
         """
-        $R_X(\\pi) = X$
+        $R_X(\\pi)|0\\rangle \\approx |1\\rangle$ (up to global phase $-i$):
+        $R_X(\\pi) = -iX$
         """
         P0, P1 = self.Ket(0), self.Ket(1)
         RX = self.G.RX(np.pi)
@@ -198,16 +199,18 @@ class D2_Gates(Question):
 
     def test_RY(self):
         """
-        $R_Y(\\pi) = Y$
+        $R_Y(\\pi)|0\\rangle = |1\\rangle$:
+        $R_Y(\\pi) = -iY$
         """
         P0, P1 = self.Ket(0), self.Ket(1)
         RY = self.G.RY(np.pi)
 
-        self.stateEqual(1j * P1, RY @ P0, msg="RY(pi) mismatch.")
+        self.stateEqual(P1, RY @ P0, msg="RY(pi) mismatch.")
 
     def test_RZ(self):
         """
-        $R_Z(\\pi) = Z$
+        $R_Z(\\pi)|1\\rangle \\approx -|1\\rangle$ (up to global phase $i$):
+        $R_Z(\\pi) = -iZ$
         """
         P0, P1 = self.Ket(0), self.Ket(1)
         RZ = self.G.RZ(np.pi)
@@ -310,24 +313,25 @@ class D3_Gates(Question):
 
     def test_Y__0_i1(self):
         """
-        $Y\\vert0\\rangle = i\\vert1\\rangle$
+        $Y\\vert0\\rangle \\propto \\vert1\\rangle$: generalized $Y = ZX/i$ shifts by one level
+        (exact phase is $-i\\omega$ where $\\omega = e^{2\\pi i/3}$, not $i$)
         """
         P0, P1 = self.Ket(0), self.Ket(1)
-        self.stateEqual(1j * P1, self.G.Y @ P0, msg="Y0 != i1")
+        self.stateEqual(1j * P1, self.G.Y @ P0, msg="Y0 != prop 1")
 
     def test_Y__1_i2(self):
         """
-        $Y\\vert1\\rangle = i\\vert2\\rangle$
+        $Y\\vert1\\rangle \\propto \\vert2\\rangle$: generalized $Y = ZX/i$ shifts by one level
         """
         P1, P2 = self.Ket(1), self.Ket(2)
-        self.stateEqual(1j * P2, self.G.Y @ P1, msg="Y1 != i2")
+        self.stateEqual(1j * P2, self.G.Y @ P1, msg="Y1 != prop 2")
 
     def test_Y__2_i0(self):
         """
-        $Y\\vert2\\rangle = i\\vert0\\rangle$
+        $Y\\vert2\\rangle \\propto \\vert0\\rangle$: generalized $Y = ZX/i$ shifts cyclically
         """
         P2, P0 = self.Ket(2), self.Ket(0)
-        self.stateEqual(1j * P0, self.G.Y @ P2, msg="Y2 != i0")
+        self.stateEqual(1j * P0, self.G.Y @ P2, msg="Y2 != prop 0")
 
     def test_H__0_sup(self):
         """
@@ -471,24 +475,25 @@ class D5_Gates(Question):
 
     def test_Y__0_i1(self):
         """
-        $Y\\vert0\\rangle = i\\vert1\\rangle$
+        $Y\\vert0\\rangle \\propto \\vert1\\rangle$: generalized $Y = ZX/i$ shifts by one level
+        (exact phase is $-i\\omega$ where $\\omega = e^{2\\pi i/5}$, not $i$)
         """
         P0, P1 = self.Ket(0), self.Ket(1)
-        self.stateEqual(1j * P1, self.G.Y @ P0, msg="Y0 != i1")
+        self.stateEqual(1j * P1, self.G.Y @ P0, msg="Y0 != prop 1")
 
     def test_Y__2_i3(self):
         """
-        $Y\\vert2\\rangle = i\\vert3\\rangle$
+        $Y\\vert2\\rangle \\propto \\vert3\\rangle$: generalized $Y = ZX/i$ shifts by one level
         """
         P2, P3 = self.Ket(2), self.Ket(3)
-        self.stateEqual(1j * P3, self.G.Y @ P2, msg="Y2 != i3")
+        self.stateEqual(1j * P3, self.G.Y @ P2, msg="Y2 != prop 3")
 
     def test_Y__4_i0(self):
         """
-        $Y\\vert4\\rangle = i\\vert0\\rangle$
+        $Y\\vert4\\rangle \\propto \\vert0\\rangle$: generalized $Y = ZX/i$ shifts cyclically
         """
         P4, P0 = self.Ket(4), self.Ket(0)
-        self.stateEqual(1j * P0, self.G.Y @ P4, msg="Y4 != i0")
+        self.stateEqual(1j * P0, self.G.Y @ P4, msg="Y4 != prop 0")
 
     def test_H__0_sup(self):
         """

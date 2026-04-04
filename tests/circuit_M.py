@@ -1,8 +1,8 @@
+from MDR import Exam, load, Question
 import sys
 
 sys.path.append("..")
 
-from unittest import TestCase, main
 from qudit import Circuit, Mode
 import torch
 
@@ -20,11 +20,17 @@ def toRho(x):
     return x.view(size, 1) @ torch.conj(x.view(1, size))
 
 
-class TestCircuitMatrixMode(TestCase):
-    def Close(self, a, b):
-        self.assertTrue(torch.allclose(a, b, rtol=1e-4, atol=1e-4), "Tensors not close")
+class MatrixCircuit(Question):
+    """
+    Circuit tests in density-matrix (MATRIX) mode, verifying
+    $\\Phi(|\\psi\\rangle\\langle\\psi|) = U|\\psi\\rangle\\langle\\psi|U^\\dagger$.
+    """
 
     def test_single_qubit(self):
+        """
+        $H: U|\\psi\\rangle\\langle\\psi|U^\\dagger = \\Phi(|\\psi\\rangle\\langle\\psi|)$
+        for a single qubit, two ways
+        """
         cM = Circuit(wires=1, dim=2, mode=Mode.MATRIX)
         cV = Circuit(wires=1, dim=2, mode=Mode.VECTOR)
         G2 = cM.gates[2]
@@ -35,13 +41,15 @@ class TestCircuitMatrixMode(TestCase):
         xV = ket0(cM.width)
         xM = toRho(xV)
 
-        SV = cV(xV)
-        Rho = cM(xM)
-
-        SVR = toRho(SV)
-        self.Close(SVR, Rho)
+        rhoV = toRho(cV(xV))
+        rhoM = cM(xM)
+        self.matEqual(rhoV, rhoM)
 
     def test_single_qutrit(self):
+        """
+        $H: U|\\psi\\rangle\\langle\\psi|U^\\dagger = \\Phi(|\\psi\\rangle\\langle\\psi|)$
+        for a single qutrit, two ways
+        """
         cM = Circuit(wires=1, dim=3, mode=Mode.MATRIX)
         cV = Circuit(wires=1, dim=3, mode=Mode.VECTOR)
         G3 = cM.gates[3]
@@ -52,12 +60,15 @@ class TestCircuitMatrixMode(TestCase):
         xV = ket0(cM.width)
         xM = toRho(xV)
 
-        SV, Rho = cV(xV), cM(xM)
-        SVR = toRho(SV)
-
-        self.Close(SVR, Rho)
+        rhoV = toRho(cV(xV))
+        rhoM = cM(xM)
+        self.matEqual(rhoV, rhoM)
 
     def test_mixed_dims(self):
+        """
+        Mixed-dimension $[2,2,3,3]$ circuit: VECTOR and MATRIX modes agree
+        under $H, X, CX$, two ways
+        """
         cM = Circuit(wires=4, dim=[2, 2, 3, 3], mode=Mode.MATRIX)
         cV = Circuit(wires=4, dim=[2, 2, 3, 3], mode=Mode.VECTOR)
         G2 = cM.gates[2]
@@ -74,11 +85,45 @@ class TestCircuitMatrixMode(TestCase):
         xV = ket0(cM.width)
         xM = toRho(xV)
 
-        SV, Rho = cV(xV), cM(xM)
-        SVR = toRho(SV)
+        rhoV = toRho(cV(xV))
+        rhoM = cM(xM)
+        self.matEqual(rhoV, rhoM)
 
-        self.Close(SVR, Rho)
+    def test_trace_preserved(self):
+        """
+        $\\mathrm{Tr}(U\\rho U^\\dagger) = \\mathrm{Tr}(\\rho) = 1$:
+        unitary channels are trace-preserving
+        """
+        cM = Circuit(wires=2, dim=2, mode=Mode.MATRIX)
+        G2 = cM.gates[2]
+        cM.gate(G2.H, [0])
+        cM.gate(G2.CX, [0, 1])
+
+        xV = ket0(cM.width)
+        rhoM = cM(toRho(xV))
+        tr = torch.trace(rhoM).real.item()
+        self.assertAlmostEqual(tr, 1.0, places=5)
+
+    def test_purity_preserved(self):
+        """
+        $\\mathrm{Tr}((U\\rho U^\\dagger)^2) = \\mathrm{Tr}(\\rho^2) = 1$:
+        unitary channels preserve purity
+        """
+        cM = Circuit(wires=2, dim=2, mode=Mode.MATRIX)
+        G2 = cM.gates[2]
+        cM.gate(G2.H, [0])
+        cM.gate(G2.CX, [0, 1])
+
+        xV = ket0(cM.width)
+        rhoM = cM(toRho(xV))
+        purity = torch.trace(rhoM @ rhoM).real.item()
+        self.assertAlmostEqual(purity, 1.0, places=5)
 
 
 if __name__ == "__main__":
-    main()
+    runner = Exam(
+        name="Qudit Matrix Circuit Tests",
+        desc="Validation of circuit forward pass in density-matrix mode",
+        file="circuit_m.md",
+    )
+    runner.run(load(MatrixCircuit))
