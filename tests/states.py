@@ -21,7 +21,9 @@ class SpecialStates(Question):
         """
         s = GHZ(2, 2)
 
-        self.assertAlmostEqual(np.linalg.norm(s), 1.0, places=6, msg="GHZ(2,2) should be normalized")
+        self.assertAlmostEqual(
+            np.linalg.norm(s), 1.0, places=6, msg="GHZ(2,2) should be normalized"
+        )
 
     def test_ghz_structure(self):
         """
@@ -30,13 +32,33 @@ class SpecialStates(Question):
         s = GHZ(2, 2)
         arr = np.array(s)
 
-        self.assertAlmostEqual(float(np.abs(arr[0])), 1 / np.sqrt(2), places=6, msg="GHZ(2,2) amplitude at |00> should be 1/√2")
+        self.assertAlmostEqual(
+            float(np.abs(arr[0])),
+            1 / np.sqrt(2),
+            places=6,
+            msg="GHZ(2,2) amplitude at |00> should be 1/√2",
+        )
 
-        self.assertAlmostEqual(float(np.abs(arr[3])), 1 / np.sqrt(2), places=6, msg="GHZ(2,2) amplitude at |11> should be 1/√2")
+        self.assertAlmostEqual(
+            float(np.abs(arr[3])),
+            1 / np.sqrt(2),
+            places=6,
+            msg="GHZ(2,2) amplitude at |11> should be 1/√2",
+        )
 
-        self.assertAlmostEqual(float(np.abs(arr[1])), 0.0, places=6, msg="GHZ(2,2) amplitude at |01> should be 0")
+        self.assertAlmostEqual(
+            float(np.abs(arr[1])),
+            0.0,
+            places=6,
+            msg="GHZ(2,2) amplitude at |01> should be 0",
+        )
 
-        self.assertAlmostEqual(float(np.abs(arr[2])), 0.0, places=6, msg="GHZ(2,2) amplitude at |10> should be 0")
+        self.assertAlmostEqual(
+            float(np.abs(arr[2])),
+            0.0,
+            places=6,
+            msg="GHZ(2,2) amplitude at |10> should be 0",
+        )
 
     def test_ghz_reduced_entropy(self):
         """
@@ -47,7 +69,12 @@ class SpecialStates(Question):
         rho_A = np.trace(rho.reshape(2, 2, 2, 2), axis1=1, axis2=3)
         ent = Entropy.neumann(rho_A)
 
-        self.assertAlmostEqual(ent, 1.0, places=5, msg="GHZ(2,2) reduced state should have entropy = 1 ebit")
+        self.assertAlmostEqual(
+            ent,
+            1.0,
+            places=5,
+            msg="GHZ(2,2) reduced state should have entropy = 1 ebit",
+        )
 
     def test_w_norm(self):
         """
@@ -55,7 +82,9 @@ class SpecialStates(Question):
         """
         s = W(3)
 
-        self.assertAlmostEqual(np.linalg.norm(s), 1.0, places=6, msg="W(3) should be normalized")
+        self.assertAlmostEqual(
+            np.linalg.norm(s), 1.0, places=6, msg="W(3) should be normalized"
+        )
 
     def test_w_equal_amplitudes(self):
         """
@@ -67,7 +96,9 @@ class SpecialStates(Question):
 
         self.assertEqual(len(nonzero), 3, msg="W(3) should have 3 nonzero amplitudes")
         for v in nonzero:
-            self.assertAlmostEqual(float(v), 1 / np.sqrt(3), places=6, msg="W(3) amplitudes should be 1/√3")
+            self.assertAlmostEqual(
+                float(v), 1 / np.sqrt(3), places=6, msg="W(3) amplitudes should be 1/√3"
+            )
 
     def test_noon_norm(self):
         """
@@ -75,7 +106,12 @@ class SpecialStates(Question):
         """
         s = NOON(2, theta=0.0)
 
-        self.assertAlmostEqual(np.linalg.norm(s), 1.0, places=6, msg="NOON(2, theta=0) should be normalized")
+        self.assertAlmostEqual(
+            np.linalg.norm(s),
+            1.0,
+            places=6,
+            msg="NOON(2, theta=0) should be normalized",
+        )
 
     def test_noon_two_terms(self):
         """
@@ -85,11 +121,23 @@ class SpecialStates(Question):
         arr = np.array(s)
         nonzero = np.abs(arr[np.abs(arr) > 1e-10])
 
-        self.assertEqual(len(nonzero), 2, msg="NOON(2) should have 2 nonzero amplitudes")
+        self.assertEqual(
+            len(nonzero), 2, msg="NOON(2) should have 2 nonzero amplitudes"
+        )
 
-        self.assertAlmostEqual(float(nonzero[0]), 1 / np.sqrt(2), places=6, msg="NOON(2) first amplitude should be 1/√2")
+        self.assertAlmostEqual(
+            float(nonzero[0]),
+            1 / np.sqrt(2),
+            places=6,
+            msg="NOON(2) first amplitude should be 1/√2",
+        )
 
-        self.assertAlmostEqual(float(nonzero[1]), 1 / np.sqrt(2), places=6, msg="NOON(2) second amplitude should be 1/√2")
+        self.assertAlmostEqual(
+            float(nonzero[1]),
+            1 / np.sqrt(2),
+            places=6,
+            msg="NOON(2) second amplitude should be 1/√2",
+        )
 
     def test_dicke_norm(self):
         """
@@ -97,7 +145,9 @@ class SpecialStates(Question):
         """
         s = Dicke(4, 2)
 
-        self.assertAlmostEqual(np.linalg.norm(s), 1.0, places=6, msg="Dicke(4,2) should be normalized")
+        self.assertAlmostEqual(
+            np.linalg.norm(s), 1.0, places=6, msg="Dicke(4,2) should be normalized"
+        )
 
     def test_dicke_term_count(self):
         """
@@ -107,9 +157,16 @@ class SpecialStates(Question):
         arr = np.array(s)
         nonzero = np.abs(arr[np.abs(arr) > 1e-10])
 
-        self.assertEqual(len(nonzero), 6, msg="Dicke(4,2) should have C(4,2)=6 nonzero amplitudes")
+        self.assertEqual(
+            len(nonzero), 6, msg="Dicke(4,2) should have C(4,2)=6 nonzero amplitudes"
+        )
         for v in nonzero:
-            self.assertAlmostEqual(float(v), 1 / np.sqrt(6), places=6, msg="Dicke(4,2) amplitudes should be 1/√6")
+            self.assertAlmostEqual(
+                float(v),
+                1 / np.sqrt(6),
+                places=6,
+                msg="Dicke(4,2) amplitudes should be 1/√6",
+            )
 
     def test_coherent_norm(self):
         """
@@ -117,7 +174,12 @@ class SpecialStates(Question):
         """
         s = Coherent(5, alpha=1.0)
 
-        self.assertAlmostEqual(np.linalg.norm(s), 1.0, places=4, msg="Coherent(5, alpha=1.0) should be approximately normalized")
+        self.assertAlmostEqual(
+            np.linalg.norm(s),
+            1.0,
+            places=4,
+            msg="Coherent(5, alpha=1.0) should be approximately normalized",
+        )
 
     def test_ghz_qutrit(self):
         """
@@ -126,11 +188,26 @@ class SpecialStates(Question):
         s = GHZ(2, 3)
         arr = np.array(s)
         # In d=3, n=2: |00⟩=0, |11⟩=4, |22⟩=8
-        self.assertAlmostEqual(float(np.abs(arr[0])), 1 / np.sqrt(3), places=6, msg="GHZ(2,3) amplitude at |00> should be 1/√3")
+        self.assertAlmostEqual(
+            float(np.abs(arr[0])),
+            1 / np.sqrt(3),
+            places=6,
+            msg="GHZ(2,3) amplitude at |00> should be 1/√3",
+        )
 
-        self.assertAlmostEqual(float(np.abs(arr[4])), 1 / np.sqrt(3), places=6, msg="GHZ(2,3) amplitude at |11> should be 1/√3")
+        self.assertAlmostEqual(
+            float(np.abs(arr[4])),
+            1 / np.sqrt(3),
+            places=6,
+            msg="GHZ(2,3) amplitude at |11> should be 1/√3",
+        )
 
-        self.assertAlmostEqual(float(np.abs(arr[8])), 1 / np.sqrt(3), places=6, msg="GHZ(2,3) amplitude at |22> should be 1/√3")
+        self.assertAlmostEqual(
+            float(np.abs(arr[8])),
+            1 / np.sqrt(3),
+            places=6,
+            msg="GHZ(2,3) amplitude at |22> should be 1/√3",
+        )
 
 
 class QuditStates(Question):
@@ -144,9 +221,16 @@ class QuditStates(Question):
         """
         s = W(3, d=3)
 
-        self.assertAlmostEqual(float(np.linalg.norm(s)), 1.0, places=6, msg="W(3, d=3) should be normalized")
+        self.assertAlmostEqual(
+            float(np.linalg.norm(s)),
+            1.0,
+            places=6,
+            msg="W(3, d=3) should be normalized",
+        )
 
-        self.assertEqual(len(s), 27, msg="W(3, d=3) should live in 3^3=27-dimensional space")
+        self.assertEqual(
+            len(s), 27, msg="W(3, d=3) should live in 3^3=27-dimensional space"
+        )
 
     def test_w_qutrit_term_count(self):
         """
@@ -156,15 +240,24 @@ class QuditStates(Question):
         arr = np.array(s)
         nonzero = np.abs(arr[np.abs(arr) > 1e-10])
 
-        self.assertEqual(len(nonzero), 3, msg="W(3, d=3) should have 3 nonzero amplitudes")
+        self.assertEqual(
+            len(nonzero), 3, msg="W(3, d=3) should have 3 nonzero amplitudes"
+        )
         for v in nonzero:
-            self.assertAlmostEqual(float(v), 1 / np.sqrt(3), places=6, msg="W(3, d=3) amplitudes should be 1/√3")
+            self.assertAlmostEqual(
+                float(v),
+                1 / np.sqrt(3),
+                places=6,
+                msg="W(3, d=3) amplitudes should be 1/√3",
+            )
 
     def test_w_qutrit_d2_unchanged(self):
         """
         $W(3, d=2)$ equals $W(3)$: d=2 default is unchanged
         """
-        self.stateEqual(np.array(W(3)), np.array(W(3, d=2)), msg="W(3, d=2) should equal W(3)")
+        self.stateEqual(
+            np.array(W(3)), np.array(W(3, d=2)), msg="W(3, d=2) should equal W(3)"
+        )
 
     def test_dicke_qutrit_norm(self):
         """
@@ -172,15 +265,26 @@ class QuditStates(Question):
         """
         s = Dicke(3, 1, d=3)
 
-        self.assertAlmostEqual(float(np.linalg.norm(s)), 1.0, places=6, msg="Dicke(3, 1, d=3) should be normalized")
+        self.assertAlmostEqual(
+            float(np.linalg.norm(s)),
+            1.0,
+            places=6,
+            msg="Dicke(3, 1, d=3) should be normalized",
+        )
 
-        self.assertEqual(len(s), 27, msg="Dicke(3, 1, d=3) should live in 3^3=27-dimensional space")
+        self.assertEqual(
+            len(s), 27, msg="Dicke(3, 1, d=3) should live in 3^3=27-dimensional space"
+        )
 
     def test_dicke_qutrit_d2_unchanged(self):
         """
         $Dicke(4, 2, d=2)$ equals $Dicke(4, 2)$: d=2 default is unchanged
         """
-        self.stateEqual(np.array(Dicke(4, 2)), np.array(Dicke(4, 2, d=2)), msg="Dicke(4,2,d=2) should equal Dicke(4,2)")
+        self.stateEqual(
+            np.array(Dicke(4, 2)),
+            np.array(Dicke(4, 2, d=2)),
+            msg="Dicke(4,2,d=2) should equal Dicke(4,2)",
+        )
 
 
 class WStatePhysics(Question):

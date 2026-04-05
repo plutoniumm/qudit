@@ -24,7 +24,9 @@ def to_mixed(num: int, bases: List[int]) -> List[int]:
 
 
 def fr_mixed(digits: List[int], bases: List[int]) -> int:
-    assert len(digits) == len(bases) and len(bases) >= 1, "digits and bases must have equal non-zero length"
+    assert (
+        len(digits) == len(bases) and len(bases) >= 1
+    ), "digits and bases must have equal non-zero length"
     num = 0
 
     for d, b in zip(digits, bases):

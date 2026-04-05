@@ -68,7 +68,9 @@ class Operator:
 
         # Operator ^ State
         if isinstance(other, State):
-            tensor = torch.kron(self.tensor, other.tensor if hasattr(other, "tensor") else other)
+            tensor = torch.kron(
+                self.tensor, other.tensor if hasattr(other, "tensor") else other
+            )
 
             return State(tensor)
 
@@ -87,7 +89,9 @@ class Operator:
     def __matmul__(self, other: Any) -> Any:
         # Operator @ State
         if isinstance(other, State):
-            return State(self.tensor @ (other.tensor if hasattr(other, "tensor") else other))
+            return State(
+                self.tensor @ (other.tensor if hasattr(other, "tensor") else other)
+            )
 
         # Operator @ Operator
         elif isinstance(other, Operator):
@@ -299,7 +303,9 @@ class Gate(nn.Module):
     def __matmul__(self, other: Any) -> Any:
         # State
         if isinstance(other, State):
-            return State(self.forward(other.tensor if hasattr(other, "tensor") else other))
+            return State(
+                self.forward(other.tensor if hasattr(other, "tensor") else other)
+            )
 
         # Operator
         elif isinstance(other, Operator):
@@ -934,7 +940,9 @@ class NoisyGate(Gate):
             p_sum = p.sum().clamp(max=1)
             r = torch.sqrt(1 - p_sum).to(C64)
 
-            return [r * self._b_I_weyl] + list(torch.sqrt(p).to(C64).view(-1, 1, 1) * self._b_weyl)
+            return [r * self._b_I_weyl] + list(
+                torch.sqrt(p).to(C64).view(-1, 1, 1) * self._b_weyl
+            )
 
     def forwardd(self, rho: torch.Tensor) -> torch.Tensor:
         """

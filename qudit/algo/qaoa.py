@@ -353,7 +353,6 @@ class ClockSolver(nn.Module):
 
         return exp_val + self.offset
 
-
     def _decode(self, idx: int) -> list:
         """
         Decode integer index to per-wire digit list (base-$d$, big-endian).

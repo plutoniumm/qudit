@@ -56,7 +56,6 @@ class VectorCircuit(Question):
         exp = State(
             (Ket2(0) ^ Ket2(1) ^ Ket3(0) ^ Ket3(0))
             + (Ket2(1) ^ Ket2(1) ^ Ket3(0) ^ Ket3(0))
-
         )
 
         self.stateEqual(exp, psi, msg="Mixed-dim entangled state mismatch")
@@ -139,7 +138,9 @@ class CircuitMeasurements(Question):
 
         result = c.expectation(Z, ket0(2))
 
-        self.assertAlmostEqual(float(result.item()), 0.0, places=5, msg="<+|Z|+> should be 0")
+        self.assertAlmostEqual(
+            float(result.item()), 0.0, places=5, msg="<+|Z|+> should be 0"
+        )
 
     def test_expectation_x_on_plus(self):
         """
@@ -152,7 +153,9 @@ class CircuitMeasurements(Question):
 
         result = c.expectation(X, ket0(2))
 
-        self.assertAlmostEqual(float(result.item()), 1.0, places=5, msg="<+|X|+> should be 1")
+        self.assertAlmostEqual(
+            float(result.item()), 1.0, places=5, msg="<+|X|+> should be 1"
+        )
 
     def test_sample_keys_and_total(self):
         """
@@ -165,9 +168,15 @@ class CircuitMeasurements(Question):
 
         counts = c.sample(ket0(2), shots=1000)
 
-        self.assertEqual(sorted(counts.keys()), ["0", "1"], msg="Sampling |+> should produce both |0> and |1> keys")
+        self.assertEqual(
+            sorted(counts.keys()),
+            ["0", "1"],
+            msg="Sampling |+> should produce both |0> and |1> keys",
+        )
 
-        self.assertEqual(sum(counts.values()), 1000, msg="Sample total should equal shots=1000")
+        self.assertEqual(
+            sum(counts.values()), 1000, msg="Sample total should equal shots=1000"
+        )
 
     def test_sample_deterministic_state(self):
         """
@@ -177,7 +186,9 @@ class CircuitMeasurements(Question):
 
         counts = c.sample(ket0(2), shots=100)
 
-        self.assertEqual(counts, {"0": 100}, msg="Deterministic |0> sample should yield only '0'")
+        self.assertEqual(
+            counts, {"0": 100}, msg="Deterministic |0> sample should yield only '0'"
+        )
 
     def test_sample_qutrit_keys(self):
         """
@@ -190,11 +201,18 @@ class CircuitMeasurements(Question):
         counts = c.sample(ket0(9), shots=300)
         for key in counts:
 
-            self.assertEqual(len(key), 2, msg="Qutrit 2-wire sample keys should have length 2")
+            self.assertEqual(
+                len(key), 2, msg="Qutrit 2-wire sample keys should have length 2"
+            )
 
-            self.assertTrue(all(ch in "012" for ch in key), msg="Qutrit sample keys should only contain digits 0, 1, 2")
+            self.assertTrue(
+                all(ch in "012" for ch in key),
+                msg="Qutrit sample keys should only contain digits 0, 1, 2",
+            )
 
-        self.assertEqual(sum(counts.values()), 300, msg="Qutrit sample total should equal shots=300")
+        self.assertEqual(
+            sum(counts.values()), 300, msg="Qutrit sample total should equal shots=300"
+        )
 
 
 if __name__ == "__main__":

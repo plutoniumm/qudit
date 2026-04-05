@@ -294,7 +294,10 @@ class Info:
 
             return S_cond
         else:
-            assert rho.shape == (dA * dB, dA * dB), f"rho must be ({dA*dB},{dA*dB}), got {rho.shape}"
+            assert rho.shape == (
+                dA * dB,
+                dA * dB,
+            ), f"rho must be ({dA*dB},{dA*dB}), got {rho.shape}"
 
             rho_B = partial.trace(rho, dA, dB, keep="B")
             S_B = Entropy.default(rho_B)
@@ -308,7 +311,10 @@ class Info:
         Quantum mutual information $I(A:B)=S(A)+S(B)-S(AB)$.
         """
 
-        assert rho.shape == (dA * dB, dA * dB), f"rho must be ({dA*dB},{dA*dB}), got {rho.shape}"
+        assert rho.shape == (
+            dA * dB,
+            dA * dB,
+        ), f"rho must be ({dA*dB},{dA*dB}), got {rho.shape}"
 
         rho_A = partial.trace(rho, dA, dB, keep="A")
         rho_B = partial.trace(rho, dA, dB, keep="B")

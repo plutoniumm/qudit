@@ -38,8 +38,14 @@ def is_assert_call(node) -> bool:
         return False
 
     func = node.value.func
-    attr = func.attr if isinstance(func, ast.Attribute) else (func.id if isinstance(func, ast.Name) else None)
+    attr = (
+        func.attr
+        if isinstance(func, ast.Attribute)
+        else (func.id if isinstance(func, ast.Name) else None)
+    )
 
-    is_camel_assert = attr.startswith("assert") and (len(attr) <= 6 or attr[6].isupper())
+    is_camel_assert = attr.startswith("assert") and (
+        len(attr) <= 6 or attr[6].isupper()
+    )
 
     return attr is not None and (is_camel_assert or attr in _ASSERT_ATTRS)

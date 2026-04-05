@@ -21,12 +21,20 @@ class QUBOConversion(Question):
         """
         ham, offset = QUBO.toHamiltonian({(0, 0): 2.0})
 
-        self.assertAlmostEqual(offset, 1.0, places=6, msg="QUBO diagonal term offset should be 1.0")
+        self.assertAlmostEqual(
+            offset, 1.0, places=6, msg="QUBO diagonal term offset should be 1.0"
+        )
 
-        self.assertEqual(len(ham), 1, msg="QUBO diagonal single var should produce 1 Hamiltonian term")
+        self.assertEqual(
+            len(ham),
+            1,
+            msg="QUBO diagonal single var should produce 1 Hamiltonian term",
+        )
         coeff, gtype, indices = ham[0]
 
-        self.assertAlmostEqual(coeff, -1.0, places=6, msg="QUBO diagonal term coefficient should be -1.0")
+        self.assertAlmostEqual(
+            coeff, -1.0, places=6, msg="QUBO diagonal term coefficient should be -1.0"
+        )
 
         self.assertEqual(gtype, "Z", msg="QUBO diagonal term should be a Z gate")
 
@@ -39,14 +47,25 @@ class QUBOConversion(Question):
         """
         ham, offset = QUBO.toHamiltonian({(0, 1): 4.0})
 
-        self.assertAlmostEqual(offset, 1.0, places=6, msg="QUBO quadratic term offset should be 1.0")
+        self.assertAlmostEqual(
+            offset, 1.0, places=6, msg="QUBO quadratic term offset should be 1.0"
+        )
         terms = {(gtype, tuple(idx)): coeff for coeff, gtype, idx in ham}
 
-        self.assertAlmostEqual(terms[("ZZ", (0, 1))], 1.0, places=6, msg="ZZ term coefficient should be 1.0")
+        self.assertAlmostEqual(
+            terms[("ZZ", (0, 1))],
+            1.0,
+            places=6,
+            msg="ZZ term coefficient should be 1.0",
+        )
 
-        self.assertAlmostEqual(terms[("Z", (0,))], -1.0, places=6, msg="Z0 term coefficient should be -1.0")
+        self.assertAlmostEqual(
+            terms[("Z", (0,))], -1.0, places=6, msg="Z0 term coefficient should be -1.0"
+        )
 
-        self.assertAlmostEqual(terms[("Z", (1,))], -1.0, places=6, msg="Z1 term coefficient should be -1.0")
+        self.assertAlmostEqual(
+            terms[("Z", (1,))], -1.0, places=6, msg="Z1 term coefficient should be -1.0"
+        )
 
     def test_energy_consistency(self):
         """
@@ -71,7 +90,12 @@ class QUBOConversion(Question):
             elif gtype == "ZZ":
                 ising_energy += coeff * z_vals[indices[0]] * z_vals[indices[1]]
 
-        self.assertAlmostEqual(float(ising_energy), qubo_energy, places=5, msg="QUBO and Ising energies should match")
+        self.assertAlmostEqual(
+            float(ising_energy),
+            qubo_energy,
+            places=5,
+            msg="QUBO and Ising energies should match",
+        )
 
     def test_zero_offset_for_linear(self):
         """
@@ -80,10 +104,17 @@ class QUBOConversion(Question):
         """
         ham, offset = QUBO.toHamiltonian({(0, 0): -3.0})
 
-        self.assertAlmostEqual(offset, -1.5, places=6, msg="Negative diagonal QUBO offset should be -1.5")
+        self.assertAlmostEqual(
+            offset, -1.5, places=6, msg="Negative diagonal QUBO offset should be -1.5"
+        )
         coeff, _, _ = ham[0]
 
-        self.assertAlmostEqual(coeff, 1.5, places=6, msg="Negative diagonal QUBO Z coefficient should be 1.5")
+        self.assertAlmostEqual(
+            coeff,
+            1.5,
+            places=6,
+            msg="Negative diagonal QUBO Z coefficient should be 1.5",
+        )
 
 
 class QAOACircuit(Question):
@@ -107,7 +138,12 @@ class QAOACircuit(Question):
 
         state = self._qaoa().forward()
 
-        self.assertAlmostEqual(pt.norm(state).item(), 1.0, places=5, msg="QAOA forward pass should produce normalized state")
+        self.assertAlmostEqual(
+            pt.norm(state).item(),
+            1.0,
+            places=5,
+            msg="QAOA forward pass should produce normalized state",
+        )
 
     def test_expectation_real(self):
         """
@@ -116,7 +152,9 @@ class QAOACircuit(Question):
 
         exp = self._qaoa().expectation()
 
-        self.assertIsInstance(float(exp), float, msg="QAOA expectation value should be a real float")
+        self.assertIsInstance(
+            float(exp), float, msg="QAOA expectation value should be a real float"
+        )
 
     def test_expectation_bounded_by_eigenvalues(self):
         """
@@ -129,9 +167,17 @@ class QAOACircuit(Question):
 
         exp_val = qaoa.expectation().item() - qaoa.offset
 
-        self.assertGreaterEqual(exp_val, float(eigs.min()) - 1e-5, msg="QAOA expectation should be >= min eigenvalue")
+        self.assertGreaterEqual(
+            exp_val,
+            float(eigs.min()) - 1e-5,
+            msg="QAOA expectation should be >= min eigenvalue",
+        )
 
-        self.assertLessEqual(exp_val, float(eigs.max()) + 1e-5, msg="QAOA expectation should be <= max eigenvalue")
+        self.assertLessEqual(
+            exp_val,
+            float(eigs.max()) + 1e-5,
+            msg="QAOA expectation should be <= max eigenvalue",
+        )
 
     def test_hamiltonian_hermitian(self):
         """
@@ -141,7 +187,9 @@ class QAOACircuit(Question):
 
         diff = pt.norm(H - H.conj().T).item()
 
-        self.assertAlmostEqual(diff, 0.0, delta=1e-5, msg="QAOA Hamiltonian should be Hermitian")
+        self.assertAlmostEqual(
+            diff, 0.0, delta=1e-5, msg="QAOA Hamiltonian should be Hermitian"
+        )
 
     def test_optimization_decreases_loss(self):
         """
@@ -158,7 +206,11 @@ class QAOACircuit(Question):
 
         final = qaoa.expectation().item()
 
-        self.assertLessEqual(final, initial + 1e-3, msg="QAOA optimization should not increase expectation value")
+        self.assertLessEqual(
+            final,
+            initial + 1e-3,
+            msg="QAOA optimization should not increase expectation value",
+        )
 
 
 if __name__ == "__main__":

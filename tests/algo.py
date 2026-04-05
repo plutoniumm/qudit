@@ -24,7 +24,9 @@ class StabiliserCode(Question):
         """
         s = Statiliser(self.STABS)
 
-        self.assertEqual(s.num_states, 2, msg="Expected 2 stabilizer codewords for n=5, k=4")
+        self.assertEqual(
+            s.num_states, 2, msg="Expected 2 stabilizer codewords for n=5, k=4"
+        )
 
     def test_states_orthonormal(self):
         """
@@ -65,7 +67,9 @@ class StabiliserCode(Question):
         """
         s = Statiliser(["ZI", "IZ"], d=3)
 
-        self.assertEqual(s.num_states, 1, msg="Qutrit d=3 stabilizer code should have 1 codeword")
+        self.assertEqual(
+            s.num_states, 1, msg="Qutrit d=3 stabilizer code should have 1 codeword"
+        )
 
         self.assertEqual(s.sz, 2, msg="Qutrit stabilizer code should have sz=2")
 
@@ -104,11 +108,15 @@ class EntanglementRank(Question):
 
         res = rank(self.system, self.D, self.r, tries=2)
 
-        self.assertIsInstance(res, float, msg="Entanglement rank result should be a float")
+        self.assertIsInstance(
+            res, float, msg="Entanglement rank result should be a float"
+        )
 
         self.assertGreater(res, 0, msg="Entanglement rank should be positive")
 
-        self.assertAlmostEqual(res, 0.2481, delta=1e-4, msg="Entanglement rank value mismatch")
+        self.assertAlmostEqual(
+            res, 0.2481, delta=1e-4, msg="Entanglement rank value mismatch"
+        )
 
 
 class QAOATests(Question):
@@ -132,15 +140,17 @@ class QAOATests(Question):
 
         q = QAOA(d=2, wires=2, qubo=self.QUBO, layers=1)
 
-
-
         result = q.solve(steps=20)
 
         self.assertIn("solution", result, msg="QAOA result missing 'solution' key")
 
-        self.assertIn("probabilities", result, msg="QAOA result missing 'probabilities' key")
+        self.assertIn(
+            "probabilities", result, msg="QAOA result missing 'probabilities' key"
+        )
 
-        self.assertNotIn("value", result, msg="QAOA result should not have 'value' key without func")
+        self.assertNotIn(
+            "value", result, msg="QAOA result should not have 'value' key without func"
+        )
 
     def test_solve_solution_shape(self):
         """
@@ -154,7 +164,9 @@ class QAOATests(Question):
         q = QAOA(d=2, wires=2, qubo=self.QUBO, layers=1)
         result = q.solve(steps=20)
 
-        self.assertEqual(len(result["solution"]), 2, msg="QAOA solution should have 2 bits")
+        self.assertEqual(
+            len(result["solution"]), 2, msg="QAOA solution should have 2 bits"
+        )
         for bit in result["solution"]:
             self.assertIn(bit, [0, 1], msg="QAOA solution bits must be 0 or 1")
 
@@ -171,7 +183,9 @@ class QAOATests(Question):
         result = q.solve(steps=20)
 
         self.assertAlmostEqual(
-            float(result["probabilities"].sum().item()), 1.0, places=5,
+            float(result["probabilities"].sum().item()),
+            1.0,
+            places=5,
             msg="QAOA probabilities should sum to 1",
         )
 
@@ -181,7 +195,6 @@ class QAOATests(Question):
         """
         from qudit.algo.qaoa import QAOA, Energy
 
-
         pt.manual_seed(0)
 
         def energy(qubo, x):
@@ -189,19 +202,20 @@ class QAOATests(Question):
                 qubo.get((i, j), 0.0) * x[i] * x[j] for i in range(2) for j in range(2)
             )
 
-
         q = QAOA(d=2, wires=2, qubo=self.QUBO, layers=1)
         result = q.solve(func=energy, steps=20)
 
-        self.assertIn("value", result, msg="QAOA result should have 'value' key when func provided")
+        self.assertIn(
+            "value",
+            result,
+            msg="QAOA result should have 'value' key when func provided",
+        )
 
 
 class ClockSolverTests(Question):
     """
     ClockSolver: qubit and qutrit output structure, probabilities.
     """
-
-
 
     QUBO = {
         (0, 0): 1.0,
@@ -217,14 +231,19 @@ class ClockSolverTests(Question):
 
         pt.manual_seed(0)
 
-
         cs = ClockSolver(d=2, wires=2, qubo=self.QUBO, layers=1)
 
         result = cs.solve(steps=20)
 
-        self.assertIn("solution", result, msg="ClockSolver result missing 'solution' key")
+        self.assertIn(
+            "solution", result, msg="ClockSolver result missing 'solution' key"
+        )
 
-        self.assertIn("probabilities", result, msg="ClockSolver result missing 'probabilities' key")
+        self.assertIn(
+            "probabilities",
+            result,
+            msg="ClockSolver result missing 'probabilities' key",
+        )
 
     def test_solve_qubit_solution_bits(self):
         """
@@ -234,11 +253,14 @@ class ClockSolverTests(Question):
 
         pt.manual_seed(0)
 
-
         cs = ClockSolver(d=2, wires=2, qubo=self.QUBO, layers=1)
         result = cs.solve(steps=20)
 
-        self.assertEqual(len(result["solution"]), 2, msg="ClockSolver(d=2) solution should have 2 digits")
+        self.assertEqual(
+            len(result["solution"]),
+            2,
+            msg="ClockSolver(d=2) solution should have 2 digits",
+        )
         for digit in result["solution"]:
             self.assertIn(digit, [0, 1], msg="ClockSolver(d=2) digits must be 0 or 1")
 
@@ -248,16 +270,21 @@ class ClockSolverTests(Question):
         """
         from qudit.algo.qaoa import ClockSolver
 
-
         pt.manual_seed(0)
         ham = [(1.0, "Z", [0]), (1.0, "Z", [1])]
 
         cs = ClockSolver(d=3, wires=2, hamiltonian=ham, layers=1)
         result = cs.solve(steps=20)
 
-        self.assertEqual(len(result["solution"]), 2, msg="ClockSolver(d=3) solution should have 2 digits")
+        self.assertEqual(
+            len(result["solution"]),
+            2,
+            msg="ClockSolver(d=3) solution should have 2 digits",
+        )
         for digit in result["solution"]:
-            self.assertIn(digit, [0, 1, 2], msg="ClockSolver(d=3) digits must be in {0,1,2}")
+            self.assertIn(
+                digit, [0, 1, 2], msg="ClockSolver(d=3) digits must be in {0,1,2}"
+            )
 
     def test_solve_probabilities_sum(self):
         """
@@ -267,12 +294,13 @@ class ClockSolverTests(Question):
 
         pt.manual_seed(0)
 
-
         cs = ClockSolver(d=2, wires=2, qubo=self.QUBO, layers=1)
         result = cs.solve(steps=20)
 
         self.assertAlmostEqual(
-            float(result["probabilities"].sum().item()), 1.0, places=5,
+            float(result["probabilities"].sum().item()),
+            1.0,
+            places=5,
             msg="ClockSolver probabilities should sum to 1",
         )
 
@@ -292,7 +320,11 @@ class ClockSolverTests(Question):
         cs = ClockSolver(d=2, wires=2, qubo=self.QUBO, layers=1)
         result = cs.solve(func=energy, steps=20)
 
-        self.assertIn("value", result, msg="ClockSolver result should have 'value' key when func provided")
+        self.assertIn(
+            "value",
+            result,
+            msg="ClockSolver result should have 'value' key when func provided",
+        )
 
 
 if __name__ == "__main__":

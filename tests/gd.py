@@ -54,12 +54,17 @@ class GradientDescent(Question):
 
         loss.backward()
 
+        self.assertIsNotNone(
+            model.angle.grad, msg="Gradient of angle should not be None"
+        )
 
-        self.assertIsNotNone(model.angle.grad, msg="Gradient of angle should not be None")
+        self.assertTrue(
+            torch.isfinite(model.angle.grad), msg="Gradient should be finite"
+        )
 
-        self.assertTrue(torch.isfinite(model.angle.grad), msg="Gradient should be finite")
-
-        self.assertGreater(model.angle.grad.abs().item(), 1e-4, msg="Gradient should be non-negligible")
+        self.assertGreater(
+            model.angle.grad.abs().item(), 1e-4, msg="Gradient should be non-negligible"
+        )
 
     def test_rx_pi_flips_qubit(self):
         """
@@ -69,10 +74,13 @@ class GradientDescent(Question):
         model = ParametricCircuit(init_angle=float(np.pi))
         out = model(ket0())
 
-
         target = torch.tensor([0.0, 1.0], dtype=C64)
 
-        self.stateEqual(target.numpy(), out.detach().numpy(), msg="RX(π)|0> should equal |1> up to global phase")
+        self.stateEqual(
+            target.numpy(),
+            out.detach().numpy(),
+            msg="RX(π)|0> should equal |1> up to global phase",
+        )
 
     def test_rx_zero_identity(self):
         """
@@ -80,10 +88,11 @@ class GradientDescent(Question):
         """
         model = ParametricCircuit(init_angle=0.0)
 
-
         out = model(ket0())
 
-        self.stateEqual(ket0().numpy(), out.detach().numpy(), msg="RX(0)|0> should equal |0>")
+        self.stateEqual(
+            ket0().numpy(), out.detach().numpy(), msg="RX(0)|0> should equal |0>"
+        )
 
     def test_hybrid_training_reduces_loss(self):
         """
@@ -119,11 +128,11 @@ class GradientDescent(Question):
             loss.backward(retain_graph=True)
             optimizer.step()
 
-
-
         final_loss = torch.norm(model(data) - target).item()
 
-        self.assertLess(final_loss, initial_loss, msg="Hybrid training should reduce loss")
+        self.assertLess(
+            final_loss, initial_loss, msg="Hybrid training should reduce loss"
+        )
 
     def test_two_qubit_gradient_flows(self):
         """
@@ -143,17 +152,17 @@ class GradientDescent(Question):
         loss = out.reshape(-1)[3].abs().pow(2)
         loss.backward()
 
-
-
         self.assertIsNotNone(a0.grad, msg="Gradient of a0 should not be None")
-
-
 
         self.assertIsNotNone(a1.grad, msg="Gradient of a1 should not be None")
 
-        self.assertGreater(a0.grad.abs().item(), 1e-4, msg="Gradient of a0 should be non-negligible")
+        self.assertGreater(
+            a0.grad.abs().item(), 1e-4, msg="Gradient of a0 should be non-negligible"
+        )
 
-        self.assertGreater(a1.grad.abs().item(), 1e-4, msg="Gradient of a1 should be non-negligible")
+        self.assertGreater(
+            a1.grad.abs().item(), 1e-4, msg="Gradient of a1 should be non-negligible"
+        )
 
 
 if __name__ == "__main__":

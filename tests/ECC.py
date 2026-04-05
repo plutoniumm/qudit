@@ -37,11 +37,17 @@ class QEC(Question):
 
         inner_01 = pt.abs(pt.dot(state0, state1)).item()
 
-        self.assertAlmostEqual(inner_00, 1.0, places=6, msg="Leung |0_L> not normalized")
+        self.assertAlmostEqual(
+            inner_00, 1.0, places=6, msg="Leung |0_L> not normalized"
+        )
 
-        self.assertAlmostEqual(inner_11, 1.0, places=6, msg="Leung |1_L> not normalized")
+        self.assertAlmostEqual(
+            inner_11, 1.0, places=6, msg="Leung |1_L> not normalized"
+        )
 
-        self.assertAlmostEqual(inner_01, 0.0, places=6, msg="Leung codewords not orthogonal")
+        self.assertAlmostEqual(
+            inner_01, 0.0, places=6, msg="Leung codewords not orthogonal"
+        )
 
     def test_petz_ad(self):
         """
@@ -74,7 +80,6 @@ class QEC(Question):
             0.9889,
             places=2,
             msg="Petz AD recovery fidelity mismatch for codeword 0",
-
         )
 
         self.assertAlmostEqual(
@@ -82,14 +87,12 @@ class QEC(Question):
             0.9889,
             places=2,
             msg="Petz AD recovery fidelity mismatch for codeword 1",
-
         )
 
         self.assertGreater(
             fid0_clean,
             fid0_noisy,
             msg="Recovery should improve fidelity for codeword 0",
-
         )
 
         self.assertGreater(
@@ -113,12 +116,10 @@ class QECCodes(Question):
 
         self.assertAlmostEqual(
             inner_00, 1.0, places=5, msg=f"{name}: |0_L> not normalized"
-
         )
 
         self.assertAlmostEqual(
             inner_11, 1.0, places=5, msg=f"{name}: |1_L> not normalized"
-
         )
 
         self.assertAlmostEqual(
@@ -144,13 +145,30 @@ class QECCodes(Question):
 
         amp0 = 1.0 / pt.sqrt(pt.tensor(3.0))
 
-        self.assertAlmostEqual(float(cw[0, 1]), float(amp0), places=5, msg="Dutta3 |0_L> amplitude at index 1")
+        self.assertAlmostEqual(
+            float(cw[0, 1]),
+            float(amp0),
+            places=5,
+            msg="Dutta3 |0_L> amplitude at index 1",
+        )
 
-        self.assertAlmostEqual(float(cw[0, 2]), float(amp0), places=5, msg="Dutta3 |0_L> amplitude at index 2")
+        self.assertAlmostEqual(
+            float(cw[0, 2]),
+            float(amp0),
+            places=5,
+            msg="Dutta3 |0_L> amplitude at index 2",
+        )
 
-        self.assertAlmostEqual(float(cw[0, 4]), float(amp0), places=5, msg="Dutta3 |0_L> amplitude at index 4")
+        self.assertAlmostEqual(
+            float(cw[0, 4]),
+            float(amp0),
+            places=5,
+            msg="Dutta3 |0_L> amplitude at index 4",
+        )
         # |1_L> has support only at index 7 (|111>) with amplitude 1
-        self.assertAlmostEqual(float(cw[1, 7]), 1.0, places=5, msg="Dutta3 |1_L> amplitude at index 7")
+        self.assertAlmostEqual(
+            float(cw[1, 7]), 1.0, places=5, msg="Dutta3 |1_L> amplitude at index 7"
+        )
 
     def test_perfect_orthonormal(self):
         """
@@ -283,7 +301,6 @@ class QECCodes(Question):
         cw = code.toTensor()
 
         self.assertEqual(
-
             cw.shape[0], 2, "1×3 qubit surface code should have 2 codewords"
         )
 
@@ -299,7 +316,6 @@ class QECCodes(Question):
         cw = code.toTensor()
 
         self.assertEqual(
-
             cw.shape[0], 3, "1×3 qutrit surface code should have 3 codewords"
         )
 
@@ -321,7 +337,9 @@ class QuditCodes(Question):
         code = Qutrit3()
         cw = code.toTensor()
 
-        self.assertEqual(cw.shape, pt.Size([3, 27]), msg="Qutrit3 shape should be [3, 27]")
+        self.assertEqual(
+            cw.shape, pt.Size([3, 27]), msg="Qutrit3 shape should be [3, 27]"
+        )
         gram = (cw @ cw.T).real
 
         self.assertTrue(
@@ -337,11 +355,23 @@ class QuditCodes(Question):
 
         cw = Qutrit3().toTensor()
 
-        self.assertAlmostEqual(float(cw[0, 0]), 1.0, places=5, msg="Qutrit3 |0_L>=|000> amplitude mismatch")
+        self.assertAlmostEqual(
+            float(cw[0, 0]), 1.0, places=5, msg="Qutrit3 |0_L>=|000> amplitude mismatch"
+        )
 
-        self.assertAlmostEqual(float(cw[1, 13]), 1.0, places=5, msg="Qutrit3 |1_L>=|111> amplitude mismatch")
+        self.assertAlmostEqual(
+            float(cw[1, 13]),
+            1.0,
+            places=5,
+            msg="Qutrit3 |1_L>=|111> amplitude mismatch",
+        )
 
-        self.assertAlmostEqual(float(cw[2, 26]), 1.0, places=5, msg="Qutrit3 |2_L>=|222> amplitude mismatch")
+        self.assertAlmostEqual(
+            float(cw[2, 26]),
+            1.0,
+            places=5,
+            msg="Qutrit3 |2_L>=|222> amplitude mismatch",
+        )
 
     def test_gottesman_d2_orthonormal(self):
         """
@@ -359,10 +389,14 @@ class QuditCodes(Question):
         for i in range(2):
             norm = float(pt.linalg.norm(cw[i]).item())
 
-            self.assertAlmostEqual(norm, 1.0, places=4, msg=f"GottesmanD(d=2) codeword {i} not normalized")
+            self.assertAlmostEqual(
+                norm, 1.0, places=4, msg=f"GottesmanD(d=2) codeword {i} not normalized"
+            )
         inner = pt.abs(cw[0].conj() @ cw[1]).item()
 
-        self.assertAlmostEqual(inner, 0.0, places=4, msg="GottesmanD(d=2) codewords not orthogonal")
+        self.assertAlmostEqual(
+            inner, 0.0, places=4, msg="GottesmanD(d=2) codewords not orthogonal"
+        )
 
     def test_gottesman_d3_orthonormal(self):
         """
@@ -372,7 +406,9 @@ class QuditCodes(Question):
         code = GottesmanD(d=3)
         cw = code.toTensor()
 
-        self.assertEqual(cw.shape, pt.Size([3, 27]), msg="GottesmanD(d=3) shape should be [3, 27]")
+        self.assertEqual(
+            cw.shape, pt.Size([3, 27]), msg="GottesmanD(d=3) shape should be [3, 27]"
+        )
         gram = (cw @ cw.conj().T).real
 
         self.assertTrue(

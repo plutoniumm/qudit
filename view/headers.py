@@ -193,7 +193,6 @@ def fmt_impl(code: str) -> str:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 stmt.body = _strip_in_body(stmt.body)
 
-
         return body
 
     tree = ast.parse(code)

@@ -60,7 +60,9 @@ def docstrings(ctx: Ctx, tree, lines: list[str]):
     inline_violations: list[int] = []
 
     for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
+        if not isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)
+        ):
             continue
         if not (node.body and is_docstring(node.body[0])):
             continue
@@ -72,20 +74,25 @@ def docstrings(ctx: Ctx, tree, lines: list[str]):
         stripped = raw.lstrip()
         for q in ('"""', "'''"):
             if stripped.startswith(q):
-                after = stripped[len(q):]
+                after = stripped[len(q) :]
                 if after.strip() and not after.strip().startswith(q):
                     ctx.E(lineno, f"Docstring text on same line as opening {q}")
                     inline_violations.append(lineno)
                 break
 
         end = ds.end_lineno
-        ds_src = "\n".join(lines[lineno - 1: end])
-        for m in re.finditer(r'(?<!\\)\\([nrtbfva])(?!\\)', ds_src):
+        ds_src = "\n".join(lines[lineno - 1 : end])
+        for m in re.finditer(r"(?<!\\)\\([nrtbfva])(?!\\)", ds_src):
             offset = ds_src[: m.start()].count("\n")
             actual_line = lineno + offset
             char = m.group(1)
-            escape_violations.append((actual_line, m.start() - ds_src.rfind("\n", 0, m.start()) - 1))
-            ctx.E(actual_line, f"Docstring contains \\{char}; use \\\\{char} for literal escape")
+            escape_violations.append(
+                (actual_line, m.start() - ds_src.rfind("\n", 0, m.start()) - 1)
+            )
+            ctx.E(
+                actual_line,
+                f"Docstring contains \\{char}; use \\\\{char} for literal escape",
+            )
 
     if ctx.fixes and inline_violations:
         cur = ctx.path.read_text().splitlines()
@@ -96,15 +103,15 @@ def docstrings(ctx: Ctx, tree, lines: list[str]):
             stripped = raw.lstrip()
             for q in ('"""', "'''"):
                 if stripped.startswith(q):
-                    inner = stripped[len(q):]
+                    inner = stripped[len(q) :]
                     if inner.rstrip().endswith(q):
                         inner = inner.rstrip()[: -len(q)].strip()
-                        cur[lineno - 1] = f'{pad}{q}'
-                        cur.insert(lineno, f'{pad}{q}')
-                        cur.insert(lineno, f'{pad}{inner}')
+                        cur[lineno - 1] = f"{pad}{q}"
+                        cur.insert(lineno, f"{pad}{q}")
+                        cur.insert(lineno, f"{pad}{inner}")
                     else:
-                        cur[lineno - 1] = f'{pad}{q}'
-                        cur.insert(lineno, f'{pad}{inner.strip()}')
+                        cur[lineno - 1] = f"{pad}{q}"
+                        cur.insert(lineno, f"{pad}{inner.strip()}")
                     break
         ctx.path.write_text("\n".join(cur) + "\n")
         ctx.fix(f"{len(set(inline_violations))} docstring(s)")
@@ -114,7 +121,9 @@ def docstrings(ctx: Ctx, tree, lines: list[str]):
         ranges: list[tuple[int, int]] = []
         cur_tree = ast.parse(text)
         for node in ast.walk(cur_tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
+            if not isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)
+            ):
                 continue
             if node.body and is_docstring(node.body[0]):
                 ds = node.body[0]
@@ -123,7 +132,9 @@ def docstrings(ctx: Ctx, tree, lines: list[str]):
         new_lines = text.splitlines()
         for start, end in ranges:
             for i in range(start - 1, end):
-                new_lines[i] = re.sub(r'(?<!\\)\\([nrtbfva])(?!\\)', r'\\\\\1', new_lines[i])
+                new_lines[i] = re.sub(
+                    r"(?<!\\)\\([nrtbfva])(?!\\)", r"\\\\\1", new_lines[i]
+                )
 
         new_text = "\n".join(new_lines) + "\n"
         if new_text != text:
@@ -253,8 +264,14 @@ def assert_messages(ctx: Ctx, tree):
         if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)):
             continue
         func = node.value.func
-        attr = func.attr if isinstance(func, ast.Attribute) else (func.id if isinstance(func, ast.Name) else None)
-        is_camel_assert = attr.startswith("assert") and (len(attr) <= 6 or attr[6].isupper())
+        attr = (
+            func.attr
+            if isinstance(func, ast.Attribute)
+            else (func.id if isinstance(func, ast.Name) else None)
+        )
+        is_camel_assert = attr.startswith("assert") and (
+            len(attr) <= 6 or attr[6].isupper()
+        )
         if attr is None or (not is_camel_assert and attr not in _ASSERT_ATTRS):
             continue
 
@@ -277,11 +294,20 @@ def inline_dicts(ctx: Ctx, tree):
         if len(node.keys) < 2:
             continue
         if node.lineno == node.end_lineno:
-            ctx.E(node.lineno, f"Inline dict with {len(node.keys)} keys — expand to one key per line")
+            ctx.E(
+                node.lineno,
+                f"Inline dict with {len(node.keys)} keys — expand to one key per line",
+            )
 
 
 def trailing_comma(ctx: Ctx, tree, toks: list):
-    skip = {tokenize.NEWLINE, tokenize.NL, tokenize.INDENT, tokenize.DEDENT, tokenize.COMMENT}
+    skip = {
+        tokenize.NEWLINE,
+        tokenize.NL,
+        tokenize.INDENT,
+        tokenize.DEDENT,
+        tokenize.COMMENT,
+    }
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Dict):
@@ -290,8 +316,13 @@ def trailing_comma(ctx: Ctx, tree, toks: list):
             continue
 
         rbrace_idx = next(
-            (i for i, t in enumerate(toks)
-             if t.start[0] == node.end_lineno and t.type == tokenize.OP and t.string == "}"),
+            (
+                i
+                for i, t in enumerate(toks)
+                if t.start[0] == node.end_lineno
+                and t.type == tokenize.OP
+                and t.string == "}"
+            ),
             None,
         )
         if rbrace_idx is None:
@@ -302,11 +333,18 @@ def trailing_comma(ctx: Ctx, tree, toks: list):
             j -= 1
 
         if j >= 0 and not (toks[j].type == tokenize.OP and toks[j].string == ","):
-            ctx.E(toks[j].end[0], "Multi-line dict missing trailing comma after last entry")
+            ctx.E(
+                toks[j].end[0],
+                "Multi-line dict missing trailing comma after last entry",
+            )
 
 
 def divider_comments(ctx: Ctx, toks: list, src: str):
-    found = [t for t in toks if t.type == tokenize.COMMENT and _DIVIDER_RE.search(t.string[1:])]
+    found = [
+        t
+        for t in toks
+        if t.type == tokenize.COMMENT and _DIVIDER_RE.search(t.string[1:])
+    ]
     if not found:
         return
 
@@ -329,11 +367,16 @@ def divider_comments(ctx: Ctx, toks: list, src: str):
 def semicolons(ctx: Ctx, toks: list):
     for tok in toks:
         if tok.type == tokenize.OP and tok.string == ";":
-            ctx.E(tok.start[0], "Semicolon separating statements on one line — split onto separate lines")
+            ctx.E(
+                tok.start[0],
+                "Semicolon separating statements on one line — split onto separate lines",
+            )
 
 
 def type_ignore(ctx: Ctx, toks: list, src: str):
-    found = [t for t in toks if t.type == tokenize.COMMENT and "type: ignore" in t.string]
+    found = [
+        t for t in toks if t.type == tokenize.COMMENT and "type: ignore" in t.string
+    ]
     if not found:
         return
 
@@ -341,7 +384,9 @@ def type_ignore(ctx: Ctx, toks: list, src: str):
         new_lines = src.splitlines()
         for tok in found:
             ln = tok.start[0] - 1
-            new_lines[ln] = re.sub(r"\s*#\s*type:\s*ignore[^\n]*", "", new_lines[ln]).rstrip()
+            new_lines[ln] = re.sub(
+                r"\s*#\s*type:\s*ignore[^\n]*", "", new_lines[ln]
+            ).rstrip()
         ctx.path.write_text("\n".join(new_lines) + "\n")
         ctx.fix(f"{len(found)} type: ignore comment(s)")
     else:

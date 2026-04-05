@@ -25,7 +25,9 @@ class BasisStates(Question):
 
         self.stateEqual(Ket(0, 0), K00, msg="Basis(2)(0,0) should equal Basis(2)('00')")
 
-        self.stateEqual(Ket(0) ^ Ket(0), K00, msg="Ket(0)^Ket(0) should equal Ket('00')")
+        self.stateEqual(
+            Ket(0) ^ Ket(0), K00, msg="Ket(0)^Ket(0) should equal Ket('00')"
+        )
 
     def test_basis_amplitude(self):
         """
@@ -34,9 +36,16 @@ class BasisStates(Question):
         Ket = Basis(2)
         K00 = Ket("00")
 
-        self.assertAlmostEqual(float(np.abs(K00[0])), 1.0, places=6, msg="|00>[0] amplitude should be 1")
+        self.assertAlmostEqual(
+            float(np.abs(K00[0])), 1.0, places=6, msg="|00>[0] amplitude should be 1"
+        )
 
-        self.assertAlmostEqual(float(np.sum(np.abs(K00[1:]))), 0.0, places=6, msg="|00>[1:] amplitudes should all be 0")
+        self.assertAlmostEqual(
+            float(np.sum(np.abs(K00[1:]))),
+            0.0,
+            places=6,
+            msg="|00>[1:] amplitudes should all be 0",
+        )
 
     def test_basis_orthogonal(self):
         """
@@ -48,7 +57,9 @@ class BasisStates(Question):
                 inner = float(np.abs(np.vdot(Ket(i), Ket(j))))
                 expected = 1.0 if i == j else 0.0
 
-                self.assertAlmostEqual(inner, expected, places=6, msg=f"<{i}|{j}> should be {expected}")
+                self.assertAlmostEqual(
+                    inner, expected, places=6, msg=f"<{i}|{j}> should be {expected}"
+                )
 
     def test_state_tr_normalized(self):
         """
@@ -57,7 +68,12 @@ class BasisStates(Question):
         Ket = Basis(2)
         psi = State(Ket(0) + Ket(1))  # State normalizes automatically
 
-        self.assertAlmostEqual(psi.tr().real, 1.0, places=6, msg="Normalized State should have Tr(|ψ><ψ|) = 1")
+        self.assertAlmostEqual(
+            psi.tr().real,
+            1.0,
+            places=6,
+            msg="Normalized State should have Tr(|ψ><ψ|) = 1",
+        )
 
     def test_state_density_two_ways(self):
         """
@@ -80,7 +96,9 @@ class BasisStates(Question):
         rho = psi.density()
         purity = float(np.real(np.trace(rho @ rho)))
 
-        self.assertAlmostEqual(purity, 1.0, places=6, msg="Pure state purity Tr(rho^2) should be 1")
+        self.assertAlmostEqual(
+            purity, 1.0, places=6, msg="Pure state purity Tr(rho^2) should be 1"
+        )
 
         self.assertTrue(rho.isPure(), msg="isPure() should return True for pure state")
 
@@ -111,7 +129,9 @@ class BasisStates(Question):
 
         self.assertTrue(np.iscomplexobj(SV), msg="State should be complex-valued")
         # Normalized: ||SV||² = 1
-        self.assertAlmostEqual(float(np.vdot(SV, SV).real), 1.0, places=6, msg="State should be normalized")
+        self.assertAlmostEqual(
+            float(np.vdot(SV, SV).real), 1.0, places=6, msg="State should be normalized"
+        )
 
 
 class RandomStates(Question):
@@ -134,7 +154,12 @@ class RandomStates(Question):
         """
         psi = random_state(20)
 
-        self.assertAlmostEqual(float(np.linalg.norm(psi)), 1.0, places=10, msg="Haar-random state should be normalized")
+        self.assertAlmostEqual(
+            float(np.linalg.norm(psi)),
+            1.0,
+            places=10,
+            msg="Haar-random state should be normalized",
+        )
 
     def test_unitary_mean(self):
         """
@@ -143,7 +168,11 @@ class RandomStates(Question):
         U = random_unitary(20)
         all_vals = np.concatenate((U.real.flatten(), U.imag.flatten()))
 
-        self.assertLess(abs(np.mean(all_vals)), 0.05, msg="Haar-random unitary should have near-zero mean")
+        self.assertLess(
+            abs(np.mean(all_vals)),
+            0.05,
+            msg="Haar-random unitary should have near-zero mean",
+        )
 
     def test_state_mean(self):
         """
@@ -152,7 +181,11 @@ class RandomStates(Question):
         S = random_state(20)
         all_vals = np.concatenate((S.real.flatten(), S.imag.flatten()))
 
-        self.assertLess(abs(np.mean(all_vals)), 0.05, msg="Haar-random state should have near-zero mean")
+        self.assertLess(
+            abs(np.mean(all_vals)),
+            0.05,
+            msg="Haar-random state should have near-zero mean",
+        )
 
 
 if __name__ == "__main__":

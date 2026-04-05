@@ -55,7 +55,10 @@ class ChannelAnalysisTests(Question):
         J = ch.toChoi()
         eig = pt.linalg.eigvalsh(J.real.float())
 
-        self.assertTrue(bool((eig >= -1e-5).all()), msg="Choi matrix should be positive semidefinite")
+        self.assertTrue(
+            bool((eig >= -1e-5).all()),
+            msg="Choi matrix should be positive semidefinite",
+        )
 
     def test_choi_trace(self):
         """
@@ -65,7 +68,9 @@ class ChannelAnalysisTests(Question):
         J = ch.toChoi()
         trace_val = float(pt.trace(J.real).item())
 
-        self.assertAlmostEqual(trace_val, 2.0, places=4, msg="Choi matrix trace should equal d=2")
+        self.assertAlmostEqual(
+            trace_val, 2.0, places=4, msg="Choi matrix trace should equal d=2"
+        )
 
     def test_superop_shape(self):
         """
@@ -74,7 +79,9 @@ class ChannelAnalysisTests(Question):
         ch = Process.Pauli(n=1, p=[0.1, 0.0, 0.0])
         S = ch.toSuperop()
 
-        self.assertEqual(tuple(S.shape), (4, 4), msg="Single-qubit superoperator should be 4×4")
+        self.assertEqual(
+            tuple(S.shape), (4, 4), msg="Single-qubit superoperator should be 4×4"
+        )
 
     def test_stinespring_isometry(self):
         """
@@ -85,7 +92,10 @@ class ChannelAnalysisTests(Question):
         VdV = V.conj().T @ V
         I = pt.eye(VdV.shape[0], dtype=VdV.dtype)
 
-        self.assertTrue(bool(pt.allclose(VdV, I, atol=1e-5)), msg="Stinespring V should satisfy V†V = I")
+        self.assertTrue(
+            bool(pt.allclose(VdV, I, atol=1e-5)),
+            msg="Stinespring V should satisfy V†V = I",
+        )
 
     def test_ad_qutrit_is_cptp(self):
         """
@@ -120,9 +130,14 @@ class WeylChannelTests(Question):
         ops = ng._kraus_ops()
         total = sum(k.conj().T @ k for k in ops)
 
-        self.assertEqual(len(ops), 4, msg="Weyl qubit channel should have 4 Kraus operators")
+        self.assertEqual(
+            len(ops), 4, msg="Weyl qubit channel should have 4 Kraus operators"
+        )
 
-        self.assertTrue(pt.allclose(total.real, pt.eye(2), atol=1e-5), msg="Weyl(d=2) should satisfy ∑K†K=I")
+        self.assertTrue(
+            pt.allclose(total.real, pt.eye(2), atol=1e-5),
+            msg="Weyl(d=2) should satisfy ∑K†K=I",
+        )
 
     def test_weyl_d3_is_tp(self):
         """
@@ -135,9 +150,14 @@ class WeylChannelTests(Question):
         ops = ng._kraus_ops()
         total = sum(k.conj().T @ k for k in ops)
 
-        self.assertEqual(len(ops), 9, msg="Weyl qutrit channel should have 9 Kraus operators")
+        self.assertEqual(
+            len(ops), 9, msg="Weyl qutrit channel should have 9 Kraus operators"
+        )
 
-        self.assertTrue(pt.allclose(total.real, pt.eye(3), atol=1e-5), msg="Weyl(d=3) should satisfy ∑K†K=I")
+        self.assertTrue(
+            pt.allclose(total.real, pt.eye(3), atol=1e-5),
+            msg="Weyl(d=3) should satisfy ∑K†K=I",
+        )
 
     def test_weyl_identity_at_zero_noise(self):
         """
@@ -149,11 +169,21 @@ class WeylChannelTests(Question):
         ng = NoisyGate("weyl", pt.zeros(3), 0, 1, 2)
         ops = ng._kraus_ops()
 
-        self.assertEqual(len(ops), 4, msg="Zero-noise Weyl channel should still have 4 Kraus operators")
+        self.assertEqual(
+            len(ops),
+            4,
+            msg="Zero-noise Weyl channel should still have 4 Kraus operators",
+        )
 
-        self.assertTrue(pt.allclose(ops[0].real, pt.eye(2), atol=1e-5), msg="K_0 should be identity at zero noise")
+        self.assertTrue(
+            pt.allclose(ops[0].real, pt.eye(2), atol=1e-5),
+            msg="K_0 should be identity at zero noise",
+        )
         for k in ops[1:]:
-            self.assertTrue(pt.allclose(k.abs(), pt.zeros(2, 2), atol=1e-5), msg="Non-identity Kraus ops should be zero at zero noise")
+            self.assertTrue(
+                pt.allclose(k.abs(), pt.zeros(2, 2), atol=1e-5),
+                msg="Non-identity Kraus ops should be zero at zero noise",
+            )
 
 
 if __name__ == "__main__":

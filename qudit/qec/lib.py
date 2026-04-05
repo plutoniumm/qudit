@@ -1,8 +1,7 @@
 from .codes import Code
+from .stab import Stabilisers
 import torch as pt
 import math
-import sys
-import os
 
 
 def Dutta3() -> Code:
@@ -123,14 +122,7 @@ def GottesmanD(d: int = 2) -> Code:
 def Surface(m: int, n: int, d: int = 2, edge: str = "even", start: str = "X") -> Code:
     """
     Build an $m \\times n$ surface code and return a ``Code`` spanning the stabilizer space.
-
-    Requires the ``surface/`` directory (containing ``stab.py``) at the repository root.
     """
-    _surface = os.path.join(os.path.dirname(__file__), "../../surface")
-    if _surface not in sys.path:
-        sys.path.insert(0, _surface)
-    from stab import Stabilisers
-
     stabs = Stabilisers(m, n, edge=edge, start=start)
 
     return Code.fromStabilizers(stabs, d=d)

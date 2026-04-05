@@ -33,14 +33,24 @@ class EntropyTests(Question):
         """
         Pure state has zero von Neumann entropy
         """
-        self.assertAlmostEqual(Entropy.neumann(rho0), 0.0, places=6, msg="Pure state von Neumann entropy should be 0")
+        self.assertAlmostEqual(
+            Entropy.neumann(rho0),
+            0.0,
+            places=6,
+            msg="Pure state von Neumann entropy should be 0",
+        )
 
     def test_neumann_mixed(self):
         """
         Maximally mixed qubit has entropy = 1 ebit
         """
 
-        self.assertAlmostEqual(Entropy.neumann(rho_mixed), 1.0, places=5, msg="Maximally mixed qubit entropy should be 1 ebit")
+        self.assertAlmostEqual(
+            Entropy.neumann(rho_mixed),
+            1.0,
+            places=5,
+            msg="Maximally mixed qubit entropy should be 1 ebit",
+        )
 
     def test_neumann_bell_reduced(self):
         """
@@ -49,21 +59,34 @@ class EntropyTests(Question):
 
         rho_A = partial.trace(rho_bell, 2, 2, keep="A")
 
-        self.assertAlmostEqual(Entropy.neumann(np.array(rho_A)), 1.0, places=5, msg="Bell state reduced entropy should be 1")
+        self.assertAlmostEqual(
+            Entropy.neumann(np.array(rho_A)),
+            1.0,
+            places=5,
+            msg="Bell state reduced entropy should be 1",
+        )
 
     def test_shannon_uniform(self):
         """
         Shannon entropy of [0.5, 0.5] = 1 bit
         """
-        self.assertAlmostEqual(Entropy.shannon(np.array([0.5, 0.5])), 1.0, places=6, msg="Shannon entropy of [0.5, 0.5] should be 1 bit")
-
+        self.assertAlmostEqual(
+            Entropy.shannon(np.array([0.5, 0.5])),
+            1.0,
+            places=6,
+            msg="Shannon entropy of [0.5, 0.5] should be 1 bit",
+        )
 
     def test_shannon_deterministic(self):
         """
         Shannon entropy of [1.0] = 0
         """
-        self.assertAlmostEqual(Entropy.shannon(np.array([1.0])), 0.0, places=6, msg="Shannon entropy of [1.0] should be 0")
-
+        self.assertAlmostEqual(
+            Entropy.shannon(np.array([1.0])),
+            0.0,
+            places=6,
+            msg="Shannon entropy of [1.0] should be 0",
+        )
 
     def test_tsallis_q1_equals_neumann(self):
         """
@@ -73,7 +96,9 @@ class EntropyTests(Question):
 
         vn = Entropy.neumann(rho_mixed)
 
-        self.assertAlmostEqual(ts, vn, places=4, msg="Tsallis(q=1) should equal von Neumann entropy")
+        self.assertAlmostEqual(
+            ts, vn, places=4, msg="Tsallis(q=1) should equal von Neumann entropy"
+        )
 
     def test_renyi_alpha1_equals_neumann(self):
         """
@@ -83,21 +108,29 @@ class EntropyTests(Question):
 
         vn = Entropy.neumann(rho_mixed)
 
-        self.assertAlmostEqual(re, vn, places=4, msg="Renyi(alpha=1) should equal von Neumann entropy")
+        self.assertAlmostEqual(
+            re, vn, places=4, msg="Renyi(alpha=1) should equal von Neumann entropy"
+        )
 
     def test_renyi_pure(self):
         """
         Renyi entropy of pure state = 0 for any alpha
         """
-        self.assertAlmostEqual(Entropy.renyi(rho0, alpha=2.0), 0.0, places=6, msg="Renyi entropy of pure state should be 0")
-
+        self.assertAlmostEqual(
+            Entropy.renyi(rho0, alpha=2.0),
+            0.0,
+            places=6,
+            msg="Renyi entropy of pure state should be 0",
+        )
 
     def test_hartley(self):
         """
         Hartley entropy = log2(|support|): uniform over 4 outcomes = 2 bits
         """
         self.assertAlmostEqual(
-            Entropy.hartley(np.array([0.25, 0.25, 0.25, 0.25])), 2.0, places=6,
+            Entropy.hartley(np.array([0.25, 0.25, 0.25, 0.25])),
+            2.0,
+            places=6,
             msg="Hartley entropy for 4 uniform outcomes should be 2 bits",
         )
 
@@ -105,7 +138,12 @@ class EntropyTests(Question):
         """
         Relative entropy D(p‖p) = 0
         """
-        self.assertAlmostEqual(Entropy.relative(rho_mixed, rho_mixed), 0.0, places=4, msg="Relative entropy D(p||p) should be 0")
+        self.assertAlmostEqual(
+            Entropy.relative(rho_mixed, rho_mixed),
+            0.0,
+            places=4,
+            msg="Relative entropy D(p||p) should be 0",
+        )
 
     def test_conditional_pure_bipartite(self):
         """
@@ -117,7 +155,12 @@ class EntropyTests(Question):
 
         cond = Entropy.conditional(rho_bell, 2, 2)
 
-        self.assertAlmostEqual(cond, S_AB - S_B, places=5, msg="S(A|B) = S(AB) - S(B) for pure bipartite state")
+        self.assertAlmostEqual(
+            cond,
+            S_AB - S_B,
+            places=5,
+            msg="S(A|B) = S(AB) - S(B) for pure bipartite state",
+        )
 
 
 class FidelityTests(Question):
@@ -129,20 +172,28 @@ class FidelityTests(Question):
         """
         F(|ψ⟩,|ψ⟩) = 1
         """
-        self.assertAlmostEqual(Fidelity.default(ket0, ket0), 1.0, places=6, msg="F(|ψ>,|ψ>) should be 1")
+        self.assertAlmostEqual(
+            Fidelity.default(ket0, ket0), 1.0, places=6, msg="F(|ψ>,|ψ>) should be 1"
+        )
 
     def test_fidelity_orthogonal(self):
         """
         F(|0⟩,|1⟩) = 0
         """
-        self.assertAlmostEqual(Fidelity.default(ket0, ket1), 0.0, places=6, msg="F(|0>,|1>) should be 0")
+        self.assertAlmostEqual(
+            Fidelity.default(ket0, ket1), 0.0, places=6, msg="F(|0>,|1>) should be 0"
+        )
 
     def test_fidelity_mixed_self(self):
         """
         F(p,p) = 1 for any state
         """
-        self.assertAlmostEqual(Fidelity.default(rho_mixed, rho_mixed), 1.0, places=5, msg="F(rho, rho) should be 1 for any state")
-
+        self.assertAlmostEqual(
+            Fidelity.default(rho_mixed, rho_mixed),
+            1.0,
+            places=5,
+            msg="F(rho, rho) should be 1 for any state",
+        )
 
 
 class DistanceTests(Question):
@@ -154,32 +205,56 @@ class DistanceTests(Question):
         """
         T(p,p) = 0
         """
-        self.assertAlmostEqual(Distance.trace(rho0, rho0), 0.0, places=6, msg="Trace distance T(rho, rho) should be 0")
+        self.assertAlmostEqual(
+            Distance.trace(rho0, rho0),
+            0.0,
+            places=6,
+            msg="Trace distance T(rho, rho) should be 0",
+        )
 
     def test_trace_orthogonal(self):
         """
         T(|0⟩⟨0|,|1⟩⟨1|) = 1
         """
-        self.assertAlmostEqual(Distance.trace(rho0, rho1), 1.0, places=5, msg="Trace distance between orthogonal pure states should be 1")
+        self.assertAlmostEqual(
+            Distance.trace(rho0, rho1),
+            1.0,
+            places=5,
+            msg="Trace distance between orthogonal pure states should be 1",
+        )
 
     def test_bures_self(self):
         """
         Bures distance D_B(p,p) = 0
         """
-        self.assertAlmostEqual(Distance.bures(rho0, rho0), 0.0, places=6, msg="Bures distance D_B(rho, rho) should be 0")
+        self.assertAlmostEqual(
+            Distance.bures(rho0, rho0),
+            0.0,
+            places=6,
+            msg="Bures distance D_B(rho, rho) should be 0",
+        )
 
     def test_bures_orthogonal(self):
         """
         Bures distance between orthogonal pure states = √2
         """
-        self.assertAlmostEqual(Distance.bures(rho0, rho1), np.sqrt(2), places=5, msg="Bures distance between orthogonal pure states should be √2")
-
+        self.assertAlmostEqual(
+            Distance.bures(rho0, rho1),
+            np.sqrt(2),
+            places=5,
+            msg="Bures distance between orthogonal pure states should be √2",
+        )
 
     def test_jensen_shannon_self(self):
         """
         Jensen-Shannon divergence JSD(p‖p) = 0
         """
-        self.assertAlmostEqual(Distance.jensen_shannon(rho0, rho0), 0.0, places=4, msg="Jensen-Shannon JSD(p||p) should be 0")
+        self.assertAlmostEqual(
+            Distance.jensen_shannon(rho0, rho0),
+            0.0,
+            places=4,
+            msg="Jensen-Shannon JSD(p||p) should be 0",
+        )
 
 
 class InfoTests(Question):
@@ -194,20 +269,34 @@ class InfoTests(Question):
 
         rho_prod = np.kron(rho0, rho1)
 
-        self.assertAlmostEqual(Info.mutual(rho_prod, 2, 2), 0.0, places=5, msg="Mutual info I(A:B) for product state should be 0")
-
+        self.assertAlmostEqual(
+            Info.mutual(rho_prod, 2, 2),
+            0.0,
+            places=5,
+            msg="Mutual info I(A:B) for product state should be 0",
+        )
 
     def test_mutual_bell(self):
         """
         I(A:B) = 2 for a Bell state (maximally entangled)
         """
-        self.assertAlmostEqual(Info.mutual(rho_bell, 2, 2), 2.0, places=5, msg="Bell state mutual info should be 2 bits")
+        self.assertAlmostEqual(
+            Info.mutual(rho_bell, 2, 2),
+            2.0,
+            places=5,
+            msg="Bell state mutual info should be 2 bits",
+        )
 
     def test_coherent_pure(self):
         """
         Coherent info I_c(A⟩B) = S(B) - S(AB) = 1 - 0 = 1 for Bell state
         """
-        self.assertAlmostEqual(Info.coherent(rho_bell, 2, 2), 1.0, places=5, msg="Bell state coherent info should be 1")
+        self.assertAlmostEqual(
+            Info.coherent(rho_bell, 2, 2),
+            1.0,
+            places=5,
+            msg="Bell state coherent info should be 1",
+        )
 
 
 class InfoCondtionalTests(Question):
@@ -249,7 +338,6 @@ class InfoCondtionalTests(Question):
         rho_prod = np.kron(rho_A, rho_B)
         cond_standard = Info.conditional(rho_prod, 2, 2, true_case=False)
 
-
         S_A = Entropy.neumann(rho_A)
 
         self.assertAlmostEqual(
@@ -282,7 +370,6 @@ class InfoCondtionalTests(Question):
         """
         from qudit.tools.metrics import Info
 
-
         bell = np.array([1, 0, 0, 1], dtype=complex) / np.sqrt(2)
         rho = np.outer(bell, bell.conj())
 
@@ -299,7 +386,6 @@ class DistanceExtendedTests(Question):
     """
 
     def test_jensen_shannon_nonneg(self):
-
         """
         $JSD(\\rho \\| \\sigma) \\geq 0$: Jensen-Shannon divergence is non-negative
         """
@@ -309,7 +395,11 @@ class DistanceExtendedTests(Question):
 
         rho1 = np.array([[0, 0], [0, 1]], dtype=complex)
 
-        self.assertGreaterEqual(Distance.jensen_shannon(rho0, rho1), 0.0, msg="Jensen-Shannon divergence should be non-negative")
+        self.assertGreaterEqual(
+            Distance.jensen_shannon(rho0, rho1),
+            0.0,
+            msg="Jensen-Shannon divergence should be non-negative",
+        )
 
     def test_jensen_shannon_symmetric(self):
         """
@@ -329,7 +419,6 @@ class DistanceExtendedTests(Question):
             msg="Jensen-Shannon divergence should be symmetric",
         )
 
-
     def test_relative_entropy_distance_same_as_entropy_relative(self):
         """
         $Distance.relative\\_entropy = Entropy.relative$: two implementations agree
@@ -347,7 +436,6 @@ class DistanceExtendedTests(Question):
             e_rel,
             places=5,
             msg="Distance.relative_entropy and Entropy.relative should agree",
-
         )
 
     def test_relative_entropy_distance_zero(self):
@@ -356,11 +444,14 @@ class DistanceExtendedTests(Question):
         """
         from qudit.tools.metrics import Distance
 
-
         rho = np.diag([0.6, 0.4]).astype(complex)
 
-        self.assertAlmostEqual(Distance.relative_entropy(rho, rho), 0.0, places=4, msg="Relative entropy distance D(rho||rho) should be 0")
-
+        self.assertAlmostEqual(
+            Distance.relative_entropy(rho, rho),
+            0.0,
+            places=4,
+            msg="Relative entropy distance D(rho||rho) should be 0",
+        )
 
     def test_relative_entropy_value(self):
         """
@@ -372,11 +463,12 @@ class DistanceExtendedTests(Question):
         rho = np.diag([0.8, 0.2]).astype(complex)
         sigma = np.diag([0.5, 0.5]).astype(complex)
 
-
         expected = 0.8 * np.log2(0.8 / 0.5) + 0.2 * np.log2(0.2 / 0.5)
 
         self.assertAlmostEqual(
-            Distance.relative_entropy(rho, sigma), expected, places=4,
+            Distance.relative_entropy(rho, sigma),
+            expected,
+            places=4,
             msg="Relative entropy distance value mismatch",
         )
 
@@ -390,7 +482,12 @@ class DistanceExtendedTests(Question):
 
         rho1 = np.array([[0, 0], [0, 1]], dtype=complex)
 
-        self.assertAlmostEqual(Distance.trace(rho0, rho1), 1.0, places=5, msg="Trace distance between orthogonal pure states should be 1")
+        self.assertAlmostEqual(
+            Distance.trace(rho0, rho1),
+            1.0,
+            places=5,
+            msg="Trace distance between orthogonal pure states should be 1",
+        )
 
 
 class FidelityExtendedTests(Question):
@@ -404,10 +501,11 @@ class FidelityExtendedTests(Question):
         """
         from qudit.tools.metrics import Fidelity
 
-
         rho = np.eye(2, dtype=complex) / 2
 
-        self.assertAlmostEqual(Fidelity.default(rho, rho), 1.0, places=5, msg="F(I/2, I/2) should be 1")
+        self.assertAlmostEqual(
+            Fidelity.default(rho, rho), 1.0, places=5, msg="F(I/2, I/2) should be 1"
+        )
 
     def test_fidelity_pure_density_matrix(self):
         """
@@ -419,7 +517,12 @@ class FidelityExtendedTests(Question):
 
         rho1 = np.array([[0, 0], [0, 1]], dtype=complex)
 
-        self.assertAlmostEqual(Fidelity.default(rho0, rho1), 0.0, places=5, msg="F(|0><0|, |1><1|) should be 0")
+        self.assertAlmostEqual(
+            Fidelity.default(rho0, rho1),
+            0.0,
+            places=5,
+            msg="F(|0><0|, |1><1|) should be 0",
+        )
 
     def test_fidelity_value(self):
         """
@@ -431,7 +534,9 @@ class FidelityExtendedTests(Question):
 
         phi = np.array([1, 1], dtype=complex) / np.sqrt(2)
 
-        self.assertAlmostEqual(Fidelity.default(psi, phi), 0.5, places=6, msg="F(|0>, |+>) should be 0.5")
+        self.assertAlmostEqual(
+            Fidelity.default(psi, phi), 0.5, places=6, msg="F(|0>, |+>) should be 0.5"
+        )
 
 
 if __name__ == "__main__":

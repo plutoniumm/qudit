@@ -30,7 +30,9 @@ class GAD:
         obj = pt.zeros((d, d), dtype=C128)
         if k < d:
             rs = pt.arange(k, d, dtype=pt.float64)
-            binom = pt.tensor([float(nCr(int(r), k)) for r in range(k, d)], dtype=pt.float64)
+            binom = pt.tensor(
+                [float(nCr(int(r), k)) for r in range(k, d)], dtype=pt.float64
+            )
             vals = binom.sqrt() * (1 - Y) ** ((rs - k) / 2) * Y ** (k / 2)
             obj[(rs - k).long(), rs.long()] = vals.to(C128)
 
@@ -47,7 +49,9 @@ class GAD:
         obj = pt.zeros((d, d), dtype=C128)
         if k < d:
             rs = pt.arange(0, d - k, dtype=pt.float64)
-            binom = pt.tensor([float(nCr(int(d - r - 1), k)) for r in range(d - k)], dtype=pt.float64)
+            binom = pt.tensor(
+                [float(nCr(int(d - r - 1), k)) for r in range(d - k)], dtype=pt.float64
+            )
             vals = binom * (1 - Y) ** ((d - rs - k - 1) / 2) * Y ** (k / 2)
             obj[(rs + k).long(), rs.long()] = vals.to(C128)
 

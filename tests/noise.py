@@ -192,7 +192,6 @@ class ChannelProperties(Question):
         V = ch.toStinespring()
         r = len(ch.ops)
 
-
         d = 2
 
         self.assertEqual(V.shape[1], d, "Stinespring matrix wrong column count")
@@ -303,7 +302,6 @@ class ProcessChannels(Question):
         $IID.AD(n=2, d=2, y=0.1)$ returns a Multiplex of $n=2$ channels
         """
 
-
         mul = IID.AD(n=2, d=2, y=0.1)
 
         self.assertIsInstance(mul, Multiplex, "IID.AD should return Multiplex")
@@ -328,7 +326,6 @@ class ProcessChannels(Question):
         """
         $IID.GAD(n=2, d=2, y=0.1, p=0.5)$ returns a Multiplex of 2 channels
         """
-
 
         mul = IID.GAD(n=2, d=2, y=0.1, p=0.5)
 

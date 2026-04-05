@@ -107,7 +107,10 @@ class Code:
 
         The `d` parameter sets the local dimension (default 2 for qubits). For d>2, `X` and `Z` are the generalized Weyl operators from `Gategen`.
         """
-        assert method in ["svd", "rrf"], f"method must be 'svd' or 'rrf', got '{method}'"
+        assert method in [
+            "svd",
+            "rrf",
+        ], f"method must be 'svd' or 'rrf', got '{method}'"
         if isinstance(stabilizers[0], str):
             stabilizers = [list(s) for s in stabilizers]
         gg = Gategen(dim=d)

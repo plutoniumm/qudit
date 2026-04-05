@@ -34,17 +34,22 @@ class SpaceTests(Question):
 
                 expected = 1.0 if i == j else 0.0
 
-                self.assertAlmostEqual(float(G[i, j].abs()), expected, places=5, msg=f"Gram matrix G[{i},{j}] should be {expected}")
+                self.assertAlmostEqual(
+                    float(G[i, j].abs()),
+                    expected,
+                    places=5,
+                    msg=f"Gram matrix G[{i},{j}] should be {expected}",
+                )
 
     def test_schmidt_rank_product(self):
-
         """
         Product state has Schmidt rank 1
         """
         mat = pt.tensor([[1.0, 0.0], [0.0, 0.0]])
 
-        self.assertEqual(Space.schmidtRank(mat), 1, msg="Product state should have Schmidt rank 1")
-
+        self.assertEqual(
+            Space.schmidtRank(mat), 1, msg="Product state should have Schmidt rank 1"
+        )
 
     def test_schmidt_rank_entangled(self):
         """
@@ -52,8 +57,9 @@ class SpaceTests(Question):
         """
         mat = pt.tensor([[1.0, 0.0], [0.0, 1.0]]) / np.sqrt(2)
 
-        self.assertEqual(Space.schmidtRank(mat), 2, msg="Bell state should have Schmidt rank 2")
-
+        self.assertEqual(
+            Space.schmidtRank(mat), 2, msg="Bell state should have Schmidt rank 2"
+        )
 
     def test_schmidt_decompose_values(self):
         """
@@ -62,9 +68,19 @@ class SpaceTests(Question):
         mat = pt.tensor([[1.0, 0.0], [0.0, 1.0]]) / np.sqrt(2)
         decomp = Space.schmidtDecompose(mat)
 
-        self.assertAlmostEqual(float(decomp[0][0]), 1 / np.sqrt(2), places=5, msg="Bell state first Schmidt value should be 1/√2")
+        self.assertAlmostEqual(
+            float(decomp[0][0]),
+            1 / np.sqrt(2),
+            places=5,
+            msg="Bell state first Schmidt value should be 1/√2",
+        )
 
-        self.assertAlmostEqual(float(decomp[1][0]), 1 / np.sqrt(2), places=5, msg="Bell state second Schmidt value should be 1/√2")
+        self.assertAlmostEqual(
+            float(decomp[1][0]),
+            1 / np.sqrt(2),
+            places=5,
+            msg="Bell state second Schmidt value should be 1/√2",
+        )
 
     def test_ppt_separable(self):
         """
@@ -75,8 +91,9 @@ class SpaceTests(Question):
 
         rho[0, 0] = 1.0
 
-        self.assertTrue(Space.PPT(rho, 3), msg="Product state |00><00| should satisfy PPT")
-
+        self.assertTrue(
+            Space.PPT(rho, 3), msg="Product state |00><00| should satisfy PPT"
+        )
 
 
 class PartialTraceTests(Question):
@@ -94,9 +111,19 @@ class PartialTraceTests(Question):
 
         rho_A = np.array(partial.trace(rho, 2, 2, keep="A"))
 
-        self.assertAlmostEqual(float(np.abs(rho_A[0, 0])), 1.0, places=6, msg="Tr_B(|00><00|)[0,0] should be 1")
+        self.assertAlmostEqual(
+            float(np.abs(rho_A[0, 0])),
+            1.0,
+            places=6,
+            msg="Tr_B(|00><00|)[0,0] should be 1",
+        )
 
-        self.assertAlmostEqual(float(np.abs(rho_A[1, 1])), 0.0, places=6, msg="Tr_B(|00><00|)[1,1] should be 0")
+        self.assertAlmostEqual(
+            float(np.abs(rho_A[1, 1])),
+            0.0,
+            places=6,
+            msg="Tr_B(|00><00|)[1,1] should be 0",
+        )
 
     def test_trace_bell_maximally_mixed(self):
         """
@@ -105,12 +132,26 @@ class PartialTraceTests(Question):
 
         rho_B = np.array(partial.trace(make_bell(), 2, 2, keep="B"))
 
+        self.assertAlmostEqual(
+            float(np.abs(rho_B[0, 0])),
+            0.5,
+            places=5,
+            msg="Tr_A(Bell)[0,0] should be 0.5",
+        )
 
-        self.assertAlmostEqual(float(np.abs(rho_B[0, 0])), 0.5, places=5, msg="Tr_A(Bell)[0,0] should be 0.5")
+        self.assertAlmostEqual(
+            float(np.abs(rho_B[1, 1])),
+            0.5,
+            places=5,
+            msg="Tr_A(Bell)[1,1] should be 0.5",
+        )
 
-        self.assertAlmostEqual(float(np.abs(rho_B[1, 1])), 0.5, places=5, msg="Tr_A(Bell)[1,1] should be 0.5")
-
-        self.assertAlmostEqual(float(np.abs(rho_B[0, 1])), 0.0, places=5, msg="Tr_A(Bell)[0,1] off-diagonal should be 0")
+        self.assertAlmostEqual(
+            float(np.abs(rho_B[0, 1])),
+            0.0,
+            places=5,
+            msg="Tr_A(Bell)[0,1] off-diagonal should be 0",
+        )
 
     def test_trace_preserves_total(self):
         """
@@ -119,7 +160,12 @@ class PartialTraceTests(Question):
 
         rho_A = np.array(partial.trace(make_bell(), 2, 2, keep="A"))
 
-        self.assertAlmostEqual(float(np.trace(rho_A).real), 1.0, places=5, msg="Partial trace of density matrix should have trace 1")
+        self.assertAlmostEqual(
+            float(np.trace(rho_A).real),
+            1.0,
+            places=5,
+            msg="Partial trace of density matrix should have trace 1",
+        )
 
     def test_transpose_hermitian(self):
         """
@@ -131,14 +177,16 @@ class PartialTraceTests(Question):
 
         rho_pt2 = np.array(partial.transpose(rho_pt, 2, 2))
 
-        self.assertTrue(np.allclose(rho, rho_pt2, atol=1e-6), msg="Applying partial transpose twice should return original")
+        self.assertTrue(
+            np.allclose(rho, rho_pt2, atol=1e-6),
+            msg="Applying partial transpose twice should return original",
+        )
 
 
 class BraketTensorTests(Question):
     """
     Braket and Tensor utility functions.
     """
-
 
     def test_braket_self(self):
         """
@@ -147,10 +195,11 @@ class BraketTensorTests(Question):
         B = Basis(2)
         ket0 = B(0)
 
-
         result = Braket(ket0, ket0)
 
-        self.assertAlmostEqual(float(np.abs(result)), 1.0, places=6, msg="<0|0> should be 1")
+        self.assertAlmostEqual(
+            float(np.abs(result)), 1.0, places=6, msg="<0|0> should be 1"
+        )
 
     def test_braket_orthogonal(self):
         """
@@ -160,7 +209,9 @@ class BraketTensorTests(Question):
 
         result = Braket(B(0), B(1))
 
-        self.assertAlmostEqual(float(np.abs(result)), 0.0, places=6, msg="<0|1> should be 0")
+        self.assertAlmostEqual(
+            float(np.abs(result)), 0.0, places=6, msg="<0|1> should be 0"
+        )
 
     def test_tensor_product(self):
         """
@@ -172,9 +223,19 @@ class BraketTensorTests(Question):
 
         arr = np.array(ket01)
 
-        self.assertAlmostEqual(float(np.abs(arr[1])), 1.0, places=6, msg="|0>⊗|1> should have amplitude 1 at index 1")
+        self.assertAlmostEqual(
+            float(np.abs(arr[1])),
+            1.0,
+            places=6,
+            msg="|0>⊗|1> should have amplitude 1 at index 1",
+        )
 
-        self.assertAlmostEqual(float(np.abs(arr[0])), 0.0, places=6, msg="|0>⊗|1> should have amplitude 0 at index 0")
+        self.assertAlmostEqual(
+            float(np.abs(arr[0])),
+            0.0,
+            places=6,
+            msg="|0>⊗|1> should have amplitude 0 at index 0",
+        )
 
     def test_tensor_norm(self):
         """
@@ -184,7 +245,12 @@ class BraketTensorTests(Question):
 
         result = Tensor(B(0), B(1))
 
-        self.assertAlmostEqual(np.linalg.norm(result), 1.0, places=6, msg="Tensor product of normalized states should be normalized")
+        self.assertAlmostEqual(
+            np.linalg.norm(result),
+            1.0,
+            places=6,
+            msg="Tensor product of normalized states should be normalized",
+        )
 
 
 class SpaceExtendedTests(Question):
@@ -218,9 +284,19 @@ class SpaceExtendedTests(Question):
 
         decomp = Space.schmidtDecompose(mat)
 
-        self.assertAlmostEqual(float(decomp[0][0]), 1.0, places=5, msg="Product state should have only one Schmidt value = 1.0")
+        self.assertAlmostEqual(
+            float(decomp[0][0]),
+            1.0,
+            places=5,
+            msg="Product state should have only one Schmidt value = 1.0",
+        )
 
-        self.assertAlmostEqual(float(decomp[1][0]), 0.0, places=5, msg="Product state second Schmidt value should be 0")
+        self.assertAlmostEqual(
+            float(decomp[1][0]),
+            0.0,
+            places=5,
+            msg="Product state second Schmidt value should be 0",
+        )
 
     def test_schmidt_rank_ghz_in_matrix_form(self):
         """
@@ -230,7 +306,6 @@ class SpaceExtendedTests(Question):
         from qudit.tools.states import GHZ
 
         ghz = GHZ(2, 3)
-
 
         mat = pt.tensor(np.array(ghz)).reshape(3, 3)
 
@@ -274,10 +349,14 @@ class PartialTraceExtendedTests(Question):
             1.0,
             places=6,
             msg="Tr_A(|01><01|) should give |1><1|",
-
         )
 
-        self.assertAlmostEqual(float(np.abs(rho_B[0, 0])), 0.0, places=6, msg="Tr_A(|01><01|)[0,0] should be 0")
+        self.assertAlmostEqual(
+            float(np.abs(rho_B[0, 0])),
+            0.0,
+            places=6,
+            msg="Tr_A(|01><01|)[0,0] should be 0",
+        )
 
     def test_trace_entangled_both_subsystems(self):
         """
@@ -294,7 +373,6 @@ class PartialTraceExtendedTests(Question):
                 0.5,
                 places=5,
                 msg=f"Tr_{label}(Bell)[0,0] should be 0.5",
-
             )
 
             self.assertAlmostEqual(
@@ -303,7 +381,6 @@ class PartialTraceExtendedTests(Question):
                 places=5,
                 msg=f"Tr_{label}(Bell)[1,1] should be 0.5",
             )
-
 
     def test_transpose_negative_eigenvalue(self):
         """
@@ -319,7 +396,6 @@ class PartialTraceExtendedTests(Question):
         self.assertAlmostEqual(
             float(evals[0]),
             -0.5,
-
             places=5,
             msg="Bell state partial transpose should have eigenvalue -1/2",
         )

@@ -76,6 +76,8 @@ class Exam:
             f.write(f"# {self.name}\n")
             f.write(f"{self.desc}\n\n")
 
+        print(f"\n{self.name}")
+
     def run(self, test):
         suite_name = "Unknown Suite"
         suite_desc = ""
@@ -90,6 +92,14 @@ class Exam:
         result = Result()
         test(result)
         self.write(result, suite_name, suite_desc)
+
+        passed = sum(1 for r in result.rows if r["result"] == "✓")
+        total = len(result.rows)
+        failures = [r for r in result.rows if r["result"] != "✓"]
+        status = "ok" if not failures else "FAIL"
+        print(f"  {status}  {suite_name}  ({passed}/{total})")
+        for r in failures:
+            print(f"    ✗ {r['name']}: {r['result']}")
 
         return result
 

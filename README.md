@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/plutoniumm/qudit/refs/heads/main/docs/public/icons/favi.svg" alt="icon" width="125" height="125" align="right" name="icon"/>
+<img src="https://raw.githubusercontent.com/plutoniumm/qudit/refs/heads/main/docs/public/icons/favi.svg" alt="icon" width="100" height="100" align="right" name="icon"/>
 
 ### `qudit`
 

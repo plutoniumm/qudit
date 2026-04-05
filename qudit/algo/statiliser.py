@@ -49,7 +49,7 @@ def GramSchmidt(vectors: Sequence[pt.Tensor]) -> pt.Tensor:
         nrm = pt.norm(w)
         if nrm > 1e-8:
             ortho.append(w / nrm)
-            
+
     return pt.stack(ortho)
 
 
