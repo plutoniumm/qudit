@@ -280,10 +280,10 @@ class Gate(nn.Module):
         rho_prime = self._left(rho)
 
         # 2. Conjugate transpose the result: (U \rho)^\dagger
-        rho_prime_dagger = rho_prime.conj().T
+        rhoAdj = rho_prime.conj().T
 
         # 3. Apply U on the left again: U (U \rho)^\dagger
-        out_dagger = self._left(rho_prime_dagger)
+        out_dagger = self._left(rhoAdj)
 
         # 4. Conjugate transpose back to get: (U (U \rho)^\dagger)^\dagger = U \rho U^\dagger
 
@@ -952,8 +952,8 @@ class NoisyGate(Gate):
         rho_out = torch.zeros_like(rho)
         for K in self._kraus_ops():
             rho_prime = self._left(rho, K)
-            rho_prime_T = rho_prime.conj().T
-            out_T = self._left(rho_prime_T, K)
+            rhoAdj = rho_prime.conj().T
+            out_T = self._left(rhoAdj, K)
             rho_out = rho_out + out_T.conj().T
 
         return rho_out

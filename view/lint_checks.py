@@ -39,6 +39,7 @@ def check_py(args: tuple) -> tuple[list[str], list[str]]:
     divider_comments(ctx, toks, src)
     semicolons(ctx, toks)
     type_ignore(ctx, toks, src)
+    variable_names(ctx, tree)
 
     return ctx.errs, ctx.msgs
 
@@ -269,10 +270,8 @@ def assert_messages(ctx: Ctx, tree):
             if isinstance(func, ast.Attribute)
             else (func.id if isinstance(func, ast.Name) else None)
         )
-        is_camel_assert = attr.startswith("assert") and (
-            len(attr) <= 6 or attr[6].isupper()
-        )
-        if attr is None or (not is_camel_assert and attr not in _ASSERT_ATTRS):
+        isCamel = attr.startswith("assert") and (len(attr) <= 6 or attr[6].isupper())
+        if attr is None or (not isCamel and attr not in _ASSERT_ATTRS):
             continue
 
         call = node.value
@@ -392,3 +391,67 @@ def type_ignore(ctx: Ctx, toks: list, src: str):
     else:
         for tok in found:
             ctx.E(tok.start[0], "type: ignore comment — fix the type error instead")
+
+
+def _word_count(name: str) -> int:
+    core = name.strip("_")
+    if not core:
+        return 1
+
+    expanded = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", core)
+
+    return len([p for p in expanded.split("_") if p])
+
+
+def variable_names(ctx: Ctx, tree):
+    class Visitor(ast.NodeVisitor):
+        def __init__(self):
+            self._stack: list[set[str]] = []
+
+        def visit_FunctionDef(self, node):
+            params: set[str] = {
+                a.arg
+                for a in node.args.args + node.args.posonlyargs + node.args.kwonlyargs
+            }
+            if node.args.vararg:
+                params.add(node.args.vararg.arg)
+            if node.args.kwarg:
+                params.add(node.args.kwarg.arg)
+
+            self._stack.append(params)
+            self.generic_visit(node)
+            self._stack.pop()
+
+        visit_AsyncFunctionDef = visit_FunctionDef
+
+        def visit_ClassDef(self, node):
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if (
+                        not child.name.startswith(("test_", "visit_"))
+                        and _word_count(child.name) > 2
+                    ):
+                        ctx.E(
+                            child.lineno,
+                            f"'{child.name}' has more than 2 name components — shorten it",
+                        )
+                    self.visit(child)
+
+        def visit_Name(self, node):
+            if not self._stack:
+                return
+
+            if not isinstance(node.ctx, ast.Store):
+                return
+
+            name = node.id
+            all_params = set().union(*self._stack)
+            if name in all_params:
+                return
+            if _word_count(name) > 2:
+                ctx.E(
+                    node.lineno,
+                    f"'{name}' has more than 2 name components — shorten it",
+                )
+
+    Visitor().visit(tree)

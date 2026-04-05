@@ -276,10 +276,10 @@ class ClockSolver(nn.Module):
 
         # Pre-compute static Hamiltonians (no grad needed)
         with pt.no_grad():
-            self._H_P = self._build_H_P()
-            self._H_B = self._build_H_B()
+            self._H_P = self._buildHP()
+            self._H_B = self._buildHB()
 
-    def _build_H_P(self) -> pt.Tensor:
+    def _buildHP(self) -> pt.Tensor:
         """
         Build phase Hamiltonian $H_P$ from Hamiltonian terms using $Z_d$ clock operators.
         """
@@ -302,7 +302,7 @@ class ClockSolver(nn.Module):
 
         return H_P
 
-    def _build_H_B(self) -> pt.Tensor:
+    def _buildHB(self) -> pt.Tensor:
         """
         Build mixer Hamiltonian $H_B = -\sum_i(X_d^{(i)} + X_d^{(i)\dagger})$.
         """

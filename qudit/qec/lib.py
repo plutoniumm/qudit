@@ -12,17 +12,15 @@ def Dutta3() -> Code:
     |0_L\\rangle = \\frac{1}{\sqrt{3}}(|001\\rangle + |010\\rangle + |100\\rangle)$
     """
 
-    dutta_3_0 = pt.zeros(8)
-    dutta_3_1 = pt.zeros(8)
+    cw0 = pt.zeros(8)
+    cw1 = pt.zeros(8)
 
-    dutta_3_0[1] = 1
-    dutta_3_0[2] = 1
-    dutta_3_0[4] = 1
-    dutta_3_1[7] = 1
+    cw0[1] = 1
+    cw0[2] = 1
+    cw0[4] = 1
+    cw1[7] = 1
 
-    code = pt.stack(
-        [dutta_3_0 / pt.linalg.norm(dutta_3_0), dutta_3_1 / pt.linalg.norm(dutta_3_1)]
-    )
+    code = pt.stack([cw0 / pt.linalg.norm(cw0), cw1 / pt.linalg.norm(cw1)])
 
     return Code(code)
 
@@ -61,12 +59,12 @@ def Perfect() -> Code:
     _0L = pt.zeros(32)
     _1L = pt.zeros(32)
 
-    _0L_keys = [0, 18, 9, 20, 10, -27, -6, -24, -29, -3, -30, -15, -17, -12, -23, 5]
-    _1L_keys = [31, 13, 22, 11, 21, -4, -25, -7, -2, -28, -1, -16, -14, -19, -8, 26]
+    k0 = [0, 18, 9, 20, 10, -27, -6, -24, -29, -3, -30, -15, -17, -12, -23, 5]
+    k1 = [31, 13, 22, 11, 21, -4, -25, -7, -2, -28, -1, -16, -14, -19, -8, 26]
 
-    for i in range(len(_0L_keys)):
-        _0key = _0L_keys[i]
-        _1key = _1L_keys[i]
+    for i in range(len(k0)):
+        _0key = k0[i]
+        _1key = k1[i]
 
         _0L[abs(_0key)] = 1.0 if _0key >= 0 else -1.0
         _1L[abs(_1key)] = 1.0 if _1key >= 0 else -1.0
