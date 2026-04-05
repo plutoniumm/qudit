@@ -68,6 +68,7 @@ When a circuit is containing unique dimensions `{d_1, d_2, ...}`, the gate sets 
 
 ```python
 from qudit import Circuit
+import torch as pt
 
 c = Circuit(wires=1, dim=2)
 G2 = c.gates[2]
@@ -75,7 +76,7 @@ G2 = c.gates[2]
 c.gate(G2.H, [0])
 c.gate(G2.RY, [0], angle=1.234)
 
-zero = torch.zeros(c.width, dtype=torch.complex64)
+zero = pt.zeros(c.width, dtype=pt.complex64)
 zero[0] = 1.0
 psi = c(zero)
 ```
@@ -93,16 +94,17 @@ c.gate(G2.CX, [0, 1])
 While you may pass in an arbitrary unitary also, it will not show up as a clean gate in the circuit diagram.
 
 ```python
-import torch
 from qudit import Circuit
+import torch as pt
+
 c = Circuit(wires=1, dim=3)
 G3 = c.gates[3]
 
-cycle = torch.tensor([
+cycle = pt.tensor([
   [0, 1, 0],
   [0, 0, 1],
   [1, 0, 0]
-], dtype=torch.complex64)
+], dtype=pt.complex64)
 c.gate(cycle, [0])
 
 print(c.draw())
@@ -151,7 +153,7 @@ import torch
 from qudit import Circuit, Mode
 
 def ket0(size):
-  x = torch.zeros(size, dtype=torch.complex64)
+  x = pt.zeros(size, dtype=pt.complex64)
   x[0] = 1.0
   return x
 
@@ -171,7 +173,7 @@ For matrix mode very little changes other than the mode and the input state. The
 ```python
 def to_rho(x):
     size = x.numel()
-    return x.view(size, 1) @ torch.conj(x.view(1, size))
+    return x.view(size, 1) @ pt.conj(x.view(1, size))
 
 c = Circuit(wires=1, dim=3, mode=Mode.VECTOR) # [!code --]
 c = Circuit(wires=1, dim=3, mode=Mode.MATRIX) # [!code ++]
@@ -196,7 +198,7 @@ class Learnable(Hybrid):
         self.c = Circuit(wires=wires, dim=dim, device=device)
         G = self.c.gates[dim]
 
-        self.theta = nn.Parameter(torch.rand(()))
+        self.theta = nn.Parameter(pt.rand(()))
         self.c.gate(G.RY, [0], angle=self.theta)
         self.c.gate(G.CX, [0, 1])
 
@@ -208,7 +210,7 @@ class Learnable(Hybrid):
 from qudit import Circuit
 from qudit.ml import Hybrid
 import torch.nn as nn
-import torch
+import torch as pt
 ```
 
 :::
@@ -217,9 +219,68 @@ import torch
 > - Prefer creating the circuit once in `__init__` and calling it in `forward`.
 > - If you use an encoder (e.g. `nn.Linear`) to map classical data into a valid input vector, ensure the output shape flattens to `c.width`.
 
-With parametrised circuits we encourage using an optimizer to update the parameters, but you can also update them manually by changing the `torch.nn.Parameter` values.
+With parametrised circuits we encourage using an optimizer to update the parameters, but you can also update them manually by changing the `torch` values.
 
 Additionally be careful when using linear layers between circuits, these are statevectors not measured values.
+
+## Measurement
+
+### Expectation values
+
+`circuit.expectation(operator, state)` runs `state` through the circuit and computes $\langle\psi|O|\psi\rangle$ (VECTOR mode) or $\mathrm{Tr}(O\rho)$ (MATRIX/NOISY mode):
+
+::: code-group
+
+```python [Example]
+c = Circuit(wires=1, dim=2)
+G = c.gates[2]
+c.gate(G.H, [0])   # |+⟩ state
+
+zero = pt.zeros(2, dtype=pt.complex64)
+zero[0] = 1.0
+
+Z = pt.tensor([[1, 0], [0, -1]], dtype=pt.complex64)
+X = pt.tensor([[0, 1], [1, 0]], dtype=pt.complex64)
+
+print(c.expectation(Z, zero))   # tensor(0.)  ⟨+|Z|+⟩ = 0
+print(c.expectation(X, zero))   # tensor(1.)  ⟨+|X|+⟩ = 1
+```
+
+```python [imports]
+from qudit import Circuit
+import torch as pt
+```
+
+:::
+
+### Sampling
+
+`circuit.sample(state, shots=1024)` returns a `dict[bitstring, count]` by sampling from the output probability distribution:
+
+::: code-group
+
+```python [Example]
+c = Circuit(wires=2, dim=2)
+G = c.gates[2]
+c.gate(G.H, [0])
+c.gate(G.CX, [0, 1])
+
+zero = pt.zeros(4, dtype=pt.complex64)
+zero[0] = 1.0
+
+counts = c.sample(zero, shots=1000)
+# counts ≈ {"00": 500, "11": 500}
+print(counts)
+```
+
+```python [imports]
+from qudit import Circuit
+import torch as pt
+```
+
+:::
+
+Bitstrings are mixed-radix for heterogeneous dimensions: a `[2,3]` circuit produces strings like `"02"` (qubit 0, qutrit 2).
 
 ## Tips
 

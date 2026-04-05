@@ -47,9 +47,12 @@ export default defineConfig({
       }
     ],
 
+    search: {
+      provider: 'local'
+    },
+
     socialLinks: [
       { icon: 'github', link: 'https://github.com/plutoniumm/qudit' },
-      { icon: 'ieee', link: 'https://ieeexplore.ieee.org/abstract/document/11333840' }
     ]
   },
   vite: {

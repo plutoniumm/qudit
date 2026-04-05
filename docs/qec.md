@@ -29,17 +29,20 @@ A `Code` wraps a `torch.Tensor` of shape `(k, d^n)` where each row is one logica
 | `code[i]` | $i$-th codeword as a 1D tensor |
 | `code.toTensor()` | Returns all codewords as a tensor (indexable) |
 | `Code.isValid(codewords)` | Assert normalization and mutual orthogonality |
-| `Code.fromStabilizers(stabs)` | Construct code from Pauli stabilizer strings |
+| `Code.fromStabilizers(stabs, d=2)` | Construct code from stabilizer strings for local dimension `d` |
 
 ### Built-in codes
 
-Three standard amplitude-damping codes are provided in `qudit.qec.lib`:
+Standard codes are provided in `qudit.qec.lib`:
 
 | Code | Description |
 | --- | --- |
-| `Dutta3()` | 3-qubit permutation-invariant code; smallest single-AD-error-correcting code |
-| `Leung()` | 4-qubit code; standard single-AD-error correction |
-| `Perfect()` | [[5,1,3]] 5-qubit perfect code; corrects any single-qubit error |
+| `Dutta3()` | 3-qubit permutation-invariant code. Smallest single-AD-error-correcting code |
+| `Leung()` | 4-qubit code. Standard single-AD-error correction |
+| `Perfect()` | [[5,1,3]] 5-qubit perfect code. corrects any single-qubit error |
+| `Qutrit3()` | 3-qutrit repetition code. codewords $\|000\rangle,\|111\rangle,\|222\rangle$ |
+| `GottesmanD(d)` | CSS-type code: 1 logical qudit in $d$ physical qudits (any prime $d$) |
+| `Surface(m, n, d=2, edge, start)` | m×n surface code for any local dimension d |
 
 ```python
 from qudit.qec.lib import Leung, Dutta3, Perfect
@@ -53,13 +56,35 @@ print(state1.norm()) # 1.0
 
 ### From stabilizers
 
-`Code.fromStabilizers` constructs the codespace projector from a list of Pauli stabilizer generators and extracts codewords via SVD or randomized range finding:
+`Code.fromStabilizers` constructs the codespace projector from a list of Pauli stabilizer generators and extracts codewords via SVD or randomized range finding. The optional `d` parameter sets the local qudit dimension (default 2). for `d>2`, `X` and `Z` are the clock and shift operators from `Gategen(d)`.
 
-```python
+::: code-group
+
+```python [Qubit (d=2)]
 from qudit.qec.codes import Code
 
 code = Code.fromStabilizers(["ZZZII", "IIZZZ", "XIXXI", "IXXIX"])
-print(len(code))  # 2  (= 2^(5-4))
+print(len(code))           # 2  (= 2^(5-4))
+print(code.codewords.shape)  # (2, 32)
+```
+
+```python [Qutrit (d=3)]
+from qudit.qec.codes import Code
+
+code = Code.fromStabilizers(["ZI", "IZ"], d=3)
+print(len(code))           # 1  (= 3^(2-2))
+print(code.codewords.shape)  # (1, 9)
+```
+
+:::
+
+The `Surface` factory wraps `fromStabilizers` for lattice surface codes:
+
+```python
+from qudit.qec.lib import Surface
+
+qubit_code  = Surface(3, 1, d=2)  # 1×3 qubit surface code: 2 codewords, dim 8
+qutrit_code = Surface(3, 1, d=3)  # 1×3 qutrit surface code: 3 codewords, dim 27
 ```
 
 ---
@@ -76,8 +101,8 @@ noise = Process.AD(d=2, n=4, Y=0.1, order=3)
 
 | Process | Description |
 | --- | --- |
-| `Process.AD(d, n, Y, order)` | Amplitude damping; only lowering operators |
-| `Process.GAD(d, n, Y, p, order)` | Generalized AD; lowering + raising operators |
+| `Process.AD(d, n, Y, order)` | Amplitude damping. Only lowering operators |
+| `Process.GAD(d, n, Y, p, order)` | Generalized AD. Lowering + raising operators |
 | `Process.Pauli(n, paulis, p, order)` | Pauli channel over `{I,X,Y,Z}` words |
 
 Applying a channel to a density matrix:
@@ -204,13 +229,13 @@ def to_rho(psi):
 :::
 
 > [!NOTE]
-> `Recovery` returns a `Channel` object;  apply it via `.run(rho)` exactly as you would any noise channel.
+> `Recovery` returns a `Channel` object.  Apply it via `.run(rho)` exactly as you would any noise channel.
 
 ---
 
 ## Practical notes
 
 - Codeword tensors must be `torch.Tensor` (1D, on the same device). Call `.toTensor()` on a `Code` and unpack the rows.
-- `Process.AD(order=3)` labels correctable Kraus words up to 3-photon-loss order; `Recovery.petz` uses all Kraus words regardless of `correctables`.
-- For large codes the Petz pseudo-inverse can be slow; try `Recovery.cafaro` as a faster approximation.
+- `Process.AD(order=3)` labels correctable Kraus words up to 3-photon-loss order. `Recovery.petz` uses all Kraus words regardless of `correctables`.
+- For large codes the Petz pseudo-inverse can be slow. Try `Recovery.cafaro` as a faster approximation.
 - To validate a custom code before running QEC, use `Code.isValid(code.toTensor())`.

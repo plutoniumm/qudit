@@ -117,12 +117,12 @@ channel = Process.AD(d=2, n=4, Y=0.01, order=1)
 
 | Argument | Description |
 | --- | --- |
-| `d` | Local dimension per site |
+| `d` | Local dimension per site (any `d ≥ 2`) |
 | `n` | Number of physical sites |
 | `Y` | Damping parameter $Y \in [0,1]$ |
 | `order` | Max correctable error order (default `1`) |
 | `group` | If `True`, keep correctable sets grouped by order |
-| `iid` | If `True`, return `Multiplex` of single-wire channels (qubit only) |
+| `iid` | If `True`, return `Multiplex` of single-wire channels |
 
 ### Generalized amplitude damping (`GAD`)
 
@@ -151,6 +151,25 @@ from qudit.noise import Process
 
 Kraus operators are tensor products of $\{I, \sqrt{p_X}X, \sqrt{p_Y}Y, \sqrt{p_Z}Z\}$ across all $n$ sites. Correctable subsets are labeled by Hamming weight.
 
+### Weyl-Heisenberg channel (NoisyGate)
+
+For circuit-level noise in `Mode.NOISY`, `NoisyGate("weyl", param, ...)` implements the Heisenberg-Weyl displacement channel for any local dimension $d$:
+
+$$\Phi(\rho) = (1 - \textstyle\sum_{(m,n)\neq(0,0)} p_{mn})\,\rho + \sum_{(m,n)\neq(0,0)} p_{mn}\, W_{mn}\,\rho\,W_{mn}^\dagger$$
+
+where $W_{mn} = X_d^m Z_d^n$, $X_d$ is the cyclic shift, and $Z_d$ is the clock operator. `param` is a length-$(d^2-1)$ tensor of probabilities in row-major order $(0,1),(0,2),\ldots,(d-1,d-1)$ excluding $(0,0)$.
+
+```python
+from qudit.circuit.gates import NoisyGate
+import torch
+
+# Qubit Weyl (d=2): 3 parameters for W_01=Z, W_10=X, W_11=XZ
+ng2 = NoisyGate("weyl", torch.tensor([0.02, 0.01, 0.01]), index=0, wires=1, dims=2)
+
+# Qutrit Weyl (d=3): 8 parameters for all (m,n) ≠ (0,0)
+ng3 = NoisyGate("weyl", torch.tensor([0.005]*8), index=0, wires=1, dims=3)
+```
+
 ## Correctable subsets
 
 After building a channel, `channel.correctables` holds a flat list (or grouped list if `group=True`) of Kraus-word indices that are considered correctable up to the given order.
@@ -164,12 +183,26 @@ These are passed directly to `Recovery.leung` for constructing recovery maps (se
 
 ## IID noise
 
-`IID` builds single-wire channels and multiplexes them for independent noise per qubit:
+`IID` builds single-wire channels and multiplexes them for independent identically distributed noise. Both factories work for any local dimension `d ≥ 2`:
 
-| Factory | Description |
-| --- | --- |
-| `IID.AD(n, y)` | Amplitude damping on each of `n` qubits independently |
-| `IID.GAD(n, y, p)` | Generalized amplitude damping on each qubit independently |
+| Factory | Signature | Description |
+| --- | --- | --- |
+| `IID.AD` | `(n, d, y)` | Amplitude damping on each of `n` qudits independently |
+| `IID.GAD` | `(n, d, y, p)` | Generalized amplitude damping on each qudit independently |
+
+::: code-group
+
+```python [Example]
+qubit = IID.AD(n=3, d=2, y=0.05)
+
+qutrit = IID.AD(n=2, d=3, y=0.1)
+```
+
+```python [imports]
+from qudit.noise import IID
+```
+
+:::
 
 > [!TIP]
-> Use `Process.GAD(d=2, n=..., iid=True)` as a shortcut;  it delegates to `IID.GAD` and returns a `Multiplex`.
+> Use `Process.AD(d=..., n=..., iid=True)` as a shortcut; it delegates to `IID.AD` and returns a `Multiplex`.

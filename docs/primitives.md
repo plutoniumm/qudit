@@ -172,18 +172,20 @@ In addition to these gates there are two special gates called `CU` or `Controlle
 | Function | Description |
 | --- | --- |
 | `GHZ(n, d)` | $n$-partite qudit GHZ: $\frac{1}{\sqrt{d}}\sum_{i=0}^{d-1}\|i\rangle^{\otimes n}$ |
-| `W(n)` | $n$-qubit W state: $\frac{1}{\sqrt{n}}\sum_i \|0\cdots 1_i\cdots 0\rangle$ |
+| `W(n, d=2)` | $n$-qudit W state: $\frac{1}{\sqrt{n}}\sum_i \|0\cdots 1_i\cdots 0\rangle$ for local dimension $d$ |
 | `NOON(n, theta)` | Two-mode NOON state: $\|n,0\rangle + e^{in\theta}\|0,n\rangle$ in dimension $n+1$ |
-| `Dicke(n, k)` | $n$-qubit Dicke state with $k$ zeros and $n-k$ ones |
+| `Dicke(n, k, d=2)` | $n$-qudit Dicke state with $k$ zeros and $n-k$ ones for local dimension $d$ |
 | `Coherent(N, alpha)` | Truncated coherent state in $(N+1)$-dimensional Fock space |
 
 ::: code-group
 
 ```python [Example]
-print(GHZ(3, 2))    # (|000> + |111>) / sqrt(2)
-print(W(3))         # (|100> + |010> + |001>) / sqrt(3)
-print(NOON(3, 0))   # (|3,0> + |0,3>) / sqrt(2) in d=4
-print(Dicke(4, 1))  # uniform superposition of weight-1 states
+print(GHZ(3, 2))       # (|000> + |111>) / sqrt(2)
+print(W(3))            # (|100> + |010> + |001>) / sqrt(3)  qubit
+print(W(3, d=3))       # qutrit W state, 27-dimensional space
+print(NOON(3, 0))      # (|3,0> + |0,3>) / sqrt(2) in d=4
+print(Dicke(4, 1))     # uniform superposition of weight-3 states (qubit)
+print(Dicke(4, 1, d=3))# qutrit Dicke state, 81-dimensional space
 print(Coherent(5, alpha=1.0))
 ```
 
@@ -209,13 +211,13 @@ U = random_unitary(4)   # 4x4 unitary matrix (np.ndarray)
 psi = random_state(4)   # random 4-component statevector
 ```
 
-## Separability and decomposition (`Space`, `PPT`)
+## Spaces and Separability
 
 `qudit.tools` provides tools for analyzing bipartite states:
 
-| Function/Method | Description |
+| Method | Description |
 | --- | --- |
-| `PPT(rho, sub)` | Peres–Horodeccy partial-transpose test: `True` if $\rho^{T_B}\succeq 0$ |
+| `Space.PPT(rho, sub)` | Peres–Horodecky partial-transpose test: `True` if $\rho^{T_B}\succeq 0$ |
 | `Space.gramSchmidt(vectors)` | Gram-Schmidt orthonormalization |
 | `Space.schmidtDecompose(state)` | Schmidt decomposition; returns list of $(\lambda_k, \|u_k\rangle, \|v_k\rangle)$ |
 | `Space.schmidtRank(mat)` | Schmidt rank (matrix rank) of a bipartite coefficient matrix |
@@ -231,15 +233,15 @@ decomp = Space.schmidtDecompose(mat)
 print(Space.schmidtRank(mat))  # 2
 
 rho = np.outer(psi, psi.conj())
-print(PPT(rho, 2))  # False  (entangled states fail PPT)
+print(Space.PPT(rho, 2))  # False  (entangled states fail PPT)
 ```
 
 ```python [imports]
-from qudit.tools.tests import Space, PPT
+from qudit.tools.tests import Space
 import numpy as np
 ```
 
 :::
 
 > [!NOTE]
-> `PPT` currently overrides the `sub` argument to `3` internally; pass the actual block size you intend and verify against the matrix dimensions.
+> `Space.PPT` currently overrides the `sub` argument to `3` internally; pass the actual block size you intend and verify against the matrix dimensions.
