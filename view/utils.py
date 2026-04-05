@@ -54,7 +54,10 @@ def toVitepress(node: dict, *, prefix: str = "code/") -> list[dict]:
             if stem.endswith(".py"):
                 stem = stem[: -len(".py")]
 
-            items.append({"text": stem, "link": fmt_link(rel_posix, prefix=prefix)})
+            items.append({
+                "text": stem,
+                "link": fmt_link(rel_posix, prefix=prefix),
+            })
 
     return items
 

@@ -91,6 +91,7 @@ def class_attr(node: ast.ClassDef) -> list[tuple[str, str, str]]:
                     attrs.append((name, ann, default))
 
     attrs.sort(key=lambda x: x[0])
+
     return attrs
 
 
@@ -105,7 +106,7 @@ def extract_symbols(path: Path) -> tuple[
     if tree is None:
         return ([], [])
 
-    assert isinstance(tree, ast.Module)
+    assert isinstance(tree, ast.Module), f"expected ast.Module, got {type(tree)}"
     src_text = path.read_text(encoding="utf-8")
 
     classes: list[
@@ -165,12 +166,13 @@ def attr_table(attrs: list[tuple[str, str, str]]) -> list[str]:
         lines.append(f"| {name} | {ann} | {default} |")
 
     lines.append("")
+
     return lines
 
 
 def fmt_impl(code: str) -> str:
-    """Return code with docstrings removed from modules, classes and functions.
-
+    """
+    Return code with docstrings removed from modules, classes and functions.
     This preserves the rest of the implementation for display in the docs.
     If parsing fails for any reason, returns the original code.
     """
@@ -191,10 +193,12 @@ def fmt_impl(code: str) -> str:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 stmt.body = _strip_in_body(stmt.body)
 
+
         return body
 
     tree = ast.parse(code)
-    assert isinstance(tree, ast.Module)
+
+    assert isinstance(tree, ast.Module), f"expected ast.Module, got {type(tree)}"
     tree.body = _strip_in_body(tree.body)
     ast.fix_missing_locations(tree)
 
@@ -258,8 +262,10 @@ def render(
     lines.append("")
 
     if not classes and not functions:
+
         lines.append("*(No functions or classes found.)*")
         lines.append("")
+
         return "\n".join(lines)
 
     for cnode, cdoc, _csrc, methods in classes:
