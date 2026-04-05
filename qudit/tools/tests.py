@@ -1,5 +1,4 @@
-from numpy import linalg as LA
-import numpy as np
+import torch as pt
 
 
 class Space:
@@ -8,7 +7,7 @@ class Space:
     """
 
     @staticmethod
-    def gramSchmidt(vectors: np.ndarray) -> np.ndarray:
+    def gramSchmidt(vectors: pt.Tensor) -> pt.Tensor:
         """
         Gram-Schmidt orthonormalization.
 
@@ -17,40 +16,40 @@ class Space:
         """
         ortho = []
         for v in vectors:
-            w = v - sum(np.dot(v, np.conj(u)) * u for u in ortho)
-            if LA.norm(w) > 1e-8:
-                ortho.append(w / LA.norm(w))
+            w = v - sum(pt.dot(v, u.conj()) * u for u in ortho)
+            if pt.linalg.norm(w) > 1e-8:
+                ortho.append(w / pt.linalg.norm(w))
 
-        return np.array(ortho)
+        return pt.stack(ortho)
 
     @staticmethod
-    def schmidtDecompose(state: np.ndarray) -> list:
+    def schmidtDecompose(state: pt.Tensor) -> list:
         """
         Schmidt decomposition via SVD.
 
         Treats `state` as a bipartite coefficient matrix $\Psi$ and returns singular triplets
         $(\lambda_k, |u_k\\rangle, |v_k\\rangle)$ with $\Psi = \sum_k \lambda_k |u_k\\rangle\langle v_k|$.
         """
-        U, D, V = LA.svd(state)
-        dims = int(np.min(state.shape))
+        U, S, Vh = pt.linalg.svd(state, full_matrices=True)
+        dims = int(min(state.shape))
 
         return sorted(
-            [(D[k], U[:, k], V.T[:, k]) for k in range(dims)],
+            [(S[k], U[:, k], Vh[k]) for k in range(dims)],
             key=lambda dec: dec[0],
             reverse=True,
         )
 
     @staticmethod
-    def schmidtRank(mat: np.ndarray) -> int:
+    def schmidtRank(mat: pt.Tensor) -> int:
         """
         Schmidt rank (matrix rank) of a bipartite coefficient matrix.
         """
-        return int(LA.matrix_rank(mat))
+        return int(pt.linalg.matrix_rank(mat))
 
     @staticmethod
-    def PPT(rho: np.ndarray, sub: int) -> bool:
+    def PPT(rho: pt.Tensor, sub: int) -> bool:
         """
-        Peres–Horodecki (PPT) separability test for a bipartite density matrix.
+        Peres-Horodecki (PPT) separability test for a bipartite density matrix.
 
         Performs a blockwise partial transpose on subsystem blocks of size `sub` and checks
         positivity: $\\rho^{T_B} \succeq 0$.
@@ -62,9 +61,9 @@ class Space:
         if side % sub != 0:
             raise ValueError(f"Matrix side ({side}) not divisible by sub ({sub})")
 
-        mat0 = rho.copy()
+        mat0 = rho.clone()
         for i in range(0, mat0.shape[0], sub):
             for j in range(0, mat0.shape[1], sub):
                 mat0[i : i + sub, j : j + sub] = mat0[i : i + sub, j : j + sub].T
 
-        return bool(np.all(np.linalg.eigvals(mat0) >= 0))
+        return bool(pt.all(pt.linalg.eigvals(mat0).real >= 0))

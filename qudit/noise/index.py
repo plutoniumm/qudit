@@ -122,6 +122,7 @@ class Channel:
 
         if isinstance(c0, int):
             idxs = [i for i in self.correctables if isinstance(i, int)]
+
             return [self.ops[i] for i in idxs]
 
         if isinstance(c0, list):
@@ -129,6 +130,7 @@ class Channel:
             sets = [s for s in self.correctables if isinstance(s, list)]
             for s in sets:
                 Ek.append([self.ops[i] for i in s])
+
             return Ek
 
         return Exception("Please don't change correctables")
@@ -173,8 +175,9 @@ class Channel:
         Check complete-positivity (CP) by verifying Choi matrix is PSD.
         """
         J = self.toChoi()
-        eig = np.linalg.eigvalsh(J)
-        return bool(np.all(eig >= -1e-8))
+        eig = pt.linalg.eigvalsh(J.to(pt.complex128))
+
+        return bool((eig.real >= -1e-5).all().item())
 
     @cached_property
     def isCPTP(self) -> bool:
@@ -183,34 +186,34 @@ class Channel:
         """
         return self.isCP and self.isTP
 
-    def toChoi(self) -> np.ndarray:
+    def toChoi(self) -> pt.Tensor:
         """
         Compute the Choi matrix $J(\Phi) = \sum_{i,j} |i\\rangle\langle j| \otimes \Phi(|i\\rangle\langle j|)$.
         """
         d = self.d
-        J = np.zeros((d * d, d * d), dtype=complex)
-        basis = np.eye(d, dtype=complex)
+        J = pt.zeros((d * d, d * d), dtype=pt.complex128)
+        basis = pt.eye(d, dtype=pt.complex128)
         for i in range(d):
             for j in range(d):
-                Eij = np.outer(basis[i], basis[j])
-                J += np.kron(Eij, self.run(Eij))
+                Eij = pt.outer(basis[i], basis[j])
+                J += pt.kron(Eij, self.run(Eij).to(pt.complex128))
+
         return J
 
-    def toSuperop(self) -> np.ndarray:
+    def toSuperop(self) -> pt.Tensor:
         """
-        Compute the superoperator $S$ such that $\mathrm{vec}(\Phi(\\rho)) = S\,\mathrm{vec}(\\rho)$.
+        Compute the superoperator $S$ such that $\mathrm{vec}(\Phi(\\rho)) = S\,\mathrm{vec}(\\rho)$,
+        i.e. $S = \sum_k E_k \otimes E_k^*$.
         """
+        mats = [self._materialize(word).to(pt.complex128) for word in self.ops]
         d = self.d
-        S = np.zeros((d * d, d * d), dtype=complex)
-        I = np.eye(d, dtype=complex)
-        for i in range(d):
-            for j in range(d):
-                Eij = np.outer(I[:, i], I[:, j])
-                S += np.kron(Eij, self.run(Eij))
+        S = pt.zeros((d * d, d * d), dtype=pt.complex128)
+        for Ek in mats:
+            S += pt.kron(Ek, Ek.conj())
 
         return S
 
-    def toStinespring(self) -> np.ndarray:
+    def toStinespring(self) -> pt.Tensor:
         """
         Compute a Stinespring isometry $V$ by stacking Kraus operators.
 
@@ -220,9 +223,9 @@ class Channel:
         K = len(self.ops)
         d = self.d
         r = K
-        V = np.zeros((d * r, d), dtype=complex)
+        V = pt.zeros((d * r, d), dtype=pt.complex128)
         for n, O in enumerate(self.ops):
-            Ek = self._materialize(O).numpy()
+            Ek = self._materialize(O).to(pt.complex128)
             V[n * d : (n + 1) * d, :] = Ek
 
         return V
@@ -230,7 +233,8 @@ class Channel:
     @property
     def Ak(self) -> list[Error]:
         """
-        Alias for the Kraus list $\{E_k\}$"""
+        Alias for the Kraus list $\{E_k\}$
+        """
         return self.ops
 
 
@@ -258,11 +262,12 @@ class Multiplex:
 
     def run(self, rho: Union["State", pt.Tensor, np.ndarray]) -> pt.Tensor:
         """
-        Apply the channels in sequence: \rho \mapsto \Phi_n \circ \cdots \circ \Phi_1(\rho).
+        Apply channels in sequence: $\\rho \mapsto \Phi_n \circ \cdots \circ \Phi_1(\\rho)$.
         """
         result = rho
         for channel in self.channels:
             result = channel.run(result)
+
         return result
 
     def __getitem__(self, key: Union[int, slice]) -> Union["Channel", list["Channel"]]:

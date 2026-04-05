@@ -96,6 +96,7 @@ class Frame:
             items = ", ".join(f"{k}={self.params[k]}" for k in sorted(self.params))
 
             return f"{self.name}({items})"
+
         return f"{self.name}"
 
 
@@ -149,7 +150,7 @@ class Circuit(nn.Module):
             self.dims_ = dim
 
         self.dim = dim
-        self.width = int(np.prod(self.dims_))
+        self.width = int(torch.prod(torch.tensor(self.dims_)).item())
         self.wires = wires
         self.device = device
         self.flip = flip
@@ -231,7 +232,6 @@ class Circuit(nn.Module):
 
             self._noise_pairs.append(pair)
 
-
     def _q_noise(self, wire: int) -> Any:
         """
         Extract the noise parameter for a given wire from self.noise_config.
@@ -252,6 +252,7 @@ class Circuit(nn.Module):
                 continue
             if isinstance(v, list):
                 return v[wire]
+
             return v
 
         raise ValueError(f"Cannot extract noise param from config: {cfg}")
@@ -308,10 +309,20 @@ class Circuit(nn.Module):
 
     def expectation(self, operator: Any, state: torch.Tensor) -> torch.Tensor:
         """
-        Compute $\\langle\\psi|O|\\psi\\rangle$ (VECTOR mode) or $\\mathrm{Tr}(O\\rho)$ (MATRIX mode)
+        Compute $\\langle\\psi|O|\\psi\\rangle$ (VECTOR mode) or $\\mathrm{Tr}(O\\rho)$ (MATRIX/NOISY mode)
         where $|\\psi\\rangle$ / $\\rho$ is the output of `forward(state)`.
         """
-        pass
+        out = self.forward(state)
+        if not isinstance(operator, torch.Tensor):
+            op = torch.tensor(operator, dtype=C64, device=self.device)
+        else:
+            op = operator.to(dtype=C64, device=self.device)
+        if self.mode == Mode.VECTOR:
+            psi = out.reshape(-1)
+
+            return torch.real(psi.conj() @ (op @ psi))
+        else:
+            return torch.real(torch.trace(op @ out))
 
     def sample(self, state: torch.Tensor, shots: int = 1024) -> dict:
         """
@@ -319,7 +330,23 @@ class Circuit(nn.Module):
         where $|\\psi\\rangle = \\mathrm{forward}(\\mathrm{state})$.
         Returns `dict[bitstring, count]`.
         """
-        pass
+        out = self.forward(state)
+        if self.mode == Mode.VECTOR:
+            probs = out.reshape(-1).abs().pow(2).real.float()
+        else:
+            probs = torch.diag(out).real.float()
+        indices = torch.multinomial(probs, num_samples=shots, replacement=True)
+        result: dict = {}
+        for idx in indices.tolist():
+            bits = []
+            n = idx
+            for d in reversed(self.dims_):
+                bits.append(str(n % d))
+                n //= d
+            key = "".join(reversed(bits))
+            result[key] = result.get(key, 0) + 1
+
+        return result
 
     def draw(self, mode: str = "ascii") -> Any:
         """

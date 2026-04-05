@@ -119,6 +119,7 @@ class QAOA(nn.Module):
         gate = gate_class(
             dim=self.d, wires=self.wires, index=index, device=self.device, **kwargs
         )
+
         return gate.forward(x)
 
     def _RZ(self, x, angle, indices):
@@ -197,7 +198,9 @@ class QAOA(nn.Module):
 
         return exp_val + self.offset
 
-    def solve(self, func: Energy, optimizer=None, steps=100, lr=0.1, hook=devnull):
+    def solve(
+        self, func: Energy = None, optimizer=None, steps=100, lr=0.1, hook=devnull
+    ):
         if optimizer is None:
             optimizer = pt.optim.Adam(self.parameters(), lr=lr)
 
@@ -213,14 +216,192 @@ class QAOA(nn.Module):
             Pi = (pt.abs(final_state) ** 2).squeeze()
             maxP = pt.argmax(Pi).item()
             solution = format(maxP, f"0{self.wires}b")
-
             solution = [int(bit) for bit in solution]
-            soltensr = [pt.tensor(bit) for bit in solution]
 
-            min_energy = func(self.qubo, soltensr)
-
-        return {
+        out = {
             "solution": solution,
-            "value": min_energy,
             "probabilities": Pi.cpu().flatten(),
         }
+
+        if func is not None and self.qubo is not None:
+            soltensr = [pt.tensor(bit) for bit in solution]
+            out["value"] = func(self.qubo, soltensr)
+
+        return out
+
+
+class ClockSolver(nn.Module):
+    """
+    Variational qudit optimizer using direct matrix exponentiation (clock/Potts model).
+
+    Works for any local dimension $d \geq 2$. Each layer applies a phase separator
+    $U_P(\gamma) = \exp(-i\gamma H_P)$ and a mixer $U_B(\beta) = \exp(-i\beta H_B)$
+    where $H_B = -\sum_i(X_d^{(i)} + X_d^{(i)\dagger})$.
+
+    Initial state: $H_d|0\\rangle^{\otimes n}$. Parameters $\gamma, \beta$ are optimized with Adam.
+    """
+
+    d: int
+    wires: int
+    width: int
+    layers: int
+    device: str
+    qubo: dict
+    hamiltonian: list
+    offset: float
+
+    def __init__(
+        self,
+        d: int,
+        wires: int,
+        qubo: dict = None,
+        hamiltonian: list = None,
+        offset: float = 0.0,
+        layers: int = 1,
+        device: str = "cpu",
+    ):
+        super().__init__()
+        self.d = d
+        self.wires = wires
+        self.width = d**wires
+        self.layers = layers
+        self.device = device
+        self.qubo = qubo
+
+        if hamiltonian is not None:
+            self.hamiltonian = hamiltonian
+            self.offset = offset
+        elif qubo is not None:
+            self.hamiltonian, self.offset = QUBO.toHamiltonian(qubo)
+        else:
+            raise ValueError("Either 'hamiltonian' or 'qubo' must be provided.")
+
+        self.gammas = nn.Parameter(pt.rand(layers, device=device) * (2 * pt.pi))
+        self.betas = nn.Parameter(pt.rand(layers, device=device) * pt.pi)
+
+        # Pre-compute static Hamiltonians (no grad needed)
+        with pt.no_grad():
+            self._H_P = self._build_H_P()
+            self._H_B = self._build_H_B()
+
+    def _build_H_P(self) -> pt.Tensor:
+        """
+        Build phase Hamiltonian $H_P$ from Hamiltonian terms using $Z_d$ clock operators.
+        """
+        gg = GG.Gategen(dim=self.d, device=self.device)
+        I = gg.I.tensor
+        Z = gg.Z.tensor
+        H_P = pt.zeros((self.width, self.width), dtype=C64, device=self.device)
+        for coeff, gtype, indices in self.hamiltonian:
+            if gtype == "Z":
+                ops = [Z if i == indices[0] else I for i in range(self.wires)]
+            elif gtype == "ZZ":
+                ops = [Z if i in indices else I for i in range(self.wires)]
+            else:
+                raise NotImplementedError(f"Hamiltonian term '{gtype}' not supported.")
+            term = ops[0]
+            for op in ops[1:]:
+                term = pt.kron(term, op)
+            H_P = H_P + coeff * term
+        H_P = (H_P + H_P.conj().T) / 2
+
+        return H_P
+
+    def _build_H_B(self) -> pt.Tensor:
+        """
+        Build mixer Hamiltonian $H_B = -\sum_i(X_d^{(i)} + X_d^{(i)\dagger})$.
+        """
+        gg = GG.Gategen(dim=self.d, device=self.device)
+        I = gg.I.tensor
+        X = gg.X.tensor
+        XpXdag = X + X.conj().T
+
+        H_B = pt.zeros((self.width, self.width), dtype=C64, device=self.device)
+        for i in range(self.wires):
+            ops = [XpXdag if j == i else I for j in range(self.wires)]
+
+            term = ops[0]
+            for op in ops[1:]:
+                term = pt.kron(term, op)
+
+            H_B = H_B - term
+
+        return H_B
+
+    def forward(self) -> pt.Tensor:
+        """
+        Return the QAOA state $|\psi(\gamma, \beta)\\rangle$ as a complex vector of length $d^n$.
+        """
+        gg = GG.Gategen(dim=self.d, device=self.device)
+        ket0 = pt.zeros(self.d, dtype=C64, device=self.device)
+        ket0[0] = 1.0
+        plus = gg.H.tensor @ ket0
+
+        state = plus
+        for _ in range(self.wires - 1):
+            state = pt.kron(state, plus)
+
+        for i in range(self.layers):
+            U_P = pt.linalg.matrix_exp(-1j * self.gammas[i].to(C64) * self._H_P)
+            state = U_P @ state
+            U_B = pt.linalg.matrix_exp(-1j * self.betas[i].to(C64) * self._H_B)
+            state = U_B @ state
+
+        return state
+
+    def expectation(self) -> pt.Tensor:
+        """
+        Expectation value $\langle\psi|H_P|\psi\\rangle + \mathrm{offset}$.
+        """
+        state = self.forward()
+        exp_val = pt.vdot(state, self._H_P @ state).real
+
+        return exp_val + self.offset
+
+
+    def _decode(self, idx: int) -> list:
+        """
+        Decode integer index to per-wire digit list (base-$d$, big-endian).
+        """
+        result = []
+        for _ in range(self.wires):
+            result.append(idx % self.d)
+            idx //= self.d
+
+        return result[::-1]
+
+    def solve(
+        self,
+        func: "Energy | None" = None,
+        optimizer=None,
+        steps: int = 200,
+        lr: float = 0.1,
+        hook: "Callable" = devnull,
+    ) -> dict:
+        """
+        Optimise gammas/betas using PyTorch Adam (or a provided optimizer).
+        """
+        if optimizer is None:
+            optimizer = pt.optim.Adam(self.parameters(), lr=lr)
+
+        for step in range(steps):
+            optimizer.zero_grad()
+            loss = self.expectation()
+            loss.backward()
+            optimizer.step()
+            hook(loss, step)
+
+        with pt.no_grad():
+            final_state = self.forward()
+            Pi = pt.abs(final_state) ** 2
+            maxP = int(pt.argmax(Pi).item())
+            solution = self._decode(maxP)
+
+        out: dict = {
+            "solution": solution,
+            "probabilities": Pi.cpu(),
+        }
+        if func is not None and self.qubo is not None:
+            out["value"] = func(self.qubo, [pt.tensor(x) for x in solution])
+
+        return out

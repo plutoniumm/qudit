@@ -1,5 +1,6 @@
 from typing import Union, List
 import torch as pt
+import math
 
 
 def to_mixed(num: int, bases: List[int]) -> List[int]:
@@ -47,10 +48,10 @@ def LittleEndian(
     if isinstance(base, (list, tuple, pt.Tensor)):
         dims_list = [int(b) for b in base]
     else:
-        n = int(pt.log(pt.tensor(width)) / pt.log(pt.tensor(base)))
+        n = round(math.log(width, base))
         dims_list = [base] * n
 
-    if int(pt.prod(pt.tensor(dims_list))) != width:
+    if math.prod(dims_list) != width:
         raise ValueError
 
     out = pt.empty_like(state)

@@ -13,8 +13,8 @@ class Basis:
     """
     Computational basis factory for qudits of local dimension $d$.
 
-    Calling `Basis(d)(k_1,\\n\dots,\\n k_n)` returns the tensor-product basis ket
-    $|k_1\\rangle \otimes \cdots \otimes |k_n\\rangle$ as a normalized `State`.
+    Calling ``Basis(d)(k_1, \dots, k_n)`` returns the normalized ket
+    $|k_1\\rangle \otimes \cdots \otimes |k_n\\rangle$.
     """
 
     d: int
@@ -55,8 +55,6 @@ class State(np.ndarray):
     Exposes basic operations (dagger, trace, tensor product, projectors).
     """
 
-    # Avoid overriding ndarray's own attribute stubs; keep only loose extras.
-
     def __new__(cls, d: Any):
         """
         Create and normalize a statevector or density matrix.
@@ -75,6 +73,7 @@ class State(np.ndarray):
             raise ValueError("Input must be 1D (vector) or 2D (density matrix)")
 
         obj = arr.view(cls)
+
         return obj
 
     def __array_finalize__(self, obj: Any) -> None:
@@ -112,16 +111,16 @@ class State(np.ndarray):
         """
         if not self.isDensity:
             return State(self / np.linalg.norm(self))
+
         return State(self / self.tr().real)
 
     def density(self) -> "State":
         """
         Return density operator.
-
-        Vector: $\\rho = |\psi\\rangle\langle\psi|$; density: returns itself.
         """
         if not self.isDensity:
             return State(np.outer(self, self.conj()))
+
         return self
 
     @property
@@ -136,10 +135,11 @@ class State(np.ndarray):
 
     def tr(self) -> complex:
         """
-        Vector: returns $\langle\psi|\psi\\rangle$; density: returns $\mathrm{Tr}(\\rho)$.
+        Vector: returns $\langle\psi|\psi\\rangle$. density: returns $\mathrm{Tr}(\\rho)$.
         """
         if not self.isDensity:
             return complex(np.vdot(self, self))
+
         return complex(np.trace(self))
 
     def proj(self) -> "State":
@@ -155,6 +155,7 @@ class State(np.ndarray):
         for i in range(len(evals)):
             if np.abs(evals[i]) > 1e-8:
                 matrix += np.outer(evecs[:, i], evecs[:, i].conj())
+
         return State(matrix)
 
     def oproj(self) -> "State":
@@ -163,4 +164,5 @@ class State(np.ndarray):
         """
         proj = self.proj()
         perp = np.eye(proj.shape[0], dtype=np.complex128) - proj
+
         return State(perp)

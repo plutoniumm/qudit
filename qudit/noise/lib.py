@@ -1,22 +1,23 @@
 from typing import List, Any, Sequence, Optional, Union
 from .index import Channel, Multiplex
-from itertools import permutations
+from itertools import product
 from ..circuit.gates import Gate
 from .kraus import GAD, Pauli
-import numpy as np
+import torch as pt
 
-C128 = np.complex128
+C128 = pt.complex128
 
 
 def permut(lst: List[str], n: int) -> List[List[str]]:
-    """Return unique length-$n$ permutations of a list of symbols.
+    """
+    Return unique length-$n$ permutations of a list of symbols.
 
-    Used to enumerate Kraus-operator “words” (tensor-product factor choices).
+    Used to enumerate Kraus-operator "words" (tensor-product factor choices).
     """
     if n > len(lst):
         raise ValueError("n must be less than or equal to the length of lst")
 
-    return [list(p) for p in set(permutations(lst, n))]
+    return [list(p) for p in product(set(lst), repeat=n)]
 
 
 def mkron(args: Sequence[Any]) -> Any:
@@ -27,7 +28,7 @@ def mkron(args: Sequence[Any]) -> Any:
     """
     result = args[0]
     for i in range(1, len(args)):
-        result = np.kron(result, args[i])
+        result = pt.kron(result, args[i])
 
     return result
 
@@ -38,77 +39,65 @@ def ungroup(lst: List[List[Any]]) -> List[Any]:
 
 class IID:
     @staticmethod
-    def AD(n: int, y: float) -> "Multiplex":
-        A0 = np.array([[1, 0], [0, np.sqrt(1 - y)]])
-        A1 = np.array([[0, np.sqrt(y)], [0, 0]])
+    def AD(n: int, d: int, y: float) -> "Multiplex":
+        """
+        Independent identical amplitude-damping on each of $n$ qudits of dimension $d$.
 
+        Single-site Kraus set: $\\{A_k\\}_{k=0}^{d-1}$ from `GAD.A(k, d, y)`.
+        For $d=2$ this recovers the standard qubit amplitude-damping channel.
+        """
         channel_list = []
+        kraus_mats = [GAD.A(k, d, y) for k in range(d)]
         for i in range(n):
-            g0 = Gate(
-                A0,
-                index=[i],
-                wires=n,
-                dim=2,
-                name=f"A0_{i}",
-                params=[("y", y), ("i", i)],
-            )
-            g1 = Gate(
-                A1,
-                index=[i],
-                wires=n,
-                dim=2,
-                name=f"A1_{i}",
-                params=[("y", y), ("i", i)],
-            )
-
-            channel_list.append(Channel([[g0], [g1]]))
+            kraus_gates = [
+                Gate(
+                    m,
+                    index=[i],
+                    wires=n,
+                    dim=d,
+                    name=f"A{k}_{i}",
+                    params=[("y", y), ("i", i)],
+                )
+                for k, m in enumerate(kraus_mats)
+            ]
+            channel_list.append(Channel([[g] for g in kraus_gates]))
 
         return Multiplex(channel_list)
 
     @staticmethod
-    def GAD(n: int, y: float, p: float) -> "Multiplex":
-        A0 = np.sqrt(1 - p) * np.array([[1, 0], [0, np.sqrt(1 - y)]])
-        A1 = np.sqrt(1 - p) * np.array([[0, np.sqrt(y)], [0, 0]])
+    def GAD(n: int, d: int, y: float, p: float) -> "Multiplex":
+        """
+        Independent identical generalized amplitude-damping on each of $n$ qudits of dimension $d$.
 
-        R0 = np.sqrt(p) * np.array([[np.sqrt(1 - y), 0], [0, 1]])
-        R1 = np.sqrt(p) * np.array([[0, 0], [np.sqrt(y), 0]])
-
+        Single-site Kraus set: $\\{A_k, R_k\\}_{k=0}^{d-1}$ from `GAD.A/R(k, d, y, p)`.
+        For $d=2$ this recovers the standard qubit GAD channel.
+        """
         channel_list = []
+        A_mats = [GAD.A(k, d, y, p) for k in range(d)]
+        R_mats = [GAD.R(k, d, y, p) for k in range(d)]
         for i in range(n):
-            gA0 = Gate(
-                A0,
-                index=[i],
-                wires=n,
-                dim=2,
-                name=f"A0_{i}",
-                params=[("y", y), ("p", p), ("i", i)],
-            )
-            gA1 = Gate(
-                A1,
-                index=[i],
-                wires=n,
-                dim=2,
-                name=f"A1_{i}",
-                params=[("y", y), ("p", p), ("i", i)],
-            )
-            gR0 = Gate(
-                R0,
-                index=[i],
-                wires=n,
-                dim=2,
-                name=f"R0_{i}",
-                params=[("y", y), ("p", p), ("i", i)],
-            )
-            gR1 = Gate(
-                R1,
-                index=[i],
-                wires=n,
-                dim=2,
-                name=f"R1_{i}",
-                params=[("y", y), ("p", p), ("i", i)],
-            )
-
-            channel_list.append(Channel([[gA0], [gA1], [gR0], [gR1]]))
+            kraus_gates = [
+                Gate(
+                    m,
+                    index=[i],
+                    wires=n,
+                    dim=d,
+                    name=f"A{k}_{i}",
+                    params=[("y", y), ("p", p), ("i", i)],
+                )
+                for k, m in enumerate(A_mats)
+            ] + [
+                Gate(
+                    m,
+                    index=[i],
+                    wires=n,
+                    dim=d,
+                    name=f"R{k}_{i}",
+                    params=[("y", y), ("p", p), ("i", i)],
+                )
+                for k, m in enumerate(R_mats)
+            ]
+            channel_list.append(Channel([[g] for g in kraus_gates]))
 
         return Multiplex(channel_list)
 
@@ -135,15 +124,14 @@ class Process:
         Build an $n$-site generalized amplitude damping channel.
 
         Constructs tensor-product Kraus operators from single-site $A_k$ (lowering) and
-        $R_k$ (raising) terms, then groups/filters “correctable” subsets by total order.
+        $R_k$ (raising) terms, then groups/filters "correctable" subsets by total order.
         """
         assert isinstance(p, float), "p must be a float"
         assert isinstance(Y, float), "Y must be a float"
         assert p <= 1 and Y <= 1, "p,Y must be in [0, 1]"
 
         if iid:
-            assert d == 2, "IID GAD is only implemented for qubits (d=2)"
-            return IID.GAD(n, Y, p)
+            return IID.GAD(n, d, Y, p)
 
         def _op_gen(error_word: Sequence[str]) -> Optional[list[Gate]]:
             gates = []
@@ -151,15 +139,17 @@ class Process:
                 ord_val = int(tag[-1])
                 m = GAD.A(ord_val, d, Y, p) if "a" in tag else GAD.R(ord_val, d, Y, p)
 
-                if np.allclose(m, 0, atol=1e-8):
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
                     return None  # The whole tensor product is 0
 
                 # If it's not the identity, append the local gate
-                if not np.allclose(m, np.eye(d), atol=1e-8):
+                if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
                     gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"{tag}_{i}"))
+
             return gates
 
-        keys = list(permut(["a0", "a1", "r0", "r1"] * n, n))
+        base_tags = [f"a{k}" for k in range(d)] + [f"r{k}" for k in range(d)]
+        keys = list(permut(base_tags * n, n))
 
         Ak = []
         valid_keys = []
@@ -171,7 +161,7 @@ class Process:
 
         Ek: list[list[int]] = [[] for _ in range((order + 1) * 2 - 1)]
         for idx, key in enumerate(valid_keys):
-            s = np.sum([int(Em[-1]) for Em in key])
+            s = sum(int(Em[-1]) for Em in key)
             if s <= order:
                 if any("r" in i and int(i[-1]) > 0 for i in key):
                     Ek[2 * s - 1].append(idx)
@@ -196,20 +186,20 @@ class Process:
         assert Y <= 1, "Y must be in [0, 1]"
 
         if iid:
-            assert d == 2, "IID AD is only implemented for qubits (d=2)"
-            return IID.AD(n, Y)
+            return IID.AD(n, d, Y)
 
         def _op_gen(error_word: Sequence[str]) -> Optional[list[Gate]]:
             gates = []
             for i, tag in enumerate(error_word):
                 m = GAD.A(int(tag[-1]), d, Y)
-                if np.allclose(m, 0, atol=1e-8):
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
                     return None
-                if not np.allclose(m, np.eye(d), atol=1e-8):
+                if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
                     gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"{tag}_{i}"))
+
             return gates
 
-        keys = list(permut(["a0", "a1"] * n, n))
+        keys = list(permut([f"a{k}" for k in range(d)] * n, n))
 
         Ak = []
         valid_keys = []
@@ -221,7 +211,7 @@ class Process:
 
         Ek: list[list[int]] = [[] for _ in range(order + 1)]
         for idx, key in enumerate(valid_keys):
-            s = np.sum([int(Em[-1]) for Em in key])
+            s = sum(int(Em[-1]) for Em in key)
             if s <= order:
                 Ek[s].append(idx)
 
@@ -242,7 +232,7 @@ class Process:
         Build an $n$-site Pauli channel.
 
         Constructs tensor-product Kraus operators from $\{I,X,Y,Z\}$ with weights
-        derived from $p=[p_X,p_Y,p_Z]$, and groups “correctable” subsets by Hamming weight.
+        derived from $p=[p_X,p_Y,p_Z]$, and groups "correctable" subsets by Hamming weight.
         """
         if paulis is None:
             paulis = ["X", "Y", "Z"]
@@ -255,18 +245,24 @@ class Process:
             "Y": lambda p: Pauli.Y(p[1]),
             "Z": lambda p: Pauli.Z(p[2]),
         }
-        weight = {"I": 0, "X": 1, "Y": 1, "Z": 1}
+        weight = {
+            "I": 0,
+            "X": 1,
+            "Y": 1,
+            "Z": 1,
+        }
 
         def _op_gen(word: Sequence[str]) -> Optional[list[Gate]]:
             gates = []
             for i, gate_str in enumerate(word):
                 m = funcs[gate_str](p)
-                if np.allclose(m, 0, atol=1e-8):
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
                     return None
-                if gate_str != "I" and not np.allclose(m, np.eye(2), atol=1e-8):
+                if not pt.allclose(m, pt.eye(2, dtype=m.dtype), atol=1e-8):
                     gates.append(
                         Gate(m, index=[i], wires=n, dim=2, name=f"{gate_str}_{i}")
                     )
+
             return gates
 
         keys = list(permut((["I"] + paulis) * n, n))
@@ -281,7 +277,7 @@ class Process:
 
         Ek: list[list[int]] = [[] for _ in range(order + 1)]
         for idx, key in enumerate(valid_keys):
-            s = np.sum([weight[i] for i in key])
+            s = sum(weight[i] for i in key)
             if s <= order:
                 Ek[s].append(idx)
 

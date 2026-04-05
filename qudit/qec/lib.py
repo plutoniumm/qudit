@@ -1,6 +1,8 @@
 from .codes import Code
 import torch as pt
-import numpy as np
+import math
+import sys
+import os
 
 
 def Dutta3() -> Code:
@@ -22,6 +24,7 @@ def Dutta3() -> Code:
     code = pt.stack(
         [dutta_3_0 / pt.linalg.norm(dutta_3_0), dutta_3_1 / pt.linalg.norm(dutta_3_1)]
     )
+
     return Code(code)
 
 
@@ -66,9 +69,68 @@ def Perfect() -> Code:
         _0key = _0L_keys[i]
         _1key = _1L_keys[i]
 
-        _0L[np.abs(_0key)] = np.sign(_0key)
-        _1L[np.abs(_1key)] = np.sign(_1key)
+        _0L[abs(_0key)] = 1.0 if _0key >= 0 else -1.0
+        _1L[abs(_1key)] = 1.0 if _1key >= 0 else -1.0
 
     _0L[0] = 1
 
-    return Code(pt.stack([_0L, _1L]))
+    return Code(pt.stack([_0L / pt.linalg.norm(_0L), _1L / pt.linalg.norm(_1L)]))
+
+
+def Qutrit3() -> Code:
+    """
+    3-qutrit repetition code: three codewords $|0_L\\rangle=|000\\rangle$,
+    $|1_L\\rangle=|111\\rangle$, $|2_L\\rangle=|222\\rangle$.
+
+    Encodes one logical qutrit in three physical qutrits ($d^n=3^3=27$ dimensional space).
+    Detects (and with measurement corrects) single qutrit shift ($X_3$) errors.
+    """
+    cw = pt.zeros(3, 27)
+    cw[0, 0] = 1.0  # |000> = index 0
+    cw[1, 13] = 1.0  # |111> = 1*9 + 1*3 + 1 = 13
+    cw[2, 26] = 1.0  # |222> = 2*9 + 2*3 + 2 = 26
+
+    return Code(cw, d=3)
+
+
+def GottesmanD(d: int = 2) -> Code:
+    """
+    Gottesman-type CSS code for prime $d$: encodes one logical $d$-level qudit in $d$
+    physical qudits.
+
+    Codewords: $|j_L\\rangle = \\frac{1}{\\sqrt{d}}\\sum_{a=0}^{d-1}|a,\\,a{+}j,\\,a{+}2j,\\,\\ldots\\rangle \\pmod{d}$
+
+    For $d=2$: $|0_L\\rangle=(|00\\rangle+|11\\rangle)/\\sqrt{2}$, $|1_L\\rangle=(|01\\rangle+|10\\rangle)/\\sqrt{2}$.
+    For $d=3$: three orthonormal codewords on 3 physical qutrits (27-dimensional space).
+    """
+    n_phys = d
+    dim_total = d**n_phys
+    cws = []
+    norm = 1.0 / math.sqrt(d)
+    for j in range(d):
+        vec = pt.zeros(dim_total, dtype=pt.complex64)
+        for a in range(d):
+            idx = 0
+            for pos in range(n_phys):
+                digit = (a + pos * j) % d
+                idx = idx * d + digit
+            vec[idx] += norm
+        cws.append(vec)
+
+    return Code(pt.stack(cws), d=d)
+
+
+def Surface(m: int, n: int, d: int = 2, edge: str = "even", start: str = "X") -> Code:
+    """
+    Build an $m \times n$ surface code and return a ``Code`` spanning the stabilizer space.
+
+    Requires the ``surface/`` directory (containing ``stab.py``) at the repository root.
+    """
+    _surface = os.path.join(os.path.dirname(__file__), "../../surface")
+    if _surface not in sys.path:
+        sys.path.insert(0, _surface)
+    from stab import Stabilisers
+
+    stabs = Stabilisers(m, n, edge=edge, start=start)
+
+    return Code.fromStabilizers(stabs, d=d)

@@ -1,6 +1,9 @@
+import math
 from typing import List, Optional, Sequence, Union
 from scipy.optimize import minimize
 import torch as pt
+
+from ..circuit.gates import Gategen
 
 """
 # Statiliser: Usage
@@ -55,8 +58,10 @@ def GramSchmidt(vectors: Sequence[pt.Tensor]) -> pt.Tensor:
     ortho: List[pt.Tensor] = []
     for v in vectors:
         w = v - sum((v @ u.conj()) * u for u in ortho)
-        if pt.norm(w) > 1e-8:
-            ortho.append(w / pt.norm(w))
+        nrm = pt.norm(w)
+        if nrm > 1e-8:
+            ortho.append(w / nrm)
+            
     return pt.stack(ortho)
 
 
@@ -72,14 +77,33 @@ class Statiliser:
     num_states: int
     basis: Optional[pt.Tensor]
 
-    def __init__(self, stabilisers: Sequence[Union[str, pt.Tensor]]):
+    def __init__(self, stabilisers: Sequence[Union[str, pt.Tensor]], d: int = 2):
         """
         Create a generator for the subspace stabilised by ``stabilisers``.
         """
-        stabilisers = [S(s) if isinstance(s, str) else s for s in stabilisers]
+        self.d = d
+        gg = Gategen(dim=d)
+        self._ops = {
+            "I": pt.eye(d, dtype=pt.cfloat),
+            "X": gg.X.tensor.to(pt.cfloat),
+            "Z": gg.Z.tensor.to(pt.cfloat),
+            "Y": gg.Y.tensor.to(pt.cfloat),
+        }
+
+        def _str_to_tensor(string: str) -> pt.Tensor:
+            ops = [self._ops[c] for c in string]
+            state = ops[0]
+            for op in ops[1:]:
+                state = pt.kron(op, state)
+
+            return state
+
+        stabilisers = [
+            _str_to_tensor(s) if isinstance(s, str) else s for s in stabilisers
+        ]
         self.stabilisers = list(stabilisers)
-        self.sz = int(pt.log2(pt.tensor(stabilisers[0].shape[0])).item())
-        self.num_states = 2 ** (self.sz - len(stabilisers))
+        self.sz = int(math.log(stabilisers[0].shape[0], d))
+        self.num_states = d ** (self.sz - len(stabilisers))
         self.basis = None
 
     def _fun(self, x, mode: str = "real", minimal: int = 1) -> float:
@@ -91,7 +115,7 @@ class Statiliser:
         - small L1 penalty to prefer sparse-ish solutions (optional) which may help in finding vectors closer to their canonical form
         - L2 penalty to encourage normalisation
         """
-        vec = pt.tensor(x, dtype=pt.complex64)
+        vec = pt.as_tensor(x).to(pt.complex64)
         if mode != "real":
             vec = self._to_complex(vec)
 
@@ -106,6 +130,7 @@ class Statiliser:
         Interpret a real tensor as concatenated real/imag parts.
         """
         l = len(vec)
+
         return vec[: l // 2] + 1j * vec[l // 2 :]
 
     def generate(
@@ -123,7 +148,7 @@ class Statiliser:
         for _ in range(self.num_states):
             res = minimize(
                 self._fun,
-                x0=pt.rand(2**self.sz * factor).numpy(),
+                x0=pt.rand(self.d**self.sz * factor).numpy(),
                 args=(mode, int(minimal)),
                 method="Powell",
                 tol=tol,

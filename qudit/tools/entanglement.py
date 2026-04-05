@@ -1,27 +1,28 @@
 from scipy.optimize import minimize
 import numpy as np
+import torch as pt
 
 ROUNDOFF_TOL = 1e-6
 
 
-def Perp(basis: "np.ndarray | list") -> np.ndarray:
+def Perp(basis: "pt.Tensor | list") -> pt.Tensor:
     """
     Return the orthogonal projector onto the complement of a basis span.
 
     Given a list/array of vectors $\{ |b_i\\rangle \}$, forms
     $P = \sum_i |b_i\\rangle\langle b_i|$ and returns $I - P$.
     """
-    if not isinstance(basis, np.ndarray):
-        basis = np.array(basis)
+    if not isinstance(basis, pt.Tensor):
+        basis = pt.as_tensor(np.asarray(basis))
 
     projector = sum(
-        np.array([np.outer(basis[i], basis[i].conj().T) for i in range(len(basis))])
+        pt.stack([pt.outer(basis[i], basis[i].conj()) for i in range(len(basis))])
     )
 
-    return np.eye(len(basis[0])) - projector
+    return pt.eye(len(basis[0])) - projector
 
 
-def Loss(F: "np.matrix | np.ndarray", projector: np.ndarray) -> np.ndarray:
+def Loss(F: pt.Tensor, projector: pt.Tensor) -> pt.Tensor:
     """
     Quadratic form $\langle F | \Pi | F \\rangle$ used as an objective.
 
@@ -30,9 +31,9 @@ def Loss(F: "np.matrix | np.ndarray", projector: np.ndarray) -> np.ndarray:
     > [!NOTE]
     > for `np.ndarray`, `.H` may not exist; callers typically pass an `np.matrix`.
     """
-    prod = F.H.dot(projector).dot(F)  # type: ignore[attr-defined]
+    prod = F.H.dot(projector).dot(F)
 
-    return np.real_if_close(prod, tol=ROUNDOFF_TOL)
+    return prod.real
 
 
 def rank(f: object, D: int, r: int, **kwargs: object) -> float:
@@ -57,7 +58,7 @@ def rank(f: object, D: int, r: int, **kwargs: object) -> float:
     if "tries" in kwargs_any:
         del kwargs_any["tries"]
 
-    minimas = np.ones(tries)
+    minimas = pt.ones(tries)
     for i in range(tries):
         try:
             minimas[i] = minimize(
@@ -66,4 +67,4 @@ def rank(f: object, D: int, r: int, **kwargs: object) -> float:
         except Exception:
             pass
 
-    return float(np.min(minimas))
+    return float(pt.min(minimas).item())

@@ -76,6 +76,7 @@ class Fidelity:
         rho_new /= np.trace(rho_new)
 
         fid = np.dot(QR.conj().T, np.dot(rho_new, QR))
+
         return np.abs(fid)
 
     @staticmethod
@@ -126,6 +127,7 @@ class Fidelity:
         rho_pt = rho_pt.reshape(dim_A * dim_B, dim_A * dim_B)
         singular_values = np.linalg.svd(rho_pt, compute_uv=False)
         trace_norm = np.sum(singular_values)
+
         return float((trace_norm - 1) / 2)
 
 
@@ -139,7 +141,7 @@ class Entropy:
         """
         Default entropy (alias for von Neumann entropy).
         """
-        return float(Entropy.neumann(*args))  # type: ignore[attr-defined]
+        return float(Entropy.neumann(*args))
 
     @staticmethod
     def tsallis(rho: np.ndarray, q: float = 2.0, base: float = 2.0) -> float:
@@ -154,6 +156,7 @@ class Entropy:
 
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
+
         return float((1 - np.sum(eigenvalues**q)) / (q - 1))
 
     @staticmethod
@@ -162,6 +165,7 @@ class Entropy:
         Shannon entropy $H(p)=-\sum i p_i \log p_i$ for a probability vector.
         """
         probs = probs[probs > 1e-12]
+
         return float(-np.sum(probs * np.log(probs) / np.log(base)))
 
     @staticmethod
@@ -173,10 +177,12 @@ class Entropy:
         """
         if alpha == 1:
             return float(Entropy.neumann(rho, base=base))
+
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
+
         return float(np.log(np.sum(eigenvalues**alpha)) / ((1 - alpha) * np.log(base)))
 
     @staticmethod
@@ -185,6 +191,7 @@ class Entropy:
         Hartley entropy $H_0=\log |\mathrm{supp}(p)|$ for a probability vector.
         """
         support_size = np.count_nonzero(probs > 1e-12)
+
         return float(np.log(support_size) / np.log(base))
 
     @staticmethod
@@ -196,6 +203,7 @@ class Entropy:
 
         eigenvalues = np.linalg.eigvalsh(rho)
         eigenvalues = eigenvalues[eigenvalues > 1e-12]
+
         return float(-np.sum(eigenvalues * np.log(eigenvalues) / np.log(base)))
 
     @staticmethod
@@ -236,6 +244,7 @@ class Entropy:
         delta_log = log_rho - log_sigma
 
         result = np.trace(rho @ delta_log).real
+
         return float(result / np.log(base))
 
     @staticmethod
@@ -305,6 +314,7 @@ class Info:
         S_A = Entropy.default(rho_A)
         S_B = Entropy.default(rho_B)
         S_AB = Entropy.default(rho)
+
         return S_A + S_B - S_AB
 
     @staticmethod
@@ -349,6 +359,7 @@ class Distance:
         delta_log = log_rho - log_sigma
 
         result = np.trace(rho @ delta_log).real  # ensured
+
         return float(result / np.log(base))
 
     @staticmethod
@@ -375,6 +386,7 @@ class Distance:
         sigma = np.outer(sigma, sigma.conj()) if sigma.ndim == 1 else sigma
 
         m = 0.5 * (rho + sigma)
+
         return 0.5 * (
             Distance.relative_entropy(rho, m, base)
             + Distance.relative_entropy(sigma, m, base)

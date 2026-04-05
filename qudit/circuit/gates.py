@@ -1,8 +1,11 @@
+from functools import cached_property
 from typing import List, Optional, Union, Callable, Any, Tuple
 from .. import State
 import torch.nn as nn
 import numpy as np
 import torch
+import cmath
+import math
 
 C64 = torch.complex64
 
@@ -45,6 +48,7 @@ class Operator:
             tensor = torch.kron(self.tensor, other.tensor)
             name = f"{self.name} ^ {other.name}"
             params = self.params + other.params
+
             return Operator(tensor, name, params)
 
         # Operator ^ Gate
@@ -52,17 +56,20 @@ class Operator:
             tensor = torch.kron(self.tensor, other.matrix())
             name = f"{self.name} ^ {other.name}"
             params = self.params + list(other.params)
+
             return Operator(tensor, name, params)
 
         # Operator ^ Tensor
         if isinstance(other, torch.Tensor):
             tensor = torch.kron(self.tensor, other)
             name = f"{self.name} ^ Tensor"
+
             return Operator(tensor, name)
 
         # Operator ^ State
         if isinstance(other, State):
             tensor = torch.kron(self.tensor, other.tensor if hasattr(other, "tensor") else other)  # type: ignore[arg-type]
+
             return State(tensor)  # type: ignore[call-arg]
 
         raise TypeError("Can only tensor product with Operator, Gate, Tensor, or State")
@@ -72,6 +79,7 @@ class Operator:
             tensor = torch.kron(other.matrix(), self.tensor)
             name = f"{other.name} ^ {self.name}"
             params = list(other.params) + list(self.params)
+
             return Operator(tensor, name, params)
 
         return NotImplemented
@@ -85,11 +93,13 @@ class Operator:
             tensor = self.tensor @ other.tensor
             name = f"{self.name} @ {other.name}"
             params = self.params + other.params
+
             return Operator(tensor, name, params)
         # Operator @ Tensor
         elif isinstance(other, torch.Tensor):
             tensor = self.tensor @ other
             name = f"{self.name} @ Tensor"
+
             return Operator(tensor, name)
         else:
             raise TypeError("Can only apply to State or compose with another Operator")
@@ -125,7 +135,7 @@ def tensorise(m: Any, device: str = "cpu", dtype: torch.dtype = C64) -> torch.Te
 
 def gell_mann(j: int, k: int, d: int, device: str = "cpu") -> torch.Tensor:
     """
-    Return a (generalized) Gell-Mann generator $\lambdaλ_{jk}$ for $SU(d)$.
+    Return a generalized Gell-Mann generator $\lambda_{jk}$ for $SU(d)$.
     """
     m = torch.zeros((d, d), dtype=C64, device=device)
 
@@ -133,14 +143,14 @@ def gell_mann(j: int, k: int, d: int, device: str = "cpu") -> torch.Tensor:
         m[j, k] = 1.0
         m[k, j] = 1.0
     elif j > k:
-        m[k, j] = torch.tensor(-1j, dtype=C64, device=device)
-        m[j, k] = torch.tensor(1j, dtype=C64, device=device)
+        m[k, j] = -1j
+        m[j, k] = 1j
     else:
         l = j + 1
         if l >= d:
             return torch.eye(d, dtype=C64, device=device)
 
-        scale = np.sqrt(2 / (l * (l + 1)))
+        scale = math.sqrt(2 / (l * (l + 1)))
         for i in range(l):
             m[i, i] = scale
         m[l, l] = -l * scale
@@ -189,9 +199,9 @@ class Gate(nn.Module):
         self.name = name
         self.params = list(params) if params is not None else []
 
-        self.total_dim = int(np.prod(self.dims))
+        self.total_dim = math.prod(self.dims)
         self.target_dims = [self.dims[i] for i in self.index]
-        self.target_size = int(np.prod(self.target_dims))
+        self.target_size = math.prod(self.target_dims)
 
         self.U = tensorise(matrix, device=device)
         if self.U.shape != (self.target_size, self.target_size):
@@ -203,7 +213,7 @@ class Gate(nn.Module):
         self.unused = [i for i in self.all if i not in self.index]
         self.perm = self.index + self.unused
 
-        self.inv_perm = [self.perm.index(i) for i in range(self.wires)]
+        self.inv_perm = list(np.argsort(self.perm))
 
         self.rest_size = self.total_dim // self.target_size
 
@@ -231,7 +241,7 @@ class Gate(nn.Module):
         psi = psi.permute(*perm)
 
         # Flatten for matrix multiplication: (target_size, rest_size * prod(trailing_dims))
-        trailing_size = int(np.prod(trailing_dims)) if trailing_dims else 1
+        trailing_size = math.prod(trailing_dims) if trailing_dims else 1
         psi_flat = psi.reshape(self.target_size, self.rest_size * trailing_size)
 
         # Apply the target unitary
@@ -249,16 +259,16 @@ class Gate(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Apply the embedded unitary to a statevector: \rho \rightarrow U |\psi \rangle
+        Apply the embedded unitary to a statevector: $|\psi\\rangle \mapsto U|\psi\\rangle$.
         """
         out = self._left(x)
         # Ensure it outputs a column vector (D, 1) to match your original API behavior
+
         return out.view(self.total_dim, 1)
 
     def forwardd(self, rho: torch.Tensor) -> torch.Tensor:
         """
-        Apply the unitary channel to a density matrix as \rho \rightarrow U \rho U^\dagger.
-        Optimized to avoid full matrix materialization.
+        Apply the unitary channel to a density matrix: $\\rho \mapsto U\\rho U^\dagger$.
         """
         # 1. Apply U on the left: U \rho
         rho_prime = self._left(rho)
@@ -270,6 +280,7 @@ class Gate(nn.Module):
         out_dagger = self._left(rho_prime_dagger)
 
         # 4. Conjugate transpose back to get: (U (U \rho)^\dagger)^\dagger = U \rho U^\dagger
+
         return out_dagger.conj().T
 
     def matrix(self) -> torch.Tensor:
@@ -293,12 +304,14 @@ class Gate(nn.Module):
             mat = U_full @ tensorise(other.tensor, device=self.device)
             name = f"{self.name} @ {other.name}"
             params = list(self.params) + list(other.params)
+
             return Operator(mat, name, params)
         # Tensor-like
         elif isinstance(other, torch.Tensor):
             U_full = self.matrix()
             mat = U_full @ other.to(device=self.device, dtype=C64)
             name = f"{self.name} @ Tensor"
+
             return Operator(mat, name)
         else:
             raise TypeError("Can only apply Gate to State, Operator, or Tensor")
@@ -316,14 +329,14 @@ class Gategen:
         self.dim = dim
         self.device = device
 
-    @property
+    @cached_property
     def I(self) -> Operator:
         """
         Identity gate on one qudit such that $I|k\\rangle = |k\\rangle$ for all states $|k\\rangle$.
         """
         return Operator(torch.eye(self.dim, dtype=C64, device=self.device), "I")
 
-    @property
+    @cached_property
     def H(self) -> Operator:
         """
         Hadamard/DFT gate (H for d=2, discrete Fourier transform for $d$>2) such that $H|k\\rangle = \\frac{1}{\sqrt{d}} \sum_{j=0}^{d-1} \omega^{jk} |j\\rangle$ where $\omega = e^{2\\pi i / d}$.
@@ -332,14 +345,15 @@ class Gategen:
         if d == 2:
             m = torch.tensor(
                 [[1, 1], [1, -1]], dtype=C64, device=self.device
-            ) / np.sqrt(2)
+            ) / math.sqrt(2)
         else:
-            w = np.exp(2j * torch.pi / d)
+            w = cmath.exp(2j * math.pi / d)
             idx = torch.arange(d, device=self.device)
-            m = (w ** torch.outer(idx, idx)) / np.sqrt(d)
+            m = (w ** torch.outer(idx, idx)) / math.sqrt(d)
+
         return Operator(m.to(dtype=C64), "H")
 
-    @property
+    @cached_property
     def X(self) -> Operator:
         """
         Generalized X (cyclic shift) gate as $X|k\\rangle = |k+1 \mod d\\rangle$ (Pauli-X for $d=2$).
@@ -353,21 +367,22 @@ class Gategen:
 
         return Operator(m, "X")
 
-    @property
+    @cached_property
     def Z(self) -> Operator:
         """
-        Generalized Z (phase) gate: diag(ω^k) as $Z|k\\rangle = \omega^k |k\\rangle$ where $\omega = e^{2\\pi i / d}$ (Pauli-Z for $d=2$).
+        Generalized Z (phase) gate: $Z|k\\rangle = \omega^k|k\\rangle$ where $\omega = e^{2\pi i/d}$ (Pauli-$Z$ for $d=2$).
         """
         d = self.dim
         if d == 2:
             m = torch.tensor([[1, 0], [0, -1]], dtype=C64, device=self.device)
         else:
-            w = np.exp(2j * torch.pi / d)
+            w = cmath.exp(2j * math.pi / d)
             idx = torch.arange(d, device=self.device)
             m = torch.diag(w**idx)
+
         return Operator(m, "Z")
 
-    @property
+    @cached_property
     def Y(self) -> Operator:
         """
         Generalized Y (up to phase), built from Z and X (Pauli-Y for d=2) as $Y = Z X / i$ such that $Y|k\\rangle = -i \omega^k |k+1 \mod d\\rangle$.
@@ -377,6 +392,7 @@ class Gategen:
             m = torch.tensor([[0, -1j], [1j, 0]], dtype=C64, device=self.device)
         else:
             m = torch.matmul(self.Z.tensor, self.X.tensor) / 1j
+
         return Operator(m, "Y")
 
     def inCircuit(self, kwargs: dict) -> bool:
@@ -472,6 +488,7 @@ class Gategen:
 
         if needs_grad:
             build_fn = _gmr_factory(j, k, type, self.dim, self.device)
+
             return VarGate(
                 build_fn,
                 orig_angle,
@@ -521,7 +538,7 @@ class Gategen:
         self, U_target: Any = None, *, matrix: bool = False, **kwargs: Any
     ) -> Union[Operator, Gate]:
         """
-        Controlled-unitary: apply target block when control is in a chosen computational state such that when $U_target$ is a dxd unitary matrix, $CU = |0\\rangle\\langle 0| \\otimes I + |1\\rangle\\langle 1| \\otimes U$ (generalized CNOT for $U=X$ and $d=2$).
+        Controlled-unitary: apply target block when control is in a chosen computational state such that when $U_\mathrm{target}$ is a $d \times d$ unitary, $CU = |0\\rangle\langle 0| \otimes I + |1\\rangle\langle 1| \otimes U$ (generalized CNOT for $U=X$ and $d=2$).
         """
         d = self.dim
 
@@ -553,6 +570,7 @@ class Gategen:
         wires = kwargs.pop("wires")
         dim = kwargs.pop("dim")
         name = kwargs.pop("name", None)
+
         return Gate(
             m,
             index=index,
@@ -563,14 +581,14 @@ class Gategen:
             params=gate_params,
         )
 
-    @property
+    @cached_property
     def CX(self) -> Operator:
         """
         Controlled-X (generalized CNOT) as a standalone dense gate as $CX = CU(X)$ where the target is the generalized X/shift gate.
         """
         return self.CU(self.X, matrix=True)  # type: ignore[return-value]
 
-    @property
+    @cached_property
     def SWAP(self) -> Operator:
         """
         SWAP gate exchanging two d-dimensional subsystems such that $SWAP|a,b\\rangle = |b,a\\rangle$.
@@ -582,6 +600,7 @@ class Gategen:
                 row = i * d + j
                 col = j * d + i
                 m[col, row] = 1.0
+
         return Operator(m, "SWAP")
 
     def U(self, matrix: Any, **kwargs: Any) -> Callable[[Any, int, Any], Gate]:
@@ -590,14 +609,18 @@ class Gategen:
         name = kwargs.get("name") or "U"
 
         def factory(dim: Any, wires: int, index: Any, **kwargs: Any) -> Gate:
-            """Create a Gate instance for given system dimensions/wires and target index set."""
+            """
+            Create a Gate instance for given system dimensions/wires and target index set.
+            """
             params = kwargs.get("params")
+
             return Gate(
                 t, index, wires, dim, device=self.device, name=name, params=params
             )
 
         gate = factory
-        gate.name = name  # type: ignore[attr-defined]
+        gate.name = name
+
         return gate
 
 
@@ -629,6 +652,7 @@ def _gmr_factory(
             def build_fn(angle: torch.Tensor) -> torch.Tensor:
                 c = torch.cos(angle / 2).to(dtype=C64_)
                 s = torch.sin(angle / 2).to(dtype=C64_)
+
                 return (
                     I_rest + c * E_aa + c * E_bb + (-1j * s) * E_ab + (-1j * s) * E_ba
                 )
@@ -638,6 +662,7 @@ def _gmr_factory(
             def build_fn(angle: torch.Tensor) -> torch.Tensor:
                 c = torch.cos(angle / 2).to(dtype=C64_)
                 s = torch.sin(angle / 2).to(dtype=C64_)
+
                 return I_rest + c * E_aa + c * E_bb + (-s) * E_ab + s * E_ba
 
     else:  # diag
@@ -645,6 +670,7 @@ def _gmr_factory(
 
         def build_fn(angle: torch.Tensor) -> torch.Tensor:
             ang = angle.to(dtype=C64_)
+
             return torch.matrix_exp(-1j * (ang / 2) * gen)
 
     return build_fn
@@ -689,8 +715,6 @@ class VarGate(Gate):
         )
         self._build_fn = build_fn
         if isinstance(angle, nn.Parameter):
-            # Caller owns this parameter;  bypass Module registration so it isn't
-            # double-counted in parameters() and optimizer updates.
             object.__setattr__(self, "angle", angle)
         else:
             self.angle = nn.Parameter(angle_val)
@@ -709,14 +733,14 @@ class NoisyGate(Gate):
     A per-wire noise channel applied after each gate in `Mode.NOISY` circuits.
 
     Subclasses Gate to reuse all wire-permutation logic (perm, inv_perm, target_size, etc.).
-    The placeholder zeros matrix passed to Gate.__init__ is never used; instead, Kraus
+    The placeholder zeros matrix passed to Gate.__init__ is never used, instead Kraus
     operators are computed live in `forwardd` from `self.param` via differentiable ops
     of the form `scalar(param) * constant_buffer`.
 
     Supported noise types: "depolarizing", "amplitude_damping", "phase_damping", "pauli".
     """
 
-    SUPPORTED = ("depolarizing", "amplitude_damping", "phase_damping", "pauli")
+    SUPPORTED = ("depolarizing", "amplitude_damping", "phase_damping", "pauli", "weyl")
 
     def __init__(
         self,
@@ -732,7 +756,7 @@ class NoisyGate(Gate):
         ), f"noise_type must be one of {self.SUPPORTED}"
         idx = index if isinstance(index, list) else [index]
         dim_list = [dims] * wires if isinstance(dims, int) else dims
-        d_local = int(np.prod([dim_list[i] for i in idx]))
+        d_local = math.prod([dim_list[i] for i in idx])
 
         super().__init__(
             matrix=torch.zeros(d_local, d_local, dtype=C64),
@@ -755,30 +779,41 @@ class NoisyGate(Gate):
         self._register_bases()
 
     def _register_bases(self) -> None:
-        """Pre-compute constant basis matrices as buffers (no grad, computed once)."""
+        """
+        Pre-compute constant basis matrices as buffers (no grad, computed once).
+        """
         d = self.target_size
         dev = self.device
 
         if self.noise_type == "amplitude_damping":
-            assert d == 2, "amplitude_damping requires d=2 (qubit) wires"
-            self.register_buffer(
-                "_b_I00", torch.tensor([[1, 0], [0, 0]], dtype=C64, device=dev)
-            )
-            self.register_buffer(
-                "_b_I11", torch.tensor([[0, 0], [0, 1]], dtype=C64, device=dev)
-            )
-            self.register_buffer(
-                "_b_raise", torch.tensor([[0, 1], [0, 0]], dtype=C64, device=dev)
-            )
+            # K_0 = |0><0| + sqrt(1-Y) * (I - |0><0|)
+            # K_k = sqrt(Y) * |k-1><k|  for k = 1..d-1
+            I00 = torch.zeros(d, d, dtype=C64, device=dev)
+            I00[0, 0] = 1.0
+            self.register_buffer("_b_I00", I00)
+            higher = torch.eye(d, dtype=C64, device=dev) - I00
+            self.register_buffer("_b_higher", higher)
+            jumps = []
+            for k in range(1, d):
+                jmp = torch.zeros(d, d, dtype=C64, device=dev)
+                jmp[k - 1, k] = 1.0
+                jumps.append(jmp)
+            self.register_buffer("_b_jumps", torch.stack(jumps))  # (d-1, d, d)
 
         elif self.noise_type == "phase_damping":
-            assert d == 2, "phase_damping requires d=2 (qubit) wires"
-            self.register_buffer(
-                "_b_I00", torch.tensor([[1, 0], [0, 0]], dtype=C64, device=dev)
-            )
-            self.register_buffer(
-                "_b_I11", torch.tensor([[0, 0], [0, 1]], dtype=C64, device=dev)
-            )
+            # K_0 = |0><0| + sqrt(1-λ) * (I - |0><0|)
+            # K_k = sqrt(λ) * |k><k|  for k = 1..d-1
+            I00 = torch.zeros(d, d, dtype=C64, device=dev)
+            I00[0, 0] = 1.0
+            self.register_buffer("_b_I00", I00)
+            higher = torch.eye(d, dtype=C64, device=dev) - I00
+            self.register_buffer("_b_higher", higher)
+            projs = []
+            for k in range(1, d):
+                proj = torch.zeros(d, d, dtype=C64, device=dev)
+                proj[k, k] = 1.0
+                projs.append(proj)
+            self.register_buffer("_b_projs", torch.stack(projs))  # (d-1, d, d)
 
         elif self.noise_type == "depolarizing":
             if d == 2:
@@ -815,6 +850,26 @@ class NoisyGate(Gate):
                 "_b_Z", torch.tensor([[1, 0], [0, -1]], dtype=C64, device=dev)
             )
 
+        elif self.noise_type == "weyl":
+            # Heisenberg-Weyl displacement operators W_mn = X^m Z^n, (m,n) != (0,0)
+            # X = cyclic shift, Z = clock (diagonal phase)
+            omega = torch.exp(torch.tensor(2j * math.pi / d, dtype=C64, device=dev))
+            X = torch.zeros(d, d, dtype=C64, device=dev)
+            for j in range(d):
+                X[j, (j - 1) % d] = 1.0
+            Z = torch.diag(torch.stack([omega**k for k in range(d)]))
+            # build all W_mn for (m,n) in {0..d-1}^2 \ {(0,0)}
+            weyl_ops = []
+            for m in range(d):
+                Xm = torch.linalg.matrix_power(X, m)
+                for n in range(d):
+                    if m == 0 and n == 0:
+                        continue
+                    Zn = torch.linalg.matrix_power(Z, n)
+                    weyl_ops.append(Xm @ Zn)
+            self.register_buffer("_b_weyl", torch.stack(weyl_ops))  # (d²-1, d, d)
+            self.register_buffer("_b_I_weyl", torch.eye(d, dtype=C64, device=dev))
+
     def _kraus_ops(self) -> List[torch.Tensor]:
         """
         Return Kraus matrices as `scalar(param) * constant_buffer`.
@@ -822,15 +877,15 @@ class NoisyGate(Gate):
         """
         if self.noise_type == "amplitude_damping":
             g = self.param.clamp(0, 1).to(C64)
-            K0 = self._b_I00 + torch.sqrt(1 - g) * self._b_I11  # type: ignore[attr-defined]
-            K1 = torch.sqrt(g) * self._b_raise  # type: ignore[attr-defined]
-            return [K0, K1]
+            K0 = self._b_I00 + torch.sqrt(1 - g) * self._b_higher
+
+            return [K0] + list(torch.sqrt(g) * self._b_jumps)
 
         elif self.noise_type == "phase_damping":
             lam = self.param.clamp(0, 1).to(C64)
-            K0 = self._b_I00 + torch.sqrt(1 - lam) * self._b_I11  # type: ignore[attr-defined]
-            K1 = torch.sqrt(lam) * self._b_I11  # type: ignore[attr-defined]
-            return [K0, K1]
+            K0 = self._b_I00 + torch.sqrt(1 - lam) * self._b_higher
+
+            return [K0] + list(torch.sqrt(lam) * self._b_projs)
 
         elif self.noise_type == "depolarizing":
             p = self.param.clamp(0, 1)
@@ -838,6 +893,7 @@ class NoisyGate(Gate):
             if d == 2:
                 r = torch.sqrt(1 - p).to(C64)
                 s = torch.sqrt(p / 3).to(C64)
+
                 return [
                     r * self._b_I,
                     s * self._b_X,
@@ -851,20 +907,30 @@ class NoisyGate(Gate):
                 r = torch.sqrt(1 - p).to(C64)
                 s = torch.sqrt(p / n_extra).to(C64)
                 gms = self._b_gm  # shape (d^2, d, d)
-                return [r * gms[0]] + [s * gms[j] for j in range(1, len(gms))]
 
-        else:  # pauli
+                return [r * gms[0]] + list(s * gms[1:])
+
+        elif self.noise_type == "pauli":
             px = self.param[0].clamp(0, 1)
             py = self.param[1].clamp(0, 1)
             pz = self.param[2].clamp(0, 1)
             p_sum = (px + py + pz).clamp(max=1)
             r = torch.sqrt(1 - p_sum).to(C64)
+
             return [
                 r * self._b_I,
                 torch.sqrt(px).to(C64) * self._b_X,
                 torch.sqrt(py).to(C64) * self._b_Y,
                 torch.sqrt(pz).to(C64) * self._b_Z,
             ]
+
+        else:  # weyl
+            # param has d²-1 entries (probabilities for each W_mn, (m,n)!=(0,0))
+            p = self.param.clamp(0, 1)
+            p_sum = p.sum().clamp(max=1)
+            r = torch.sqrt(1 - p_sum).to(C64)
+
+            return [r * self._b_I_weyl] + list(torch.sqrt(p).to(C64).view(-1, 1, 1) * self._b_weyl)
 
     def forwardd(self, rho: torch.Tensor) -> torch.Tensor:
         """
@@ -873,11 +939,11 @@ class NoisyGate(Gate):
         """
         rho_out = torch.zeros_like(rho)
         for K in self._kraus_ops():
-            K = K.to(dtype=C64, device=self.device)
             rho_prime = self._left(rho, K)
             rho_prime_T = rho_prime.conj().T
             out_T = self._left(rho_prime_T, K)
             rho_out = rho_out + out_T.conj().T
+
         return rho_out
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

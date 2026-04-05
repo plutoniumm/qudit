@@ -18,8 +18,8 @@ class Recovery:
         word: List[Gate], total_dim: int, device: pt.device, dtype: pt.dtype
     ) -> pt.Tensor:
         """
-        Efficiently materializes the full d^n x d^n matrix for a Kraus word
-        by passing an identity matrix through the localized _left() calls.
+        Materialize the full $d^n \times d^n$ matrix for a Kraus word by
+        passing an identity through the localized `_left()` calls.
         """
         Ek_mat = pt.eye(total_dim, dtype=dtype, device=device)
 
