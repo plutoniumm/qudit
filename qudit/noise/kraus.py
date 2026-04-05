@@ -22,7 +22,9 @@ class GAD:
         determined by $(Y,p)$.
         """
         k = order
+
         assert isinstance(k, int) and k >= 0, "k must be int>=0"
+
         assert isinstance(d, int) and d > 0, "d must be int>0"
 
         obj = pt.zeros((d, d), dtype=C128)

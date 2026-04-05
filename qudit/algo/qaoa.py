@@ -24,11 +24,6 @@ class QUBO:
         Convert a QUBO problem defined by matrix Q into a Hamiltonian representation.
 
         Function iterates over `Q` constructs Hamiltonian in terms of Pauli Z ops. Linear terms are (where $i = j$) and quadratic terms are (where $i \\neq j$). The resulting Hamiltonian is `list[tuple]`, where
-
-        ```py
-        # (coefficient, gate_type, indices)
-        type Term = tuple[float, str, list[int]]
-        ```
         """
         ising = {}
         offset = 0.0
@@ -235,10 +230,10 @@ class ClockSolver(nn.Module):
     Variational qudit optimizer using direct matrix exponentiation (clock/Potts model).
 
     Works for any local dimension $d \geq 2$. Each layer applies a phase separator
-    $U_P(\gamma) = \exp(-i\gamma H_P)$ and a mixer $U_B(\beta) = \exp(-i\beta H_B)$
+    $U_P(\gamma) = \exp(-i\gamma H_P)$ and a mixer $U_B(\\beta) = \exp(-i\\beta H_B)$
     where $H_B = -\sum_i(X_d^{(i)} + X_d^{(i)\dagger})$.
 
-    Initial state: $H_d|0\\rangle^{\otimes n}$. Parameters $\gamma, \beta$ are optimized with Adam.
+    Initial state: $H_d|0\\rangle^{\otimes n}$. Parameters $\gamma, \\beta$ are optimized with Adam.
     """
 
     d: int
@@ -330,7 +325,7 @@ class ClockSolver(nn.Module):
 
     def forward(self) -> pt.Tensor:
         """
-        Return the QAOA state $|\psi(\gamma, \beta)\\rangle$ as a complex vector of length $d^n$.
+        Return the QAOA state $|\psi(\gamma, \\beta)\\rangle$ as a complex vector of length $d^n$.
         """
         gg = GG.Gategen(dim=self.d, device=self.device)
         ket0 = pt.zeros(self.d, dtype=C64, device=self.device)

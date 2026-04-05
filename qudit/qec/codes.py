@@ -40,7 +40,7 @@ def SVD_RRF(P: pt.Tensor, target_rank=2) -> pt.Tensor:
     Y = P @ Omega
     Q = LA.qr(Y, mode="reduced")[0]
 
-    return Q.T  # rows=vectors
+    return Q.T
 
 
 def SVD_RRF_np(P, target_rank=2):
@@ -49,7 +49,7 @@ def SVD_RRF_np(P, target_rank=2):
     Y = P @ Omega
     Q = SLA.qr(Y, mode="economic", overwrite_a=True, check_finite=False)[0]
 
-    return pt.from_numpy(Q.T)  # rows=vectors
+    return pt.from_numpy(Q.T)
 
 
 class Code:
@@ -107,7 +107,7 @@ class Code:
 
         The `d` parameter sets the local dimension (default 2 for qubits). For d>2, `X` and `Z` are the generalized Weyl operators from `Gategen`.
         """
-        assert method in ["svd", "rrf"]
+        assert method in ["svd", "rrf"], f"method must be 'svd' or 'rrf', got '{method}'"
         if isinstance(stabilizers[0], str):
             stabilizers = [list(s) for s in stabilizers]
         gg = Gategen(dim=d)

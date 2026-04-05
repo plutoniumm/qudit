@@ -78,7 +78,6 @@ class Channel:
         Apply the channel in Kraus form: $\\rho \mapsto \sum_k E_k\\rho E_k^{\dagger}$.
         Executes localized gate operations via `forwardd`.
         """
-        # Convert State to density matrix if needed
         if hasattr(rho, "isDensity"):
             if not rho.isDensity:
                 rho = rho.density()
@@ -99,11 +98,9 @@ class Channel:
 
         rho_out = pt.zeros_like(tensor_rho)
 
-        # Apply each Kraus operator (which is a sequence of local gates)
         for kraus_word in self.ops:
             rho_branch = tensor_rho.clone()
 
-            # Apply local U \rho U^\dagger for each gate in the word
             for g in kraus_word:
                 rho_branch = g.forwardd(rho_branch)
 

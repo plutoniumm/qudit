@@ -68,9 +68,9 @@ class Operator:
 
         # Operator ^ State
         if isinstance(other, State):
-            tensor = torch.kron(self.tensor, other.tensor if hasattr(other, "tensor") else other)  # type: ignore[arg-type]
+            tensor = torch.kron(self.tensor, other.tensor if hasattr(other, "tensor") else other)
 
-            return State(tensor)  # type: ignore[call-arg]
+            return State(tensor)
 
         raise TypeError("Can only tensor product with Operator, Gate, Tensor, or State")
 
@@ -87,7 +87,8 @@ class Operator:
     def __matmul__(self, other: Any) -> Any:
         # Operator @ State
         if isinstance(other, State):
-            return State(self.tensor @ (other.tensor if hasattr(other, "tensor") else other))  # type: ignore[call-arg]
+            return State(self.tensor @ (other.tensor if hasattr(other, "tensor") else other))
+
         # Operator @ Operator
         elif isinstance(other, Operator):
             tensor = self.tensor @ other.tensor
@@ -95,6 +96,7 @@ class Operator:
             params = self.params + other.params
 
             return Operator(tensor, name, params)
+
         # Operator @ Tensor
         elif isinstance(other, torch.Tensor):
             tensor = self.tensor @ other
@@ -297,7 +299,8 @@ class Gate(nn.Module):
     def __matmul__(self, other: Any) -> Any:
         # State
         if isinstance(other, State):
-            return State(self.forward(other.tensor if hasattr(other, "tensor") else other))  # type: ignore[call-arg]
+            return State(self.forward(other.tensor if hasattr(other, "tensor") else other))
+
         # Operator
         elif isinstance(other, Operator):
             U_full = self.matrix()
@@ -306,6 +309,7 @@ class Gate(nn.Module):
             params = list(self.params) + list(other.params)
 
             return Operator(mat, name, params)
+
         # Tensor-like
         elif isinstance(other, torch.Tensor):
             U_full = self.matrix()
@@ -538,7 +542,7 @@ class Gategen:
         self, U_target: Any = None, *, matrix: bool = False, **kwargs: Any
     ) -> Union[Operator, Gate]:
         """
-        Controlled-unitary: apply target block when control is in a chosen computational state such that when $U_\mathrm{target}$ is a $d \times d$ unitary, $CU = |0\\rangle\langle 0| \otimes I + |1\\rangle\langle 1| \otimes U$ (generalized CNOT for $U=X$ and $d=2$).
+        Controlled-unitary: apply target block when control is in a chosen computational state such that when $U_\mathrm{target}$ is a $d \\times d$ unitary, $CU = |0\\rangle\langle 0| \otimes I + |1\\rangle\langle 1| \otimes U$ (generalized CNOT for $U=X$ and $d=2$).
         """
         d = self.dim
 
@@ -586,7 +590,7 @@ class Gategen:
         """
         Controlled-X (generalized CNOT) as a standalone dense gate as $CX = CU(X)$ where the target is the generalized X/shift gate.
         """
-        return self.CU(self.X, matrix=True)  # type: ignore[return-value]
+        return self.CU(self.X, matrix=True)
 
     @cached_property
     def SWAP(self) -> Operator:

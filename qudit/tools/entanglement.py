@@ -43,7 +43,7 @@ def rank(f: object, D: int, r: int, **kwargs: object) -> float:
     Runs `scipy.optimize.minimize` from several random initial points and returns the
     smallest objective value found.
     """
-    kwargs_any = dict(kwargs)  # type: ignore[arg-type]
+    kwargs_any = dict(kwargs)
 
     if "method" not in kwargs_any:
         kwargs_any["method"] = "Powell"

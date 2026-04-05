@@ -44,9 +44,9 @@ class partial:
         rho = pt.as_tensor(rho, dtype=pt.complex128).reshape(dA, dB, dA, dB)
 
         if keep == "A":
-            return pt.einsum("abcb->ac", rho)  # Result: shape (dA, dA)
+            return pt.einsum("abcb->ac", rho)
         elif keep == "B":
-            return pt.einsum("abac->bc", rho)  # Result: shape (dB, dB)
+            return pt.einsum("abac->bc", rho)
         else:
             raise ValueError("keep must be 'A' or 'B'")
 

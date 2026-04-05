@@ -4,10 +4,10 @@ import math
 
 
 def to_mixed(num: int, bases: List[int]) -> List[int]:
-    assert len(bases) >= 1
+    assert len(bases) >= 1, "bases must be non-empty"
 
     for b in bases:
-        assert b >= 2
+        assert b >= 2, f"each base must be >= 2, got {b}"
 
     n = len(bases)
     digits: List[int] = [0] * n
@@ -24,7 +24,7 @@ def to_mixed(num: int, bases: List[int]) -> List[int]:
 
 
 def fr_mixed(digits: List[int], bases: List[int]) -> int:
-    assert len(digits) == len(bases) and len(bases) >= 1
+    assert len(digits) == len(bases) and len(bases) >= 1, "digits and bases must have equal non-zero length"
     num = 0
 
     for d, b in zip(digits, bases):

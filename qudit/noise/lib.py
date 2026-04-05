@@ -127,7 +127,9 @@ class Process:
         $R_k$ (raising) terms, then groups/filters "correctable" subsets by total order.
         """
         assert isinstance(p, float), "p must be a float"
+
         assert isinstance(Y, float), "Y must be a float"
+
         assert p <= 1 and Y <= 1, "p,Y must be in [0, 1]"
 
         if iid:
@@ -140,9 +142,8 @@ class Process:
                 m = GAD.A(ord_val, d, Y, p) if "a" in tag else GAD.R(ord_val, d, Y, p)
 
                 if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
-                    return None  # The whole tensor product is 0
+                    return None
 
-                # If it's not the identity, append the local gate
                 if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
                     gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"{tag}_{i}"))
 
@@ -169,7 +170,7 @@ class Process:
                     Ek[2 * s - 0].append(idx)
 
         op_ch = Channel(Ak)
-        op_ch.correctables = Ek if group else ungroup(Ek)  # type: ignore[assignment]
+        op_ch.correctables = Ek if group else ungroup(Ek)
 
         return op_ch
 
@@ -183,6 +184,7 @@ class Process:
         This is the $p=0$ special case of GAD using only lowering operators $A_k$.
         """
         assert isinstance(Y, float), "Y must be a float"
+
         assert Y <= 1, "Y must be in [0, 1]"
 
         if iid:
@@ -194,6 +196,7 @@ class Process:
                 m = GAD.A(int(tag[-1]), d, Y)
                 if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
                     return None
+
                 if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
                     gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"{tag}_{i}"))
 
@@ -216,7 +219,7 @@ class Process:
                 Ek[s].append(idx)
 
         op_ch = Channel(Ak)
-        op_ch.correctables = Ek if group else ungroup(Ek)  # type: ignore[assignment]
+        op_ch.correctables = Ek if group else ungroup(Ek)
 
         return op_ch
 
@@ -258,6 +261,7 @@ class Process:
                 m = funcs[gate_str](p)
                 if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
                     return None
+
                 if not pt.allclose(m, pt.eye(2, dtype=m.dtype), atol=1e-8):
                     gates.append(
                         Gate(m, index=[i], wires=n, dim=2, name=f"{gate_str}_{i}")
@@ -282,6 +286,6 @@ class Process:
                 Ek[s].append(idx)
 
         op_ch = Channel(Ak)
-        op_ch.correctables = Ek if group else ungroup(Ek)  # type: ignore[assignment]
+        op_ch.correctables = Ek if group else ungroup(Ek)
 
         return op_ch

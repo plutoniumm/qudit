@@ -152,6 +152,7 @@ class Entropy:
         """
         if q == 1:
             return float(Entropy.neumann(rho, base=base))
+
         rho = np.outer(rho, rho.conj()) if rho.ndim == 1 else rho
 
         eigenvalues = np.linalg.eigvalsh(rho)
@@ -220,9 +221,9 @@ class Entropy:
         s = np.sum(eigenvalues**alpha)
 
         if abs(q - 1.0) < 1e-8:
-            return float(np.log(s) / ((1 - alpha) * np.log(base)))  # renyi
+            return float(np.log(s) / ((1 - alpha) * np.log(base)))
         elif abs(alpha - 1.0) < 1e-8:
-            return float((1 - np.sum(eigenvalues**q)) / (q - 1))  # tsallis
+            return float((1 - np.sum(eigenvalues**q)) / (q - 1))
         else:
             return float(((s ** ((1 - q) / (1 - alpha))) - 1) / (1 - q))
 
@@ -293,7 +294,7 @@ class Info:
 
             return S_cond
         else:
-            assert rho.shape == (dA * dB, dA * dB)
+            assert rho.shape == (dA * dB, dA * dB), f"rho must be ({dA*dB},{dA*dB}), got {rho.shape}"
 
             rho_B = partial.trace(rho, dA, dB, keep="B")
             S_B = Entropy.default(rho_B)
@@ -307,7 +308,7 @@ class Info:
         Quantum mutual information $I(A:B)=S(A)+S(B)-S(AB)$.
         """
 
-        assert rho.shape == (dA * dB, dA * dB)
+        assert rho.shape == (dA * dB, dA * dB), f"rho must be ({dA*dB},{dA*dB}), got {rho.shape}"
 
         rho_A = partial.trace(rho, dA, dB, keep="A")
         rho_B = partial.trace(rho, dA, dB, keep="B")
@@ -358,7 +359,7 @@ class Distance:
         log_sigma = np.asarray(logm(sigma))
         delta_log = log_rho - log_sigma
 
-        result = np.trace(rho @ delta_log).real  # ensured
+        result = np.trace(rho @ delta_log).real
 
         return float(result / np.log(base))
 

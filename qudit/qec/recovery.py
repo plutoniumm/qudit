@@ -18,7 +18,7 @@ class Recovery:
         word: List[Gate], total_dim: int, device: pt.device, dtype: pt.dtype
     ) -> pt.Tensor:
         """
-        Materialize the full $d^n \times d^n$ matrix for a Kraus word by
+        Materialize the full $d^n \\times d^n$ matrix for a Kraus word by
         passing an identity through the localized `_left()` calls.
         """
         Ek_mat = pt.eye(total_dim, dtype=dtype, device=device)
@@ -37,7 +37,6 @@ class Recovery:
         d = first_gate.dims[0] if hasattr(first_gate, "dims") else 2
         total_dim = codes[0].numel()
 
-        # Construct Projector P
         P = pt.zeros((total_dim, total_dim), dtype=dtype, device=device)
         for c in codes:
             c_col = c.view(total_dim, 1)
@@ -47,14 +46,12 @@ class Recovery:
         for i, word in enumerate(channel.ops):
             Ek_mat = Recovery._apply(word, total_dim, device, dtype)
 
-            # Polar decomposition of Ek * P via SVD
             A = Ek_mat @ P
             U, S, Vh = pt.linalg.svd(A, full_matrices=False)
-            Uk = U @ Vh  # Unitary from polar decomp
+            Uk = U @ Vh
 
             Rk_mat = P @ Uk.conj().T
 
-            # Wrap full recovery matrix in a global Gate
             rg = Gate(Rk_mat, index=list(range(n)), wires=n, dim=d, name=f"R_leung_{i}")
             R_gates.append([rg])
 
@@ -99,7 +96,6 @@ class Recovery:
         d = first_gate.dims[0] if hasattr(first_gate, "dims") else 2
         total_dim = codes[0].numel()
 
-        # 1. Code Projector P
         P = pt.zeros((total_dim, total_dim), dtype=C64, device=device)
         for c in codes:
             c_col = c.view(total_dim, 1)
@@ -107,7 +103,6 @@ class Recovery:
 
         E_P = channel.run(P)
 
-        # 3. Pseudo-inverse square root of E(P): E(P)^{-1/2}
         L, V = pt.linalg.eigh(E_P)
         L_rinv = pt.zeros_like(L)
         mask = L > 1e-10

@@ -5,18 +5,6 @@ import torch as pt
 
 from ..circuit.gates import Gategen
 
-"""
-# Statiliser: Usage
-
-statiliser = Statiliser(["ZZZII", "IIZZZ", "XIXXI", "IXXIX"])
-
-states = statiliser.generate()
-print(states)
-
-statiliser.draw(0)
-statiliser.draw(1)
-"""
-
 _paulis = {
     "X": pt.tensor([[0, 1], [1, 0]], dtype=pt.cfloat),
     "Y": pt.tensor([[0, -1j], [1j, 0]], dtype=pt.cfloat),
@@ -111,7 +99,7 @@ class Statiliser:
         Objective used by the optimiser.
 
         Combines:
-        # - stabiliser constraint violation: $||g|\psi\\rangle - |\psi\\rangle||$ summed over g
+        - stabiliser constraint violation: $||g|\psi\\rangle - |\psi\\rangle||$ summed over g
         - small L1 penalty to prefer sparse-ish solutions (optional) which may help in finding vectors closer to their canonical form
         - L2 penalty to encourage normalisation
         """

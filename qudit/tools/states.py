@@ -10,7 +10,6 @@ def GHZ(n: int, d: int) -> State:
 
     Returns $\sum_{i=0}^{d-1} |i\\rangle^{\otimes n}$ (unnormalized).
     """
-    # sum_ i^d -> |0000> + |1111> + |2222> for n=4, d=3
     Ket = Basis(d)
     vals = sum([Ket(f"{i}" * n) for i in range(d)])
 
@@ -37,7 +36,6 @@ def NOON(n: int, theta: float = 0.0) -> State:
 
     Returns $|n,0\\rangle + e^{i n\\theta}|0,n\\rangle$ (unnormalized) in a local dimension $n+1$.
     """
-    # |N0> + |0N> for N
     Ket = Basis(n + 1)
     kets = [Ket(0, n), Ket(n, 0)]
 

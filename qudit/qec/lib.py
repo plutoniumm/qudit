@@ -86,9 +86,9 @@ def Qutrit3() -> Code:
     Detects (and with measurement corrects) single qutrit shift ($X_3$) errors.
     """
     cw = pt.zeros(3, 27)
-    cw[0, 0] = 1.0  # |000> = index 0
-    cw[1, 13] = 1.0  # |111> = 1*9 + 1*3 + 1 = 13
-    cw[2, 26] = 1.0  # |222> = 2*9 + 2*3 + 2 = 26
+    cw[0, 0] = 1.0
+    cw[1, 13] = 1.0
+    cw[2, 26] = 1.0
 
     return Code(cw, d=3)
 
@@ -122,7 +122,7 @@ def GottesmanD(d: int = 2) -> Code:
 
 def Surface(m: int, n: int, d: int = 2, edge: str = "even", start: str = "X") -> Code:
     """
-    Build an $m \times n$ surface code and return a ``Code`` spanning the stabilizer space.
+    Build an $m \\times n$ surface code and return a ``Code`` spanning the stabilizer space.
 
     Requires the ``surface/`` directory (containing ``stab.py``) at the repository root.
     """
