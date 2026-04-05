@@ -21,15 +21,18 @@ class QuantumFidelity(Question):
         phi = np.array([1, 1], dtype=complex) / np.sqrt(2)
         f_func = Fidelity.default(psi, phi)
         f_manual = float(np.abs(np.vdot(psi, phi)) ** 2)
-        self.assertAlmostEqual(f_func, f_manual, places=6)
-        self.assertAlmostEqual(f_func, 0.5, places=6)
+
+        self.assertAlmostEqual(f_func, f_manual, places=6, msg="Fidelity function and direct overlap should agree")
+
+        self.assertAlmostEqual(f_func, 0.5, places=6, msg="F(|0>, |+>) should be 0.5")
 
     def test_fidelity_identical(self):
         """
         $F(|\\psi\\rangle, |\\psi\\rangle) = 1$
         """
         psi = np.array([1, 1], dtype=complex) / np.sqrt(2)
-        self.assertAlmostEqual(Fidelity.default(psi, psi), 1.0, places=6)
+
+        self.assertAlmostEqual(Fidelity.default(psi, psi), 1.0, places=6, msg="F(|ψ>, |ψ>) should be 1")
 
     def test_fidelity_orthogonal(self):
         """
@@ -41,6 +44,7 @@ class QuantumFidelity(Question):
             ),
             0.0,
             places=6,
+            msg="F(|0>, |1>) should be 0",
         )
 
     def test_fidelity_symmetric(self):
@@ -49,8 +53,10 @@ class QuantumFidelity(Question):
         """
         rho = np.diag([0.7, 0.3]).astype(complex)
         sigma = np.diag([0.4, 0.6]).astype(complex)
+
         self.assertAlmostEqual(
-            Fidelity.default(rho, sigma), Fidelity.default(sigma, rho), places=6
+            Fidelity.default(rho, sigma), Fidelity.default(sigma, rho), places=6,
+            msg="Fidelity should be symmetric",
         )
 
     def test_channel_two_ways(self):
@@ -63,8 +69,10 @@ class QuantumFidelity(Question):
         rho = np.array([[1, 0], [0, 0]], dtype=complex)
         out_func = Fidelity.channel([K0, K1], rho)
         out_manual = K0 @ rho @ K0.conj().T + K1 @ rho @ K1.conj().T
-        self.matEqual(out_func, out_manual)
-        self.matEqual(out_func, 0.5 * np.eye(2))
+
+        self.matEqual(out_func, out_manual, msg="Channel output should match manual Kraus sum")
+
+        self.matEqual(out_func, 0.5 * np.eye(2), msg="Depolarizing channel output should be I/2")
 
     def test_channel_trace_preserving(self):
         """
@@ -74,7 +82,8 @@ class QuantumFidelity(Question):
         K1 = np.sqrt(0.5) * np.array([[0, 1], [1, 0]])
         rho = np.array([[1, 0], [0, 0]], dtype=complex)
         out = Fidelity.channel([K0, K1], rho)
-        self.assertAlmostEqual(float(np.trace(out).real), 1.0, places=6)
+
+        self.assertAlmostEqual(float(np.trace(out).real), 1.0, places=6, msg="Trace-preserving channel should have Tr(output) = 1")
 
     def test_negativity_bell(self):
         """
@@ -83,7 +92,8 @@ class QuantumFidelity(Question):
         """
         bell = np.array([1, 0, 0, 1], dtype=complex) / np.sqrt(2)
         rho = np.outer(bell, bell.conj())
-        self.assertAlmostEqual(Fidelity.negativity(rho, 2, 2), 0.5, places=6)
+
+        self.assertAlmostEqual(Fidelity.negativity(rho, 2, 2), 0.5, places=6, msg="Bell state negativity should be 0.5")
 
     def test_negativity_separable(self):
         """
@@ -92,7 +102,8 @@ class QuantumFidelity(Question):
         rho_A = np.diag([0.7, 0.3]).astype(complex)
         rho_B = np.diag([0.4, 0.6]).astype(complex)
         rho_sep = np.kron(rho_A, rho_B)
-        self.assertAlmostEqual(Fidelity.negativity(rho_sep, 2, 2), 0.0, places=6)
+
+        self.assertAlmostEqual(Fidelity.negativity(rho_sep, 2, 2), 0.0, places=6, msg="Separable state negativity should be 0")
 
     def test_mutual_info_two_ways(self):
         """
@@ -109,8 +120,10 @@ class QuantumFidelity(Question):
         I_manual = (
             Entropy.neumann(rho_A) + Entropy.neumann(rho_B) - Entropy.neumann(rho_AB)
         )
-        self.assertAlmostEqual(I_func, I_manual, places=5)
-        self.assertAlmostEqual(I_func, 2.0, places=5)
+
+        self.assertAlmostEqual(I_func, I_manual, places=5, msg="Mutual info function and manual calculation should agree")
+
+        self.assertAlmostEqual(I_func, 2.0, places=5, msg="Bell state mutual info should be 2 bits")
 
     def test_mutual_info_product(self):
         """
@@ -119,7 +132,8 @@ class QuantumFidelity(Question):
         rho_A = np.diag([0.7, 0.3]).astype(complex)
         rho_B = np.diag([0.5, 0.5]).astype(complex)
         rho_prod = np.kron(rho_A, rho_B)
-        self.assertAlmostEqual(Info.mutual(rho_prod, 2, 2), 0.0, places=5)
+
+        self.assertAlmostEqual(Info.mutual(rho_prod, 2, 2), 0.0, places=5, msg="Product state mutual info should be 0")
 
     def test_coherent_info_bell(self):
         """
@@ -127,7 +141,8 @@ class QuantumFidelity(Question):
         """
         bell = np.array([1, 0, 0, 1], dtype=complex) / np.sqrt(2)
         rho = np.outer(bell, bell.conj())
-        self.assertAlmostEqual(Info.coherent(rho, 2, 2), 1.0, places=5)
+
+        self.assertAlmostEqual(Info.coherent(rho, 2, 2), 1.0, places=5, msg="Bell state coherent info should be 1 bit")
 
 
 class QuantumEntropy(Question):
@@ -141,14 +156,16 @@ class QuantumEntropy(Question):
         $S(|\\psi\\rangle\\langle\\psi|) = 0$: pure states have zero entropy
         """
         rho = np.array([[1, 0], [0, 0]], dtype=complex)
-        self.assertAlmostEqual(Entropy.neumann(rho), 0.0, places=6)
+
+        self.assertAlmostEqual(Entropy.neumann(rho), 0.0, places=6, msg="Pure state von Neumann entropy should be 0")
 
     def test_neumann_maximally_mixed(self):
         """
         $S(I/d) = \\log_2 d$: maximally mixed qubit has entropy 1 bit
         """
         rho = 0.5 * np.eye(2, dtype=complex)
-        self.assertAlmostEqual(Entropy.neumann(rho), 1.0, places=6)
+
+        self.assertAlmostEqual(Entropy.neumann(rho), 1.0, places=6, msg="Maximally mixed qubit entropy should be 1 bit")
 
     def test_neumann_vs_shannon(self):
         """
@@ -157,7 +174,8 @@ class QuantumEntropy(Question):
         """
         p = np.array([0.7, 0.3])
         rho = np.diag(p).astype(complex)
-        self.assertAlmostEqual(Entropy.neumann(rho), Entropy.shannon(p), places=6)
+
+        self.assertAlmostEqual(Entropy.neumann(rho), Entropy.shannon(p), places=6, msg="von Neumann on diagonal rho should equal Shannon entropy")
 
     def test_neumann_value(self):
         """
@@ -165,21 +183,24 @@ class QuantumEntropy(Question):
         """
         rho = np.diag([0.7, 0.3]).astype(complex)
         expected = -0.7 * np.log2(0.7) - 0.3 * np.log2(0.3)
-        self.assertAlmostEqual(Entropy.neumann(rho), expected, places=6)
+
+        self.assertAlmostEqual(Entropy.neumann(rho), expected, places=6, msg="von Neumann entropy value mismatch for diag(0.7, 0.3)")
 
     def test_shannon_uniform(self):
         """
         $H(1/n, \\ldots, 1/n) = \\log_2 n$ bits
         """
         p = np.full(4, 0.25)
-        self.assertAlmostEqual(Entropy.shannon(p), np.log2(4), places=6)
+
+        self.assertAlmostEqual(Entropy.shannon(p), np.log2(4), places=6, msg="Uniform Shannon entropy should be log2(4)=2 bits")
 
     def test_tsallis_value(self):
         """
         $S_2(\\mathrm{diag}(0.6, 0.4)) = \\frac{1 - (0.6^2 + 0.4^2)}{1} = 0.48$
         """
         rho = np.diag([0.6, 0.4]).astype(complex)
-        self.assertAlmostEqual(Entropy.tsallis(rho, q=2), 0.48, places=6)
+
+        self.assertAlmostEqual(Entropy.tsallis(rho, q=2), 0.48, places=6, msg="Tsallis(q=2) entropy value mismatch")
 
     def test_renyi_value(self):
         """
@@ -187,14 +208,16 @@ class QuantumEntropy(Question):
         """
         rho = np.diag([0.6, 0.4]).astype(complex)
         expected = -np.log2(0.6**2 + 0.4**2)
-        self.assertAlmostEqual(Entropy.renyi(rho, alpha=2), expected, places=6)
+
+        self.assertAlmostEqual(Entropy.renyi(rho, alpha=2), expected, places=6, msg="Renyi(alpha=2) entropy value mismatch")
 
     def test_hartley_value(self):
         """
         $H_0(0.25, 0.25, 0.25, 0.25) = \\log_2 4 = 2$ bits
         """
         self.assertAlmostEqual(
-            Entropy.hartley(np.array([0.25, 0.25, 0.25, 0.25])), 2.0, places=6
+            Entropy.hartley(np.array([0.25, 0.25, 0.25, 0.25])), 2.0, places=6,
+            msg="Hartley entropy for 4 uniform outcomes should be 2 bits",
         )
 
     def test_relative_zero(self):
@@ -202,7 +225,8 @@ class QuantumEntropy(Question):
         $D(\\rho \\| \\rho) = 0$
         """
         rho = np.diag([0.7, 0.3]).astype(complex)
-        self.assertAlmostEqual(Entropy.relative(rho, rho), 0.0, places=5)
+
+        self.assertAlmostEqual(Entropy.relative(rho, rho), 0.0, places=5, msg="Relative entropy D(rho||rho) should be 0")
 
     def test_relative_value(self):
         """
@@ -212,17 +236,20 @@ class QuantumEntropy(Question):
         rho = np.diag([0.8, 0.2]).astype(complex)
         sigma = np.diag([0.5, 0.5]).astype(complex)
         expected = 0.8 * np.log2(0.8 / 0.5) + 0.2 * np.log2(0.2 / 0.5)
-        self.assertAlmostEqual(Entropy.relative(rho, sigma), expected, places=5)
+
+        self.assertAlmostEqual(Entropy.relative(rho, sigma), expected, places=5, msg="Relative entropy value mismatch")
 
     def test_unified_reduces_to_renyi(self):
         """
         $S^{(q,\\alpha)}$ at $q=1$ reduces to $S_\\alpha$ (Rényi), two ways
         """
         rho = np.diag([0.6, 0.4]).astype(complex)
+
         self.assertAlmostEqual(
             Entropy.unified(rho, q=1.0, alpha=2.0),
             Entropy.renyi(rho, alpha=2.0),
             places=6,
+            msg="Unified entropy at q=1 should equal Renyi entropy",
         )
 
     def test_unified_reduces_to_tsallis(self):
@@ -230,10 +257,12 @@ class QuantumEntropy(Question):
         $S^{(q,\\alpha)}$ at $\\alpha=1$ reduces to $S_q$ (Tsallis), two ways
         """
         rho = np.diag([0.6, 0.4]).astype(complex)
+
         self.assertAlmostEqual(
             Entropy.unified(rho, q=2.0, alpha=1.0),
             Entropy.tsallis(rho, q=2.0),
             places=6,
+            msg="Unified entropy at alpha=1 should equal Tsallis entropy",
         )
 
     def test_conditional_product(self):
@@ -245,7 +274,8 @@ class QuantumEntropy(Question):
         rho_B = np.diag([0.5, 0.5]).astype(complex)
         rho_prod = np.kron(rho_A, rho_B)
         S_A = Entropy.neumann(rho_A)
-        self.assertAlmostEqual(Entropy.conditional(rho_prod, 2, 2), S_A, places=5)
+
+        self.assertAlmostEqual(Entropy.conditional(rho_prod, 2, 2), S_A, places=5, msg="S(A|B) for product state should equal S(A)")
 
 
 class QuantumDistance(Question):
@@ -258,7 +288,8 @@ class QuantumDistance(Question):
         $T(\\rho, \\rho) = 0$
         """
         rho = np.diag([0.7, 0.3]).astype(complex)
-        self.assertAlmostEqual(Distance.trace(rho, rho), 0.0, places=6)
+
+        self.assertAlmostEqual(Distance.trace(rho, rho), 0.0, places=6, msg="Trace distance T(rho, rho) should be 0")
 
     def test_trace_value(self):
         """
@@ -268,7 +299,8 @@ class QuantumDistance(Question):
         rho = np.array([[1, 0], [0, 0]], dtype=complex)
         sigma = np.array([[0.5, 0.5], [0.5, 0.5]], dtype=complex)
         expected = np.sqrt(0.5)
-        self.assertAlmostEqual(Distance.trace(rho, sigma), expected, places=5)
+
+        self.assertAlmostEqual(Distance.trace(rho, sigma), expected, places=5, msg="Trace distance value mismatch")
 
     def test_trace_two_ways(self):
         """
@@ -281,14 +313,16 @@ class QuantumDistance(Question):
         # Manual: half sum of absolute eigenvalues of (rho - sigma)
         evals = np.linalg.eigvalsh(rho - sigma)
         t_manual = 0.5 * np.sum(np.abs(evals))
-        self.assertAlmostEqual(t_func, t_manual, places=5)
+
+        self.assertAlmostEqual(t_func, t_manual, places=5, msg="Trace distance function and manual eigenvalue sum should agree")
 
     def test_bures_identical(self):
         """
         $D_B(\\rho, \\rho) = 0$
         """
         rho = np.diag([0.7, 0.3]).astype(complex)
-        self.assertAlmostEqual(Distance.bures(rho, rho), 0.0, places=6)
+
+        self.assertAlmostEqual(Distance.bures(rho, rho), 0.0, places=6, msg="Bures distance D_B(rho, rho) should be 0")
 
     def test_bures_value(self):
         """
@@ -297,7 +331,8 @@ class QuantumDistance(Question):
         psi = np.array([1, 0], dtype=complex)
         phi = np.array([1, 1], dtype=complex) / np.sqrt(2)
         expected = np.sqrt(2 - np.sqrt(2))
-        self.assertAlmostEqual(Distance.bures(psi, phi), expected, places=5)
+
+        self.assertAlmostEqual(Distance.bures(psi, phi), expected, places=5, msg="Bures distance value mismatch for |0> vs |+>")
 
     def test_bures_vs_fidelity(self):
         """
@@ -308,7 +343,8 @@ class QuantumDistance(Question):
         sigma = np.diag([0.5, 0.5]).astype(complex)
         F = Fidelity.default(rho, sigma)
         bures_manual = np.sqrt(2 - 2 * np.sqrt(F))
-        self.assertAlmostEqual(Distance.bures(rho, sigma), bures_manual, places=5)
+
+        self.assertAlmostEqual(Distance.bures(rho, sigma), bures_manual, places=5, msg="Bures distance and fidelity should be consistent")
 
 
 if __name__ == "__main__":

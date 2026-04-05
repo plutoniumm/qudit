@@ -33,7 +33,7 @@ class CircuitDraw(Question):
         c.gate(G3.X, [2])
         c.gate(G3.CX, [2, 3])
 
-        self.assertEqual(c.draw(), solution)
+        self.assertEqual(c.draw(), solution, msg="Circuit draw() output does not match expected ASCII diagram")
 
 
 if __name__ == "__main__":

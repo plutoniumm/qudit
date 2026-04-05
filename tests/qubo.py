@@ -20,12 +20,17 @@ class QUBOConversion(Question):
         diagonal term maps to single Pauli $Z$ with coefficient $-Q_{00}/2$
         """
         ham, offset = QUBO.toHamiltonian({(0, 0): 2.0})
-        self.assertAlmostEqual(offset, 1.0, places=6)
-        self.assertEqual(len(ham), 1)
+
+        self.assertAlmostEqual(offset, 1.0, places=6, msg="QUBO diagonal term offset should be 1.0")
+
+        self.assertEqual(len(ham), 1, msg="QUBO diagonal single var should produce 1 Hamiltonian term")
         coeff, gtype, indices = ham[0]
-        self.assertAlmostEqual(coeff, -1.0, places=6)
-        self.assertEqual(gtype, "Z")
-        self.assertEqual(indices, [0])
+
+        self.assertAlmostEqual(coeff, -1.0, places=6, msg="QUBO diagonal term coefficient should be -1.0")
+
+        self.assertEqual(gtype, "Z", msg="QUBO diagonal term should be a Z gate")
+
+        self.assertEqual(indices, [0], msg="QUBO diagonal term should act on qubit 0")
 
     def test_quadratic_term(self):
         """
@@ -33,30 +38,40 @@ class QUBOConversion(Question):
         with coefficients $1, -1, -1$ and offset $1$
         """
         ham, offset = QUBO.toHamiltonian({(0, 1): 4.0})
-        self.assertAlmostEqual(offset, 1.0, places=6)
+
+        self.assertAlmostEqual(offset, 1.0, places=6, msg="QUBO quadratic term offset should be 1.0")
         terms = {(gtype, tuple(idx)): coeff for coeff, gtype, idx in ham}
-        self.assertAlmostEqual(terms[("ZZ", (0, 1))], 1.0, places=6)
-        self.assertAlmostEqual(terms[("Z", (0,))], -1.0, places=6)
-        self.assertAlmostEqual(terms[("Z", (1,))], -1.0, places=6)
+
+        self.assertAlmostEqual(terms[("ZZ", (0, 1))], 1.0, places=6, msg="ZZ term coefficient should be 1.0")
+
+        self.assertAlmostEqual(terms[("Z", (0,))], -1.0, places=6, msg="Z0 term coefficient should be -1.0")
+
+        self.assertAlmostEqual(terms[("Z", (1,))], -1.0, places=6, msg="Z1 term coefficient should be -1.0")
 
     def test_energy_consistency(self):
         """
         QUBO energy at $x=[1,0]$ equals Ising expectation $(Z_0=-1, Z_1=+1)$ plus offset,
         two ways: direct sum vs. Ising evaluation
         """
-        Q = {(0, 0): -2.0, (0, 1): 1.0, (1, 1): -2.0}
+        Q = {
+            (0, 0): -2.0,
+            (0, 1): 1.0,
+            (1, 1): -2.0,
+        }
         ham, offset = QUBO.toHamiltonian(Q)
-        # Direct QUBO energy at x=[1,0]: -2*1 + 0 + 0 = -2
         qubo_energy = -2.0
-        # Ising: x=1 maps to Z=-1, x=0 maps to Z=+1
-        z_vals = {0: -1, 1: 1}
+        z_vals = {
+            0: -1,
+            1: 1,
+        }
         ising_energy = offset
         for coeff, gtype, indices in ham:
             if gtype == "Z":
                 ising_energy += coeff * z_vals[indices[0]]
             elif gtype == "ZZ":
                 ising_energy += coeff * z_vals[indices[0]] * z_vals[indices[1]]
-        self.assertAlmostEqual(float(ising_energy), qubo_energy, places=5)
+
+        self.assertAlmostEqual(float(ising_energy), qubo_energy, places=5, msg="QUBO and Ising energies should match")
 
     def test_zero_offset_for_linear(self):
         """
@@ -64,9 +79,11 @@ class QUBOConversion(Question):
         symmetric about the $x=0, x=1$ energies
         """
         ham, offset = QUBO.toHamiltonian({(0, 0): -3.0})
-        self.assertAlmostEqual(offset, -1.5, places=6)
+
+        self.assertAlmostEqual(offset, -1.5, places=6, msg="Negative diagonal QUBO offset should be -1.5")
         coeff, _, _ = ham[0]
-        self.assertAlmostEqual(coeff, 1.5, places=6)
+
+        self.assertAlmostEqual(coeff, 1.5, places=6, msg="Negative diagonal QUBO Z coefficient should be 1.5")
 
 
 class QAOACircuit(Question):
@@ -76,22 +93,30 @@ class QAOACircuit(Question):
     """
 
     def _qaoa(self, wires=2, layers=1):
-        Q = {(0, 0): -1.0, (1, 1): -1.0}
+        Q = {
+            (0, 0): -1.0,
+            (1, 1): -1.0,
+        }
+
         return QAOA(d=2, wires=wires, qubo=Q, layers=layers, device="cpu")
 
     def test_forward_normalized(self):
         """
         QAOA forward pass produces a normalized state: $\\|\\psi\\|_2 = 1$
         """
+
         state = self._qaoa().forward()
-        self.assertAlmostEqual(pt.norm(state).item(), 1.0, places=5)
+
+        self.assertAlmostEqual(pt.norm(state).item(), 1.0, places=5, msg="QAOA forward pass should produce normalized state")
 
     def test_expectation_real(self):
         """
         Expectation value $\\langle H \\rangle \\in \\mathbb{R}$
         """
+
         exp = self._qaoa().expectation()
-        self.assertIsInstance(float(exp), float)
+
+        self.assertIsInstance(float(exp), float, msg="QAOA expectation value should be a real float")
 
     def test_expectation_bounded_by_eigenvalues(self):
         """
@@ -101,17 +126,22 @@ class QAOACircuit(Question):
         qaoa = self._qaoa()
         H = qaoa._H_P_matrix
         eigs = pt.linalg.eigvalsh(H.real).numpy()
+
         exp_val = qaoa.expectation().item() - qaoa.offset
-        self.assertGreaterEqual(exp_val, float(eigs.min()) - 1e-5)
-        self.assertLessEqual(exp_val, float(eigs.max()) + 1e-5)
+
+        self.assertGreaterEqual(exp_val, float(eigs.min()) - 1e-5, msg="QAOA expectation should be >= min eigenvalue")
+
+        self.assertLessEqual(exp_val, float(eigs.max()) + 1e-5, msg="QAOA expectation should be <= max eigenvalue")
 
     def test_hamiltonian_hermitian(self):
         """
         $H_P = H_P^\\dagger$: the problem Hamiltonian is Hermitian
         """
         H = self._qaoa()._H_P_matrix
+
         diff = pt.norm(H - H.conj().T).item()
-        self.assertAlmostEqual(diff, 0.0, delta=1e-5)
+
+        self.assertAlmostEqual(diff, 0.0, delta=1e-5, msg="QAOA Hamiltonian should be Hermitian")
 
     def test_optimization_decreases_loss(self):
         """
@@ -125,8 +155,10 @@ class QAOACircuit(Question):
             optimizer.zero_grad()
             qaoa.expectation().backward()
             optimizer.step()
+
         final = qaoa.expectation().item()
-        self.assertLessEqual(final, initial + 1e-3)
+
+        self.assertLessEqual(final, initial + 1e-3, msg="QAOA optimization should not increase expectation value")
 
 
 if __name__ == "__main__":

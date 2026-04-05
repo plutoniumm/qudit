@@ -33,6 +33,7 @@ class D2_Gates(Question):
         """
         P0, P1 = self.Ket(0), self.Ket(1)
         _P0 = self.G.X @ P1
+
         self.stateEqual(
             P0,
             _P0,
@@ -45,6 +46,7 @@ class D2_Gates(Question):
         """
         P0, P1 = self.Ket(0), self.Ket(1)
         _P1 = self.G.Y @ P0
+
         self.stateEqual(
             1j * P1,
             _P1,
@@ -57,6 +59,7 @@ class D2_Gates(Question):
         """
         P0, P1 = self.Ket(0), self.Ket(1)
         _P0 = self.G.Y @ P1
+
         self.stateEqual(
             -1j * P0,
             _P0,
@@ -69,6 +72,7 @@ class D2_Gates(Question):
         """
         P0 = self.Ket(0)
         _P0 = self.G.Z @ P0
+
         self.stateEqual(
             P0,
             _P0,
@@ -81,6 +85,7 @@ class D2_Gates(Question):
         """
         P1 = self.Ket(1)
         _P1 = self.G.Z @ P1
+
         self.stateEqual(
             -P1,
             _P1,
@@ -95,6 +100,7 @@ class D2_Gates(Question):
         a = 1 / np.sqrt(2)
         exp0 = a * (P0 + P1)
         _P0 = self.G.H @ P0
+
         self.stateEqual(
             exp0,
             _P0,
@@ -109,6 +115,7 @@ class D2_Gates(Question):
         a = 1 / np.sqrt(2)
         exp1 = a * (P0 - P1)
         _P1 = self.G.H @ P1
+
         self.stateEqual(
             exp1,
             _P1,
@@ -121,6 +128,7 @@ class D2_Gates(Question):
         """
         P0 = self.Ket(0)
         _P0 = self.G.I @ P0
+
         self.stateEqual(
             P0,
             _P0,
@@ -133,6 +141,7 @@ class D2_Gates(Question):
         """
         P1 = self.Ket(1)
         _P1 = self.G.I @ P1
+
         self.stateEqual(
             P1,
             _P1,
@@ -145,6 +154,7 @@ class D2_Gates(Question):
         """
         P00 = self.Ket(0, 0)
         _P00 = self.G.CX @ P00
+
         self.stateEqual(P00, _P00, msg="CX gate mismatch.")
 
     def test_CX__01(self):
@@ -153,6 +163,7 @@ class D2_Gates(Question):
         """
         P01 = self.Ket(0, 1)
         _P01 = self.G.CX @ P01
+
         self.stateEqual(P01, _P01, msg="CX gate mismatch.")
 
     def test_CX__10_11(self):
@@ -161,6 +172,7 @@ class D2_Gates(Question):
         """
         P10 = self.Ket(1, 0)
         _P11 = self.G.CX @ P10
+
         self.stateEqual(self.Ket(1, 1), _P11, msg="CX gate mismatch.")
 
     def test_CX__11_10(self):
@@ -169,6 +181,7 @@ class D2_Gates(Question):
         """
         P11 = self.Ket(1, 1)
         _P10 = self.G.CX @ P11
+
         self.stateEqual(self.Ket(1, 0), _P10, msg="CX gate mismatch.")
 
     def test_SWAP__01_10(self):
@@ -177,6 +190,7 @@ class D2_Gates(Question):
         """
         P01 = self.Ket(0, 1)
         _P10 = self.G.SWAP @ P01
+
         self.stateEqual(self.Ket(1, 0), _P10, msg="SWAP gate mismatch.")
 
     def test_SWAP__10_01(self):
@@ -185,6 +199,7 @@ class D2_Gates(Question):
         """
         P10 = self.Ket(1, 0)
         _P01 = self.G.SWAP @ P10
+
         self.stateEqual(self.Ket(0, 1), _P01, msg="SWAP gate mismatch.")
 
     def test_RX(self):
@@ -217,7 +232,6 @@ class D2_Gates(Question):
 
         self.stateEqual(-P1, RZ @ P1, msg="RZ(pi) mismatch.")
 
-    # we can do a special test with an identity H = RX(pi) RY(pi/2) RZ(pi) RY(-pi/2)
     def test_H_decomp(self):
         """
         $H = X R_Y(\pi/2)$
@@ -249,6 +263,7 @@ class D3_Gates(Question):
         """
         P = self.Ket(0)
         _P = self.G.I @ P
+
         self.stateEqual(P, _P, msg=f"I mismatch for 0.")
 
     def test_I__1(self):
@@ -257,6 +272,7 @@ class D3_Gates(Question):
         """
         P = self.Ket(1)
         _P = self.G.I @ P
+
         self.stateEqual(P, _P, msg=f"I mismatch for 1.")
 
     def test_I__2(self):
@@ -265,6 +281,7 @@ class D3_Gates(Question):
         """
         P = self.Ket(2)
         _P = self.G.I @ P
+
         self.stateEqual(P, _P, msg=f"I mismatch for 2.")
 
     def test_X__0_1(self):
@@ -272,6 +289,7 @@ class D3_Gates(Question):
         $X\\vert0\\rangle = \\vert1\\rangle$
         """
         P0, P1 = self.Ket(0), self.Ket(1)
+
         self.stateEqual(P1, self.G.X @ P0, msg="X0 != 1")
 
     def test_X__1_2(self):
@@ -279,6 +297,7 @@ class D3_Gates(Question):
         $X\\vert1\\rangle = \\vert2\\rangle$
         """
         P1, P2 = self.Ket(1), self.Ket(2)
+
         self.stateEqual(P2, self.G.X @ P1, msg="X1 != 2")
 
     def test_X__2_0(self):
@@ -286,6 +305,7 @@ class D3_Gates(Question):
         $X\\vert2\\rangle = \\vert0\\rangle$
         """
         P2, P0 = self.Ket(2), self.Ket(0)
+
         self.stateEqual(P0, self.G.X @ P2, msg="X2 != 0")
 
     def test_Z__0(self):
@@ -293,6 +313,7 @@ class D3_Gates(Question):
         $Z\\vert0\\rangle = \\vert0\\rangle$
         """
         P0 = self.Ket(0)
+
         self.stateEqual(P0, self.G.Z @ P0, msg="Z0 != 0")
 
     def test_Z__1(self):
@@ -301,6 +322,7 @@ class D3_Gates(Question):
         """
         P1 = self.Ket(1)
         w = np.exp(2j * np.pi / 3)
+
         self.stateEqual(w * P1, self.G.Z @ P1, msg="Z1 != w1")
 
     def test_Z__2(self):
@@ -309,6 +331,7 @@ class D3_Gates(Question):
         """
         P2 = self.Ket(2)
         w = np.exp(2j * np.pi / 3)
+
         self.stateEqual(w**2 * P2, self.G.Z @ P2, msg="Z2 != w2")
 
     def test_Y__0_i1(self):
@@ -317,6 +340,7 @@ class D3_Gates(Question):
         (exact phase is $-i\\omega$ where $\\omega = e^{2\\pi i/3}$, not $i$)
         """
         P0, P1 = self.Ket(0), self.Ket(1)
+
         self.stateEqual(1j * P1, self.G.Y @ P0, msg="Y0 != prop 1")
 
     def test_Y__1_i2(self):
@@ -324,6 +348,7 @@ class D3_Gates(Question):
         $Y\\vert1\\rangle \\propto \\vert2\\rangle$: generalized $Y = ZX/i$ shifts by one level
         """
         P1, P2 = self.Ket(1), self.Ket(2)
+
         self.stateEqual(1j * P2, self.G.Y @ P1, msg="Y1 != prop 2")
 
     def test_Y__2_i0(self):
@@ -331,6 +356,7 @@ class D3_Gates(Question):
         $Y\\vert2\\rangle \\propto \\vert0\\rangle$: generalized $Y = ZX/i$ shifts cyclically
         """
         P2, P0 = self.Ket(2), self.Ket(0)
+
         self.stateEqual(1j * P0, self.G.Y @ P2, msg="Y2 != prop 0")
 
     def test_H__0_sup(self):
@@ -339,6 +365,7 @@ class D3_Gates(Question):
         """
         exp0 = (1 / np.sqrt(3)) * (self.Ket(0) + self.Ket(1) + self.Ket(2))
         _P0 = self.G.H @ self.Ket(0)
+
         self.stateEqual(exp0, _P0, msg="H0 mismatch")
 
     def test_H__1_sup(self):
@@ -348,6 +375,7 @@ class D3_Gates(Question):
         w = np.exp(2j * np.pi / 3)
         exp1 = (1 / np.sqrt(3)) * (self.Ket(0) + w * self.Ket(1) + w**2 * self.Ket(2))
         _P1 = self.G.H @ self.Ket(1)
+
         self.stateEqual(exp1, _P1, msg="H1 mismatch")
 
     def test_CX__00(self):
@@ -356,6 +384,7 @@ class D3_Gates(Question):
         """
         P00 = self.Ket(0, 0)
         _P00 = self.G.CX @ P00
+
         self.stateEqual(P00, _P00, msg="CX00 mismatch")
 
     def test_CX__11(self):
@@ -365,6 +394,7 @@ class D3_Gates(Question):
         P11 = self.Ket(1, 1)
         P12 = self.Ket(1, 2)
         _P12 = self.G.CX @ P11
+
         self.stateEqual(P12, _P12, msg="CX11 mismatch")
 
     def test_CX__21(self):
@@ -374,6 +404,7 @@ class D3_Gates(Question):
         P21 = self.Ket(2, 1)
         P20 = self.Ket(2, 0)
         _P20 = self.G.CX @ P21
+
         self.stateEqual(P20, _P20, msg="CX21 mismatch")
 
     def test_SWAP__12_21(self):
@@ -383,6 +414,7 @@ class D3_Gates(Question):
         P12 = self.Ket(1, 2)
         P21 = self.Ket(2, 1)
         _P21 = self.G.SWAP @ P12
+
         self.stateEqual(P21, _P21, msg="SWAP12 mismatch")
 
 
@@ -399,6 +431,7 @@ class D5_Gates(Question):
         $I\\vert0\\rangle = \\vert0\\rangle$
         """
         P = self.Ket(0)
+
         self.stateEqual(P, self.G.I @ P, msg="I mismatch for 0.")
 
     def test_I__1(self):
@@ -406,6 +439,7 @@ class D5_Gates(Question):
         $I\\vert1\\rangle = \\vert1\\rangle$
         """
         P = self.Ket(1)
+
         self.stateEqual(P, self.G.I @ P, msg="I mismatch for 1.")
 
     def test_I__2(self):
@@ -413,6 +447,7 @@ class D5_Gates(Question):
         $I\\vert2\\rangle = \\vert2\\rangle$
         """
         P = self.Ket(2)
+
         self.stateEqual(P, self.G.I @ P, msg="I mismatch for 2.")
 
     def test_I__3(self):
@@ -420,6 +455,7 @@ class D5_Gates(Question):
         $I\\vert3\\rangle = \\vert3\\rangle$
         """
         P = self.Ket(3)
+
         self.stateEqual(P, self.G.I @ P, msg="I mismatch for 3.")
 
     def test_I__4(self):
@@ -427,6 +463,7 @@ class D5_Gates(Question):
         $I\\vert4\\rangle = \\vert4\\rangle$
         """
         P = self.Ket(4)
+
         self.stateEqual(P, self.G.I @ P, msg="I mismatch for 4.")
 
     def test_X__0_1(self):
@@ -434,6 +471,7 @@ class D5_Gates(Question):
         $X\\vert0\\rangle = \\vert1\\rangle$
         """
         P0, P1 = self.Ket(0), self.Ket(1)
+
         self.stateEqual(P1, self.G.X @ P0, msg="X0 != 1")
 
     def test_X__1_2(self):
@@ -441,6 +479,7 @@ class D5_Gates(Question):
         $X\\vert1\\rangle = \\vert2\\rangle$
         """
         P1, P2 = self.Ket(1), self.Ket(2)
+
         self.stateEqual(P2, self.G.X @ P1, msg="X1 != 2")
 
     def test_X__4_0(self):
@@ -448,6 +487,7 @@ class D5_Gates(Question):
         $X\\vert4\\rangle = \\vert0\\rangle$
         """
         P4, P0 = self.Ket(4), self.Ket(0)
+
         self.stateEqual(P0, self.G.X @ P4, msg="X4 != 0")
 
     def test_Z__0(self):
@@ -455,6 +495,7 @@ class D5_Gates(Question):
         $Z\\vert0\\rangle = \\vert0\\rangle$
         """
         P0 = self.Ket(0)
+
         self.stateEqual(P0, self.G.Z @ P0, msg="Z0 != 0")
 
     def test_Z__1(self):
@@ -463,6 +504,7 @@ class D5_Gates(Question):
         """
         P1 = self.Ket(1)
         w = np.exp(2j * np.pi / 5)
+
         self.stateEqual(w * P1, self.G.Z @ P1, msg="Z1 != w1")
 
     def test_Z__4(self):
@@ -471,6 +513,7 @@ class D5_Gates(Question):
         """
         P4 = self.Ket(4)
         w = np.exp(2j * np.pi / 5)
+
         self.stateEqual(w**4 * P4, self.G.Z @ P4, msg="Z4 != w4")
 
     def test_Y__0_i1(self):
@@ -479,6 +522,7 @@ class D5_Gates(Question):
         (exact phase is $-i\\omega$ where $\\omega = e^{2\\pi i/5}$, not $i$)
         """
         P0, P1 = self.Ket(0), self.Ket(1)
+
         self.stateEqual(1j * P1, self.G.Y @ P0, msg="Y0 != prop 1")
 
     def test_Y__2_i3(self):
@@ -486,6 +530,7 @@ class D5_Gates(Question):
         $Y\\vert2\\rangle \\propto \\vert3\\rangle$: generalized $Y = ZX/i$ shifts by one level
         """
         P2, P3 = self.Ket(2), self.Ket(3)
+
         self.stateEqual(1j * P3, self.G.Y @ P2, msg="Y2 != prop 3")
 
     def test_Y__4_i0(self):
@@ -493,6 +538,7 @@ class D5_Gates(Question):
         $Y\\vert4\\rangle \\propto \\vert0\\rangle$: generalized $Y = ZX/i$ shifts cyclically
         """
         P4, P0 = self.Ket(4), self.Ket(0)
+
         self.stateEqual(1j * P0, self.G.Y @ P4, msg="Y4 != prop 0")
 
     def test_H__0_sup(self):
@@ -504,6 +550,7 @@ class D5_Gates(Question):
             self.Ket(0) + self.Ket(1) + self.Ket(2) + self.Ket(3) + self.Ket(4)
         )
         _P0 = self.G.H @ self.Ket(0)
+
         self.stateEqual(exp0, _P0, msg="H0 mismatch")
 
     def test_H__1_sup(self):
@@ -519,6 +566,7 @@ class D5_Gates(Question):
             + w**4 * self.Ket(4)
         )
         _P1 = self.G.H @ self.Ket(1)
+
         self.stateEqual(exp1, _P1, msg="H1 mismatch")
 
     def test_CX__00(self):
@@ -526,6 +574,7 @@ class D5_Gates(Question):
         $CX\\vert00\\rangle = \\vert00\\rangle$
         """
         P00 = self.Ket(0, 0)
+
         self.stateEqual(P00, self.G.CX @ P00, msg="CX00 mismatch")
 
     def test_CX__11(self):
@@ -534,6 +583,7 @@ class D5_Gates(Question):
         """
         P11 = self.Ket(1, 1)
         P12 = self.Ket(1, 2)
+
         self.stateEqual(P12, self.G.CX @ P11, msg="CX11 mismatch")
 
     def test_CX__34(self):
@@ -542,6 +592,7 @@ class D5_Gates(Question):
         """
         P34 = self.Ket(3, 4)
         P32 = self.Ket(3, 2)  # target 4 + control 3 = 7 -> 2 mod 5
+
         self.stateEqual(P32, self.G.CX @ P34, msg="CX34 mismatch")
 
     def test_SWAP__13_31(self):
@@ -550,6 +601,7 @@ class D5_Gates(Question):
         """
         P13 = self.Ket(1, 3)
         P31 = self.Ket(3, 1)
+
         self.stateEqual(P31, self.G.SWAP @ P13, msg="SWAP13 mismatch")
 
 

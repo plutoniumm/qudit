@@ -14,7 +14,9 @@ dev = "cpu"
 
 
 class ParametricCircuit(nn.Module):
-    """Minimal single-qubit RX circuit with a trainable angle."""
+    """
+    Minimal single-qubit RX circuit with a trainable angle.
+    """
 
     def __init__(self, init_angle: float = 0.5):
         super().__init__()
@@ -30,6 +32,7 @@ class ParametricCircuit(nn.Module):
 def ket0():
     x = torch.zeros(2, dtype=C64)
     x[0] = 1.0
+
     return x
 
 
@@ -47,13 +50,16 @@ class GradientDescent(Question):
         """
         model = ParametricCircuit(init_angle=1.0)
         out = model(ket0())
-        # p1 = sin^2(theta/2); d(p1)/d(theta) = sin(theta)/2 ≈ 0.421 at theta=1
         loss = out.reshape(-1)[1].abs().pow(2)
+
         loss.backward()
-        self.assertIsNotNone(model.angle.grad)
-        self.assertTrue(torch.isfinite(model.angle.grad))
-        # Gradient must be non-zero;  sin(1)/2 ≈ 0.421
-        self.assertGreater(model.angle.grad.abs().item(), 1e-4)
+
+
+        self.assertIsNotNone(model.angle.grad, msg="Gradient of angle should not be None")
+
+        self.assertTrue(torch.isfinite(model.angle.grad), msg="Gradient should be finite")
+
+        self.assertGreater(model.angle.grad.abs().item(), 1e-4, msg="Gradient should be non-negligible")
 
     def test_rx_pi_flips_qubit(self):
         """
@@ -62,16 +68,22 @@ class GradientDescent(Question):
         """
         model = ParametricCircuit(init_angle=float(np.pi))
         out = model(ket0())
+
+
         target = torch.tensor([0.0, 1.0], dtype=C64)
-        self.stateEqual(target.numpy(), out.detach().numpy())
+
+        self.stateEqual(target.numpy(), out.detach().numpy(), msg="RX(π)|0> should equal |1> up to global phase")
 
     def test_rx_zero_identity(self):
         """
         $R_X(0)|0\\rangle = |0\\rangle$: zero rotation is the identity
         """
         model = ParametricCircuit(init_angle=0.0)
+
+
         out = model(ket0())
-        self.stateEqual(ket0().numpy(), out.detach().numpy())
+
+        self.stateEqual(ket0().numpy(), out.detach().numpy(), msg="RX(0)|0> should equal |0>")
 
     def test_hybrid_training_reduces_loss(self):
         """
@@ -91,6 +103,7 @@ class GradientDescent(Question):
 
             def forward(self, x):
                 x = self.enc(x).to(C64)
+
                 return self.c(x)
 
         model = HybridModel()
@@ -106,8 +119,11 @@ class GradientDescent(Question):
             loss.backward(retain_graph=True)
             optimizer.step()
 
+
+
         final_loss = torch.norm(model(data) - target).item()
-        self.assertLess(final_loss, initial_loss)
+
+        self.assertLess(final_loss, initial_loss, msg="Hybrid training should reduce loss")
 
     def test_two_qubit_gradient_flows(self):
         """
@@ -124,14 +140,20 @@ class GradientDescent(Question):
         x = torch.zeros(4, dtype=C64)
         x[0] = 1.0
         out = c(x)
-        # p11 = sin^2(a0/2)*sin^2(a1/2); nonzero gradient w.r.t. both angles
         loss = out.reshape(-1)[3].abs().pow(2)
         loss.backward()
 
-        self.assertIsNotNone(a0.grad)
-        self.assertIsNotNone(a1.grad)
-        self.assertGreater(a0.grad.abs().item(), 1e-4)
-        self.assertGreater(a1.grad.abs().item(), 1e-4)
+
+
+        self.assertIsNotNone(a0.grad, msg="Gradient of a0 should not be None")
+
+
+
+        self.assertIsNotNone(a1.grad, msg="Gradient of a1 should not be None")
+
+        self.assertGreater(a0.grad.abs().item(), 1e-4, msg="Gradient of a0 should be non-negligible")
+
+        self.assertGreater(a1.grad.abs().item(), 1e-4, msg="Gradient of a1 should be non-negligible")
 
 
 if __name__ == "__main__":

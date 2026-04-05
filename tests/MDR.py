@@ -116,6 +116,7 @@ class Question(unittest.TestCase):
     def tensorise(self, x):
         if isinstance(x, torch.Tensor):
             return x
+
         if isinstance(x, (list, tuple)):
             x = torch.tensor(x)
 
@@ -142,13 +143,15 @@ class Question(unittest.TestCase):
 
         phase = ta[k] / tb[k]
         eq = torch.allclose(ta, phase * tb, atol=atol)
+
         self.assertEqual(eq, True, msg=msg)
 
-    def matEqual(self, A, B, places=4):
+    def matEqual(self, A, B, places=4, msg=None):
         A = self.tensorise(A)
         B = self.tensorise(B)
 
-        self.assertEqual(tuple(A.shape), tuple(B.shape))
+        self.assertEqual(tuple(A.shape), tuple(B.shape), msg=msg or "shape mismatch")
 
         diff = round(torch.sum(torch.abs(A - B)).item(), int(places))
-        self.assertEqual(diff, 0)
+
+        self.assertEqual(diff, 0, msg=msg or "matrix values differ")

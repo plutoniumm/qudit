@@ -12,11 +12,13 @@ C64 = torch.complex64
 def ket0(size):
     x = torch.zeros(size, dtype=C64)
     x[0] = 1.0
+
     return x
 
 
 def toRho(x):
     size = x.numel()
+
     return x.view(size, 1) @ torch.conj(x.view(1, size))
 
 
@@ -43,7 +45,8 @@ class MatrixCircuit(Question):
 
         rhoV = toRho(cV(xV))
         rhoM = cM(xM)
-        self.matEqual(rhoV, rhoM)
+
+        self.matEqual(rhoV, rhoM, msg="Single-qubit: VECTOR and MATRIX modes should agree")
 
     def test_single_qutrit(self):
         """
@@ -62,7 +65,8 @@ class MatrixCircuit(Question):
 
         rhoV = toRho(cV(xV))
         rhoM = cM(xM)
-        self.matEqual(rhoV, rhoM)
+
+        self.matEqual(rhoV, rhoM, msg="Single-qutrit: VECTOR and MATRIX modes should agree")
 
     def test_mixed_dims(self):
         """
@@ -87,7 +91,8 @@ class MatrixCircuit(Question):
 
         rhoV = toRho(cV(xV))
         rhoM = cM(xM)
-        self.matEqual(rhoV, rhoM)
+
+        self.matEqual(rhoV, rhoM, msg="Mixed-dims [2,2,3,3]: VECTOR and MATRIX modes should agree")
 
     def test_trace_preserved(self):
         """
@@ -100,9 +105,11 @@ class MatrixCircuit(Question):
         cM.gate(G2.CX, [0, 1])
 
         xV = ket0(cM.width)
+
         rhoM = cM(toRho(xV))
         tr = torch.trace(rhoM).real.item()
-        self.assertAlmostEqual(tr, 1.0, places=5)
+
+        self.assertAlmostEqual(tr, 1.0, places=5, msg="Unitary channel should preserve trace")
 
     def test_purity_preserved(self):
         """
@@ -115,9 +122,11 @@ class MatrixCircuit(Question):
         cM.gate(G2.CX, [0, 1])
 
         xV = ket0(cM.width)
+
         rhoM = cM(toRho(xV))
         purity = torch.trace(rhoM @ rhoM).real.item()
-        self.assertAlmostEqual(purity, 1.0, places=5)
+
+        self.assertAlmostEqual(purity, 1.0, places=5, msg="Unitary channel should preserve purity")
 
 
 if __name__ == "__main__":
