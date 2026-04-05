@@ -21,3 +21,6 @@ docs/.vitepress/cache/
 docs/code
 docs/tests
 docs/public/dumps
+
+missing.md
+claude.md

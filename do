@@ -55,12 +55,17 @@ test() {
   hasPython;
   local root;
   root="$(rootDir)";
+  cd "$root";
+
+  python -m view.lint;
+  black qudit/ tests/ view/;
+
   cd "$root/tests";
 
   python circuit_V.py;
   python gates.py;
   python gd.py;
-  # python ECC.py;
+  python ECC.py;
   python algo.py;
   python circuit_M.py;
   python metrics.py;

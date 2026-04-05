@@ -10,8 +10,6 @@ High performance simulations for qudit systems. To make qudit machine learning, 
 pip install qudit
 ```
 
-> WARNING: Error correction is currently broken and is being worked on. Currently anything inside `qudit.noise` or `qudit.qec` should be considered volatile.
-
 ## Quickstart
 
 In most cases it should not matter if you mix and match `pytorch` with `qudit` since most abstractions are built on top of `pytorch` tensors. The following is two examples to do the same thing, one using the `Circuit` class and the other manually using the matrices.
@@ -37,20 +35,10 @@ print(C(ket0))  # [1. 0. 0. 1.]/rt2
 ## Contributing
 Qudit has a small shell scripts used to generate documentation and run tests. If you want to contribute, please fork the repo and make a pull request with your changes. The running script is `do`.
 
-### `./do` helper script
-
-The repository includes a small `./do` helper for common workflows (build, tests, docs, etc.).
-
-```bash
-./do help
-```
-
-### Caveats
-- `qudit` does not, and will not support openQASM in the near future since hardware is not a goal. There are plans for some amount of interoperability with other qudit simulators, however that will be a long term goal and not a near term one. We will first make qudit stable.
--
-
 #### Commands
 
+- `./do help`
+  - Helper for common workflows (build, tests, docs, etc.)
 - `./do build`
   - Builds `sdist` + `wheel` and runs `twine check dist/*`.
 - `./do deploy`
@@ -100,3 +88,6 @@ FILE=.vscode/token.env ./do deploy
 Many many thanks to [Sai Sakunthala](https://github.com/Sai-sakunthala) and [R-Phoenix](https://github.com/R-Phoenix) for testing and fixing bugs!
 
 This library is built on top of pytorch, and takes ideas from Qiskit, Cirq, and QuDiet.
+
+### Caveats
+`qudit` does not, and will not support openQASM in the near future since hardware is not a goal. There are plans for some amount of interoperability with other qudit simulators, however that will be a long term goal and not a near term one. We will first make qudit stable.
