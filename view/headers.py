@@ -43,6 +43,8 @@ def format(node: ast.AST) -> str | None:
         ann = ast.unparse(a.annotation) if a.annotation else "Any"
         args.append(f"{a.arg}: {ann}")
 
+    # no need for *args and **kwargs
+
     returns = ast.unparse(node.returns) if node.returns is not None else "Any"
     prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
 
