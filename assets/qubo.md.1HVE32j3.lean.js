@@ -1,0 +1,1 @@
+import{_ as i,o as a,c as n,ag as l}from"./chunks/framework.CVnWAasT.js";const o=JSON.parse('{"title":"QUBO","description":"","frontmatter":{},"headers":[],"relativePath":"qubo.md","filePath":"qubo.md"}'),h={name:"qubo.md"};function p(t,s,e,k,r,d){return a(),n("div",null,[...s[0]||(s[0]=[l("",44)])])}const g=i(h,[["render",p]]);export{o as __pageData,g as default};
