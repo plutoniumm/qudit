@@ -4,7 +4,7 @@ import sys
 sys.path.append("..")
 
 from qudit.algo import QAOA
-from qudit.algo.qaoa import QUBO
+from qudit.algo.qaoa import QUBO, ClockSolver
 import torch as pt
 import numpy as np
 
@@ -213,6 +213,292 @@ class QAOACircuit(Question):
         )
 
 
+class QAOASolve(Question):
+    """
+    QAOA.solve() output contract and optimization tests.
+    """
+
+    Q = {
+        (0, 0): -1.0,
+        (1, 1): -1.0,
+        (0, 1): 2.0,
+    }
+
+    def _qaoa(self, d=2, layers=1):
+        pt.manual_seed(42)
+
+        return QAOA(d=d, wires=2, qubo=self.Q, layers=layers, device="cpu")
+
+    def test_solve_returns_dict(self):
+        """
+        solve() returns a dict containing keys "solution" and "probabilities"
+        """
+        out = self._qaoa().solve(steps=30, lr=0.1)
+
+        self.assertIn("solution", out, msg="solve() output missing 'solution' key")
+
+        self.assertIn(
+            "probabilities", out, msg="solve() output missing 'probabilities' key"
+        )
+
+    def test_solution_is_int_list(self):
+        """
+        solve()["solution"] is a list of ints, one per wire
+        """
+        sol = self._qaoa().solve(steps=30, lr=0.1)["solution"]
+
+        self.assertIsInstance(sol, list, msg="solution should be a list")
+
+        self.assertEqual(
+            len(sol), 2, msg="solution length should equal number of wires"
+        )
+
+        for bit in sol:
+            self.assertIsInstance(
+                bit, int, msg=f"each solution element should be int, got {type(bit)}"
+            )
+
+    def test_probabilities_sum_to_one(self):
+        """
+        solve()["probabilities"] sums to $1$ (normalized distribution over bitstrings)
+        """
+        probs = self._qaoa().solve(steps=30, lr=0.1)["probabilities"]
+        total = float(probs.sum().item())
+
+        self.assertAlmostEqual(
+            total, 1.0, places=5, msg="probabilities should sum to 1.0"
+        )
+
+    def test_probabilities_length(self):
+        """
+        solve()["probabilities"] has $d^n = 4$ entries for 2 qubits
+        """
+        probs = self._qaoa().solve(steps=30, lr=0.1)["probabilities"]
+
+        self.assertEqual(
+            len(probs.flatten()),
+            4,
+            msg="probabilities should have d^wires entries",
+        )
+
+    def test_two_layers_runs(self):
+        """
+        QAOA with layers=2 runs solve() without error
+        """
+        pt.manual_seed(42)
+        qaoa = QAOA(d=2, wires=2, qubo=self.Q, layers=2, device="cpu")
+        out = qaoa.solve(steps=20, lr=0.1)
+
+        self.assertIn("solution", out, msg="layers=2 solve() should return solution")
+
+    def test_qutrit_runs(self):
+        """
+        QAOA with $d=3$ (qutrit) runs solve() without error
+        """
+        pt.manual_seed(42)
+        qaoa = QAOA(d=3, wires=2, qubo=self.Q, layers=1, device="cpu")
+        out = qaoa.solve(steps=20, lr=0.1)
+
+        self.assertIn("solution", out, msg="d=3 QAOA solve() should return solution")
+
+        self.assertEqual(
+            len(out["solution"]),
+            2,
+            msg="d=3 solution length should equal number of wires",
+        )
+
+
+class ClockSolverTests(Question):
+    """
+    ClockSolver variational qudit optimizer tests for $d=2$ and $d=3$.
+    """
+
+    Q = {
+        (0, 0): -1.0,
+        (1, 1): -1.0,
+        (0, 1): 2.0,
+    }
+
+    def _solver(self, d=2, layers=1):
+        pt.manual_seed(42)
+
+        return ClockSolver(d=d, wires=2, qubo=self.Q, layers=layers, device="cpu")
+
+    def test_d2_solve_returns_dict(self):
+        """
+        ClockSolver($d=2$) solve() returns dict with "solution" and "probabilities"
+        """
+        out = self._solver(d=2).solve(steps=30, lr=0.1)
+
+        self.assertIn("solution", out, msg="d=2 solve() missing 'solution'")
+
+        self.assertIn("probabilities", out, msg="d=2 solve() missing 'probabilities'")
+
+    def test_d2_solution_is_int_list(self):
+        """
+        ClockSolver($d=2$) solution is a list of 2 ints
+        """
+        sol = self._solver(d=2).solve(steps=30, lr=0.1)["solution"]
+
+        self.assertIsInstance(sol, list, msg="d=2 solution should be a list")
+
+        self.assertEqual(len(sol), 2, msg="d=2 solution length should be 2")
+
+        for v in sol:
+            self.assertIsInstance(
+                v, int, msg=f"d=2 solution element should be int, got {type(v)}"
+            )
+
+    def test_d3_solve_returns_dict(self):
+        """
+        ClockSolver($d=3$) solve() returns dict with "solution" and "probabilities"
+        """
+        out = self._solver(d=3).solve(steps=30, lr=0.1)
+
+        self.assertIn("solution", out, msg="d=3 solve() missing 'solution'")
+
+        self.assertIn("probabilities", out, msg="d=3 solve() missing 'probabilities'")
+
+    def test_d3_solution_values_in_range(self):
+        """
+        ClockSolver($d=3$) solution elements are in $\\{0, 1, 2\\}$
+        """
+        sol = self._solver(d=3).solve(steps=30, lr=0.1)["solution"]
+
+        for v in sol:
+            self.assertIn(
+                v,
+                [0, 1, 2],
+                msg=f"d=3 solution element {v} not in {{0,1,2}}",
+            )
+
+    def test_expectation_is_scalar_tensor(self):
+        """
+        expectation() returns a scalar torch.Tensor
+        """
+        exp = self._solver().expectation()
+
+        self.assertIsInstance(
+            exp, pt.Tensor, msg="expectation() should return a torch.Tensor"
+        )
+
+        self.assertEqual(
+            exp.shape,
+            pt.Size([]),
+            msg="expectation() should be a scalar (0-dim tensor)",
+        )
+
+    def test_forward_normalized(self):
+        """
+        forward() produces a state with $\\|\\psi\\|_2 \\approx 1$
+        """
+        state = self._solver().forward()
+        norm = pt.norm(state).item()
+
+        self.assertAlmostEqual(
+            norm, 1.0, places=5, msg="ClockSolver forward() state should be normalized"
+        )
+
+    def test_d3_forward_normalized(self):
+        """
+        ClockSolver($d=3$) forward() state is also normalized
+        """
+        state = self._solver(d=3).forward()
+        norm = pt.norm(state).item()
+
+        self.assertAlmostEqual(
+            norm,
+            1.0,
+            places=5,
+            msg="ClockSolver d=3 forward() state should be normalized",
+        )
+
+
+class QUBOEdgeCases(Question):
+    """
+    Edge-case and symmetry tests for QUBO.toHamiltonian().
+    """
+
+    def test_empty_q(self):
+        """
+        Empty $Q$ gives empty Hamiltonian and zero offset
+        """
+        ham, offset = QUBO.toHamiltonian({})
+
+        self.assertEqual(len(ham), 0, msg="empty Q should give empty Hamiltonian")
+
+        self.assertAlmostEqual(
+            offset, 0.0, places=6, msg="empty Q should give zero offset"
+        )
+
+    def test_multiple_diagonal_terms(self):
+        """
+        Three diagonal entries produce exactly 3 $Z$ terms (one per variable)
+        """
+        Q = {
+            (0, 0): 1.0,
+            (1, 1): 2.0,
+            (2, 2): 3.0,
+        }
+        ham, _ = QUBO.toHamiltonian(Q)
+
+        z_terms = [(c, gt, idx) for c, gt, idx in ham if gt == "Z"]
+
+        self.assertEqual(
+            len(z_terms), 3, msg="three diagonal entries should produce 3 Z terms"
+        )
+
+    def test_diagonal_offset_sum(self):
+        """
+        Offset equals $\sum_i Q_{ii}/2$ for all-diagonal $Q$
+        """
+        Q = {
+            (0, 0): 2.0,
+            (1, 1): 4.0,
+            (2, 2): 6.0,
+        }
+        _, offset = QUBO.toHamiltonian(Q)
+
+        expected = (2.0 + 4.0 + 6.0) / 2
+
+        self.assertAlmostEqual(
+            offset,
+            expected,
+            places=6,
+            msg=f"all-diagonal offset should be {expected}",
+        )
+
+    def test_symmetry_ij_vs_ji(self):
+        """
+        $Q = \\{(0,1): v\\}$ and $Q = \\{(1,0): v\\}$ produce identical Hamiltonians
+        (QUBO is symmetric in off-diagonal indices)
+        """
+        v = 3.0
+        ham_ij, off_ij = QUBO.toHamiltonian({(0, 1): v})
+        ham_ji, off_ji = QUBO.toHamiltonian({(1, 0): v})
+
+        self.assertAlmostEqual(
+            off_ij, off_ji, places=6, msg="offsets should match for (0,1) vs (1,0)"
+        )
+
+        terms_ij = {(gt, tuple(idx)): c for c, gt, idx in ham_ij}
+        terms_ji = {(gt, tuple(idx)): c for c, gt, idx in ham_ji}
+
+        self.assertEqual(
+            terms_ij.keys(),
+            terms_ji.keys(),
+            msg="Hamiltonian term keys should match for (0,1) vs (1,0)",
+        )
+
+        for key in terms_ij:
+            self.assertAlmostEqual(
+                terms_ij[key],
+                terms_ji[key],
+                places=6,
+                msg=f"coefficient for {key} should match for (0,1) vs (1,0)",
+            )
+
+
 if __name__ == "__main__":
     runner = Exam(
         name="Qudit QUBO Tests",
@@ -221,3 +507,6 @@ if __name__ == "__main__":
     )
     runner.run(load(QUBOConversion))
     runner.run(load(QAOACircuit))
+    runner.run(load(QAOASolve))
+    runner.run(load(ClockSolverTests))
+    runner.run(load(QUBOEdgeCases))

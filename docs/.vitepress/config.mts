@@ -28,12 +28,26 @@ export default defineConfig({
           { text: 'Quickstart', link: '/quickstart' },
           { text: 'Primitives', link: '/primitives' },
           { text: 'Circuit', link: '/circuit' },
+          { text: 'Noisy Circuits', link: '/noisy' },
+          { text: 'Circuit Cutting', link: '/cutting' },
           { text: 'QUBO', link: '/qubo' },
           { text: 'Error Correction', link: '/qec' },
           { text: 'Noise Channels', link: '/noise' },
           { text: 'Metrics', link: '/metrics' },
           { text: 'Algorithms', link: '/algo' },
         ]
+      },
+      {
+        text: 'Performance',
+        items: [
+          { text: 'Overview', link: '/benchmarks' },
+          { text: 'Ideal Circuit', link: '/bench-circuit' },
+          { text: 'Noisy Circuits', link: '/bench-noisy' },
+          { text: 'QEC Recovery', link: '/bench-qec' },
+          { text: 'Gradient Descent', link: '/bench-gd' },
+          { text: 'QUBO / QAOA', link: '/bench-qubo' },
+          { text: 'Metrics', link: '/bench-metrics' },
+        ],
       },
       {
         text: 'Testing',

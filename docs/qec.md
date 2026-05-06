@@ -104,6 +104,14 @@ noise = Process.AD(d=2, n=4, Y=0.1, order=3)
 | `Process.AD(d, n, Y, order)` | Amplitude damping. Only lowering operators |
 | `Process.GAD(d, n, Y, p, order)` | Generalized AD. Lowering + raising operators |
 | `Process.Pauli(n, paulis, p, order)` | Pauli channel over `{I,X,Y,Z}` words |
+| `Process.Depolarising(d, n, p)` | Weyl-Heisenberg depolarising for any $d$ |
+| `Process.PhaseDamp(d, n, p)` | Phase damping (dephasing) for any $d$ |
+| `Process.BitFlip(d, n, p)` | Cyclic shift $X_d$ with probability $p$ |
+| `Process.PhaseFlip(d, n, p)` | Clock operator $Z_d$ with probability $p$ |
+| `Process.Reset(d, n, p)` | Collapse to $|0\rangle$ with probability $p$ |
+| `Process.ThermalRelax(n, T1, T2, t)` | $T_1$/$T_2$ thermal relaxation (qubits only) |
+
+See [Noise Channels](/noise) for full channel documentation and IID variants.
 
 Applying a channel to a density matrix:
 

@@ -417,6 +417,345 @@ class QuditCodes(Question):
         )
 
 
+class RecoveryMaps(Question):
+    """
+    Recovery map tests: Leung and Cafaro maps improve fidelity on Leung 4-qubit code.
+    """
+
+    def setUp(self):
+        state0, state1 = Leung().toTensor()
+        state0 = state0.to(pt.complex64)
+        state1 = state1.to(pt.complex64)
+        self.rho0 = to_rho(state0)
+        self.rho1 = to_rho(state1)
+        self.noise = Process.AD(d=2, n=4, Y=0.1, order=3)
+        self.codewords = [state0, state1]
+
+    def test_leung_improves_fidelity(self):
+        """
+        $\\mathcal{R}_\\mathrm{Leung}$ strictly improves fidelity over noisy channel
+        for both Leung codewords
+        """
+        rec = Recovery.leung(self.noise, self.codewords)
+        noisy0 = self.noise.run(self.rho0)
+        clean0 = rec.run(noisy0)
+
+        self.assertGreater(
+            fid(self.rho0, clean0),
+            fid(self.rho0, noisy0),
+            msg="Leung recovery should improve fidelity for codeword 0",
+        )
+
+    def test_leung_returns_channel(self):
+        """
+        $Recovery.leung$ returns a $Channel$ object
+        """
+        from qudit.noise.index import Channel
+
+        rec = Recovery.leung(self.noise, self.codewords)
+
+        self.assertIsInstance(rec, Channel, msg="Leung recovery should be a Channel")
+
+    def test_cafaro_improves_fidelity(self):
+        """
+        $\\mathcal{R}_\\mathrm{Cafaro}$ strictly improves fidelity over noisy channel
+        for codeword 0
+        """
+        rec = Recovery.cafaro(self.noise, self.codewords)
+        noisy0 = self.noise.run(self.rho0)
+        clean0 = rec.run(noisy0)
+
+        self.assertGreater(
+            fid(self.rho0, clean0),
+            fid(self.rho0, noisy0),
+            msg="Cafaro recovery should improve fidelity for codeword 0",
+        )
+
+    def test_cafaro_returns_channel(self):
+        """
+        $Recovery.cafaro$ returns a $Channel$ object
+        """
+        from qudit.noise.index import Channel
+
+        rec = Recovery.cafaro(self.noise, self.codewords)
+
+        self.assertIsInstance(rec, Channel, msg="Cafaro recovery should be a Channel")
+
+    def test_all_three_improve_fidelity(self):
+        """
+        All three recovery maps (Petz, Leung, Cafaro) improve fidelity over raw noise
+        """
+        noisy0 = self.noise.run(self.rho0)
+        raw_fid = fid(self.rho0, noisy0)
+
+        for name, rec in [
+            ("Petz", Recovery.petz(self.noise, self.codewords)),
+            ("Leung", Recovery.leung(self.noise, self.codewords)),
+            ("Cafaro", Recovery.cafaro(self.noise, self.codewords)),
+        ]:
+            clean0 = rec.run(noisy0)
+
+            self.assertGreater(
+                fid(self.rho0, clean0),
+                raw_fid,
+                msg=f"{name} recovery should improve fidelity",
+            )
+
+
+class DepolarizingRecovery(Question):
+    """
+    Recovery under Pauli and depolarising noise: fidelity improvement and trace preservation.
+    """
+
+    def setUp(self):
+        state0, state1 = Leung().toTensor()
+        state0 = state0.to(pt.complex64)
+        state1 = state1.to(pt.complex64)
+        self.rho0 = to_rho(state0)
+        self.rho1 = to_rho(state1)
+        self.codewords_leung = [state0, state1]
+        self.noise_leung = Process.AD(d=2, n=4, Y=0.1, order=3)
+
+        d0, d1 = Dutta3().toTensor()
+        d0 = d0.to(pt.complex64)
+        d1 = d1.to(pt.complex64)
+        self.rho_d0 = to_rho(d0)
+        self.codewords_dutta = [d0, d1]
+        self.noise_dep = Process.Depolarising(d=2, n=3, p=0.05)
+
+    def test_depolarising_petz_improves_fidelity(self):
+        """
+        $\\mathcal{R}_\\mathrm{Petz}$ on depolarising noise ($p=0.05$, Dutta3 code) improves fidelity
+        """
+        rec = Recovery.petz(self.noise_dep, self.codewords_dutta)
+        noisy = self.noise_dep.run(self.rho_d0)
+        clean = rec.run(noisy)
+
+        self.assertGreater(
+            fid(self.rho_d0, clean),
+            fid(self.rho_d0, noisy),
+            msg="Petz recovery under depolarising noise should improve fidelity",
+        )
+
+    def test_pauli_leung_improves_fidelity(self):
+        """
+        $\\mathcal{R}_\\mathrm{Leung}$ on Pauli-X noise ($p_X=0.05$, Leung code) improves fidelity
+        """
+        noise = Process.Pauli(n=4, p=[0.05, 0.0, 0.0])
+        rec = Recovery.leung(noise, self.codewords_leung)
+        noisy = noise.run(self.rho0)
+        clean = rec.run(noisy)
+
+        self.assertGreater(
+            fid(self.rho0, clean),
+            fid(self.rho0, noisy),
+            msg="Leung recovery under Pauli noise should improve fidelity",
+        )
+
+    def test_petz_trace_preservation_cw0(self):
+        """
+        $\\mathrm{tr}(\\mathcal{R}_\\mathrm{Petz}(\\mathcal{N}(\\rho_0))) \\approx 1$: Petz preserves trace on codeword 0
+        """
+        rec = Recovery.petz(self.noise_leung, self.codewords_leung)
+        noisy = self.noise_leung.run(self.rho0)
+        out = rec.run(noisy)
+
+        self.assertAlmostEqual(
+            pt.real(pt.trace(out)).item(),
+            1.0,
+            places=4,
+            msg="Petz recovery should preserve trace for codeword 0",
+        )
+
+    def test_petz_trace_preservation_cw1(self):
+        """
+        $\\mathrm{tr}(\\mathcal{R}_\\mathrm{Petz}(\\mathcal{N}(\\rho_1))) \\approx 1$: Petz preserves trace on codeword 1
+        """
+        rec = Recovery.petz(self.noise_leung, self.codewords_leung)
+        noisy = self.noise_leung.run(self.rho1)
+        out = rec.run(noisy)
+
+        self.assertAlmostEqual(
+            pt.real(pt.trace(out)).item(),
+            1.0,
+            places=4,
+            msg="Petz recovery should preserve trace for codeword 1",
+        )
+
+    def test_depolarising_petz_returns_channel(self):
+        """
+        $Recovery.petz$ on depolarising noise returns a $Channel$
+        """
+        from qudit.noise.index import Channel
+
+        rec = Recovery.petz(self.noise_dep, self.codewords_dutta)
+
+        self.assertIsInstance(
+            rec, Channel, msg="Petz recovery under depolarising should be a Channel"
+        )
+
+
+class RecoveryChannelProperties(Question):
+    """
+    Structural properties of recovered density matrices: Hermitian, PSD, unit trace.
+    """
+
+    def setUp(self):
+        state0, state1 = Leung().toTensor()
+        state0 = state0.to(pt.complex64)
+        state1 = state1.to(pt.complex64)
+        self.rho0 = to_rho(state0)
+        self.codewords = [state0, state1]
+        self.noise = Process.AD(d=2, n=4, Y=0.1, order=3)
+        noisy = self.noise.run(self.rho0)
+        rec_petz = Recovery.petz(self.noise, self.codewords)
+        self.out_petz = rec_petz.run(noisy)
+        rec_cafaro = Recovery.cafaro(self.noise, self.codewords)
+        self.out_cafaro = rec_cafaro.run(noisy)
+
+    def test_petz_output_hermitian(self):
+        """
+        Petz recovery output on noisy Leung codeword 0 is Hermitian: $\\rho^\\dagger = \\rho$
+        """
+        diff = pt.abs(self.out_petz - self.out_petz.conj().T).max().item()
+
+        self.assertAlmostEqual(
+            diff,
+            0.0,
+            places=5,
+            msg="Petz recovery output is not Hermitian",
+        )
+
+    def test_petz_output_positive_semidefinite(self):
+        """
+        Petz recovery output is positive semidefinite: all eigenvalues $\\geq 0$
+        """
+        eigs = pt.linalg.eigvalsh(self.out_petz).real
+
+        self.assertTrue(
+            bool((eigs >= -1e-5).all()),
+            msg="Petz recovery output has negative eigenvalues",
+        )
+
+    def test_cafaro_output_hermitian(self):
+        """
+        Cafaro recovery output on noisy Leung codeword 0 is Hermitian: $\\rho^\\dagger = \\rho$
+        """
+        diff = pt.abs(self.out_cafaro - self.out_cafaro.conj().T).max().item()
+
+        self.assertAlmostEqual(
+            diff,
+            0.0,
+            places=5,
+            msg="Cafaro recovery output is not Hermitian",
+        )
+
+
+class CodeProperties(Question):
+    """
+    Code attribute tests: isValid, dits, dim, len.
+    """
+
+    def test_isvalid_leung(self):
+        """
+        $Code.isValid$ does not raise for the Leung code
+        """
+        code = Leung()
+        try:
+            Code.isValid(code.toTensor())
+        except ValueError as e:
+            self.fail(f"Code.isValid raised ValueError for Leung: {e}")
+
+    def test_isvalid_dutta3(self):
+        """
+        $Code.isValid$ does not raise for the Dutta3 code
+        """
+        code = Dutta3()
+        try:
+            Code.isValid(code.toTensor())
+        except ValueError as e:
+            self.fail(f"Code.isValid raised ValueError for Dutta3: {e}")
+
+    def test_isvalid_perfect(self):
+        """
+        $Code.isValid$ does not raise for the Perfect code
+        """
+        code = Perfect()
+        try:
+            Code.isValid(code.toTensor())
+        except ValueError as e:
+            self.fail(f"Code.isValid raised ValueError for Perfect: {e}")
+
+    def test_isvalid_gottesmand_d2(self):
+        """
+        $Code.isValid$ does not raise for $GottesmanD(d=2)$
+        """
+        code = GottesmanD(d=2)
+        try:
+            Code.isValid(code.toTensor())
+        except ValueError as e:
+            self.fail(f"Code.isValid raised ValueError for GottesmanD(d=2): {e}")
+
+    def test_isvalid_raises_unnormalized(self):
+        """
+        $Code.isValid$ raises $ValueError$ for an un-normalized code
+        """
+        bad = pt.tensor([[2.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]])
+
+        with self.assertRaises(
+            ValueError, msg="un-normalized code should raise ValueError"
+        ):
+            Code.isValid(bad)
+
+    def test_dits_dutta3(self):
+        """
+        Dutta3 code has $\\mathrm{dits}=3$ (three physical qubits)
+        """
+        self.assertEqual(Dutta3().dits, 3, msg="Dutta3 dits should be 3")
+
+    def test_dits_leung(self):
+        """
+        Leung code has $\\mathrm{dits}=4$ (four physical qubits)
+        """
+        self.assertEqual(Leung().dits, 4, msg="Leung dits should be 4")
+
+    def test_dits_perfect(self):
+        """
+        Perfect code has $\\mathrm{dits}=5$ (five physical qubits)
+        """
+        self.assertEqual(Perfect().dits, 5, msg="Perfect dits should be 5")
+
+    def test_dim_leung(self):
+        """
+        Leung code has $\\mathrm{dim}=2$ (encodes one logical qubit: 2 codewords)
+        """
+        self.assertEqual(Leung().dim, 2, msg="Leung dim should be 2")
+
+    def test_dim_perfect(self):
+        """
+        Perfect code has $\\mathrm{dim}=2$ (encodes one logical qubit: 2 codewords)
+        """
+        self.assertEqual(Perfect().dim, 2, msg="Perfect dim should be 2")
+
+    def test_len_leung(self):
+        """
+        $\\mathrm{len}(\\mathrm{Leung()}) = 2$: two codewords
+        """
+        self.assertEqual(len(Leung()), 2, msg="len(Leung()) should be 2")
+
+    def test_len_dutta3(self):
+        """
+        $\\mathrm{len}(\\mathrm{Dutta3()}) = 2$: two codewords
+        """
+        self.assertEqual(len(Dutta3()), 2, msg="len(Dutta3()) should be 2")
+
+    def test_len_qutrit3(self):
+        """
+        $\\mathrm{len}(\\mathrm{Qutrit3()}) = 3$: three codewords
+        """
+        self.assertEqual(len(Qutrit3()), 3, msg="len(Qutrit3()) should be 3")
+
+
 if __name__ == "__main__":
     runner = Exam(
         name="Qudit ECC Tests",
@@ -426,3 +765,7 @@ if __name__ == "__main__":
     runner.run(load(QEC))
     runner.run(load(QECCodes))
     runner.run(load(QuditCodes))
+    runner.run(load(RecoveryMaps))
+    runner.run(load(DepolarizingRecovery))
+    runner.run(load(RecoveryChannelProperties))
+    runner.run(load(CodeProperties))

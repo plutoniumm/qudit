@@ -1,252 +1,319 @@
-import sys, json, os
+"""
+Gradient descent / VQE benchmark.
 
-sys.path.append("..")
+All frameworks optimise the same problem:
+    minimise <Z⊗I⊗...> over a layered RY-CX ansatz.
 
-import matplotlib.pyplot as plt
+Gradient method per framework:
+  qudit       torch autograd (AD)
+  pennylane   torch autograd (AD)
+  qiskit      parameter-shift rule via StatevectorEstimator batch API (PS, 2L evals/step)
+  cirq        parameter-shift rule, manual (PS, 2L evals/step)
+  braket      parameter-shift rule, manual (PS, 2L evals/step)
+  qutip       parameter-shift rule, manual (PS, 2L evals/step)
 
+AD and PS are both O(L) evals/step — autograd is typically 1-2x forward cost,
+param-shift is exactly 2L forward costs. The comparison is framework overhead,
+not algorithmic complexity, so both gradient methods are noted in the output.
+"""
 
-def _early_plot_and_exit():
-    if os.path.exists("bench_sgd.json"):
-        with open("bench_sgd.json") as f:
-            data = json.load(f)
-
-        n_range = range(3, 21)
-        LOG_THRESH = 8
-
-        for k, ts in data.items():
-            if ts:
-                plt.plot(list(n_range)[: len(ts)], ts, label=k, marker=".")
-        plt.axhline(LOG_THRESH, color="red", linestyle="--", label="Cutoff Threshold")
-
-        plt.xlabel("Num Qubits (n)")
-        plt.ylabel("log (avg ms/run)")
-        plt.xticks(range(3, 18))
-        plt.yticks(range(0, LOG_THRESH))
-        plt.ylim(0, LOG_THRESH + 1)
-        plt.title("Qubit GD Runtime")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-
-        plt.savefig("bench_sgd.png", dpi=300)
-        sys.exit(0)
-
-
-_early_plot_and_exit()
-
-import pennylane as qml
-from torch import nn
-import torch
+import sys
+import time
 import numpy as np
-import sympy
+
+sys.path.insert(0, "..")
+
+import torch
+import torch.nn as nn
 import cirq
-from qiskit.circuit import QuantumCircuit as Qiskitc, ParameterVector
-from qiskit.quantum_info import Statevector
-from qudit.circuit import Circuit as Quditc
-import qudit.circuit.gates as G
-import matplotlib.pyplot as plt
-from time import time
+import sympy
+import pennylane as qml
+import qutip as qt
+from qiskit.circuit import QuantumCircuit, ParameterVector
+from qiskit.primitives import StatevectorEstimator
+from qiskit.quantum_info import SparsePauliOp
+from braket.circuits import Circuit as BCircuit, observables as bobs
+from braket.devices import LocalSimulator
+from qutip_qip.circuit import QubitCircuit, CircuitSimulator
+
+from qudit.circuit import Circuit
 
 C64 = torch.complex64
-lr = 0.05
-steps = 20
-eps = 1e-3
-ms = 1e3
-repeats = 5
+WARMUP = 3
+N = 20
+
+CONFIGS = [
+    {"label": "2q 1-layer  50 steps", "wires": 2, "layers": 1, "steps": 50},
+    {"label": "4q 2-layer  50 steps", "wires": 4, "layers": 2, "steps": 50},
+    {"label": "6q 3-layer 100 steps", "wires": 6, "layers": 3, "steps": 100},
+    {"label": "8q 3-layer 100 steps", "wires": 8, "layers": 3, "steps": 100},
+]
 
 
-class HybridQubit(nn.Module):
-    def __init__(self, n, device):
-        super().__init__()
-        self.wires, self.dim = n, 2
-        self.circuit = C = Quditc(n, dim=2, device=device)
-
-        rx = torch.randn(n, requires_grad=True)
-        ry = torch.randn(n, requires_grad=True)
-        self.opt = torch.optim.Adam([rx, ry], lr=lr)
-
-        for i in range(n):
-            C.gate(G.RX, i, angle=rx[i])
-            C.gate(G.RY, i, angle=ry[i])
-
-        for i in range(n - 1):
-            C.gate(G.CX, [i, i + 1])
-
-    def forward(self, x):
-        return self.circuit(x).reshape(-1, 1)
+def _ket0(n):
+    x = torch.zeros(2**n, dtype=C64)
+    x[0] = 1.0
+    return x
 
 
-def b_qudit(n, r):
-    dev = "cpu"
-    M = HybridQubit(n, device=dev)
-    d = G.tensorise([1] + [0] * (2**n - 1), device=dev)
-    tgt = G.tensorise([1] + [0] * (2**n - 2) + [1], device=dev) / np.sqrt(2)
-
-    t = 0
-    for _ in range(r):
-        t0 = time()
-        for _ in range(steps):
-            out = M(d).view(-1)
-            l = -torch.abs(torch.dot(out, tgt))
-
-            M.opt.zero_grad()
-            l.backward(retain_graph=False)
-            M.opt.step()
-        t += time() - t0
-
-    return t / r
+def _zi_obs(wires):
+    Z = torch.tensor([[1.0, 0], [0, -1.0]], dtype=C64)
+    I = torch.eye(2, dtype=C64)
+    obs = Z
+    for _ in range(wires - 1):
+        obs = torch.kron(obs, I)
+    return obs
 
 
-def b_qiskit(n, r):
-    rx = ParameterVector("rx", n)
-    ry = ParameterVector("ry", n)
-
-    qc = Qiskitc(n)
-    for i in range(n):
-        qc.rx(rx[i], i)
-        qc.ry(ry[i], i)
-    for i in range(n - 1):
-        qc.cx(i, i + 1)
-
-    tgt = np.zeros(2**n, dtype=np.complex64)
-    tgt[0] = tgt[-1] = 1 / np.sqrt(2)
-
-    def cost(p):
-        b = {rx[i]: p[i] for i in range(n)}
-        b.update({ry[i]: p[i + n] for i in range(n)})
-        return 1 - np.abs(np.vdot(Statevector(qc.assign_parameters(b)).data, tgt)) ** 2
-
-    t = 0
-    for _ in range(r):
-        p = np.random.randn(2 * n)
-        t0 = time()
-
-        for _ in range(steps):
-            g = np.zeros(2 * n)
-            for i in range(2 * n):
-                d = np.zeros_like(p)
-                d[i] = eps
-                g[i] = (cost(p + d) - cost(p - d)) / (2 * eps)
-            p -= lr * g
-        t += time() - t0
-
-    return t / r
-
-
-def b_cirq(n, r):
-    q = [cirq.LineQubit(i) for i in range(n)]
-    rx = sympy.symbols(f"rx0:{n}")
-    ry = sympy.symbols(f"ry0:{n}")
-    C = cirq.Circuit()
-
-    for i in range(n):
-        C.append(cirq.rx(rx[i])(q[i]))
-        C.append(cirq.ry(ry[i])(q[i]))
-    for i in range(n - 1):
-        C.append(cirq.CNOT(q[i], q[i + 1]))
-
-    sim = cirq.Simulator()
-    tgt = np.zeros(2**n, dtype=np.complex64)
-    tgt[0] = tgt[-1] = 1 / np.sqrt(2)
-
-    def cost(p):
-        b = {rx[i]: p[i] for i in range(n)}
-        b.update({ry[i]: p[i + n] for i in range(n)})
-        psi = sim.simulate(C, param_resolver=b).final_state_vector
-        return 1 - np.abs(np.vdot(psi, tgt)) ** 2
-
-    t = 0
-    for _ in range(r):
-        p = np.random.randn(2 * n)
-        t0 = time()
-
-        for _ in range(steps):
-            g = np.zeros_like(p)
-            for i in range(2 * n):
-                d = np.zeros_like(p)
-                d[i] = eps
-                g[i] = (cost(p + d) - cost(p - d)) / (2 * eps)
-            p -= lr * g
-        t += time() - t0
-    return t / r
-
-
-def b_pennylane(n, r):
-    dev = qml.device("default.qubit", wires=n)
-
-    @qml.qnode(dev, interface="torch")
-    def circuit(rx, ry):
-        for i in range(n):
-            qml.RX(rx[i], wires=i)
-            qml.RY(ry[i], wires=i)
-        for i in range(n - 1):
-            qml.CNOT(wires=[i, i + 1])
-        return qml.state()
-
-    tgt = torch.zeros(2**n, dtype=C64)
-    tgt[0] = tgt[-1] = 1 / np.sqrt(2)
-
-    t = 0
-    for _ in range(r):
-        rx = torch.randn(n, requires_grad=True)
-        ry = torch.randn(n, requires_grad=True)
-        opt = torch.optim.Adam([rx, ry], lr=lr)
-
-        t0 = time()
+def bench_qudit(wires, layers, steps):
+    def run():
+        c = Circuit(wires=wires, dim=2)
+        G = c.gates[2]
+        params = []
+        for _ in range(layers):
+            for w in range(wires):
+                p = nn.Parameter(torch.rand(()))
+                params.append(p)
+                c.gate(G.RY, [w], angle=p)
+            for w in range(wires - 1):
+                c.gate(G.CX, [w, w + 1])
+        obs = _zi_obs(wires)
+        ket = _ket0(wires)
+        opt = torch.optim.Adam(params, lr=0.1)
         for _ in range(steps):
             opt.zero_grad()
-            out = circuit(rx, ry).type(C64)
-            l = 1 - torch.abs(torch.vdot(out, tgt)) ** 2
-            l.backward()
+            c.expectation(obs, ket).backward()
             opt.step()
-        t += time() - t0
 
-    return t / r
+    for _ in range(WARMUP):
+        run()
+    times = []
+    for _ in range(N):
+        t0 = time.perf_counter()
+        run()
+        times.append((time.perf_counter() - t0) * 1e3)
+    return times
 
 
-backends = {
-    "Qiskit": b_qiskit,
-    "Cirq": b_cirq,
-    "PennyLane": b_pennylane,
-    "Qudit": b_qudit,
+def bench_pennylane(wires, layers, steps):
+    dev = qml.device("default.qubit", wires=wires)
+
+    @qml.qnode(dev, interface="torch")
+    def circuit(angles):
+        idx = 0
+        for _ in range(layers):
+            for w in range(wires):
+                qml.RY(angles[idx], wires=w)
+                idx += 1
+            for w in range(wires - 1):
+                qml.CNOT(wires=[w, w + 1])
+        return qml.expval(qml.PauliZ(0))
+
+    def run():
+        angles = torch.rand(wires * layers, requires_grad=True)
+        opt = torch.optim.Adam([angles], lr=0.1)
+        for _ in range(steps):
+            opt.zero_grad()
+            circuit(angles).backward()
+            opt.step()
+
+    for _ in range(WARMUP):
+        run()
+    times = []
+    for _ in range(N):
+        t0 = time.perf_counter()
+        run()
+        times.append((time.perf_counter() - t0) * 1e3)
+    return times
+
+
+def bench_qiskit(wires, layers, steps):
+    nparams = wires * layers
+    theta = ParameterVector("t", nparams)
+    qc = QuantumCircuit(wires)
+    idx = 0
+    for _ in range(layers):
+        for w in range(wires):
+            qc.ry(theta[idx], w)
+            idx += 1
+        for w in range(wires - 1):
+            qc.cx(w, w + 1)
+
+    obs = SparsePauliOp("I" * (wires - 1) + "Z")
+    estimator = StatevectorEstimator()
+
+    def expectation(params):
+        pub = (qc, obs, [params])
+        return float(estimator.run([pub]).result()[0].data.evs)
+
+    def run():
+        p = np.random.uniform(0, np.pi, nparams)
+        lr = 0.1
+        shifts = [np.zeros(nparams) for _ in range(nparams)]
+        for i in range(nparams):
+            shifts[i][i] = np.pi / 2
+        for _ in range(steps):
+            pubs = [(qc, obs, [p + s]) for s in shifts] + [
+                (qc, obs, [p - s]) for s in shifts
+            ]
+            evs = [float(r.data.evs[0]) for r in estimator.run(pubs).result()]
+            grad = np.array([(evs[i] - evs[nparams + i]) / 2 for i in range(nparams)])
+            p -= lr * grad
+
+    for _ in range(WARMUP):
+        run()
+    times = []
+    for _ in range(N):
+        t0 = time.perf_counter()
+        run()
+        times.append((time.perf_counter() - t0) * 1e3)
+    return times
+
+
+def bench_cirq(wires, layers, steps):
+    q = cirq.LineQubit.range(wires)
+    nparams = wires * layers
+    syms = [sympy.Symbol(f"t{i}") for i in range(nparams)]
+    ops = []
+    idx = 0
+    for _ in range(layers):
+        for w in range(wires):
+            ops.append(cirq.ry(syms[idx])(q[w]))
+            idx += 1
+        for w in range(wires - 1):
+            ops.append(cirq.CNOT(q[w], q[w + 1]))
+    circuit = cirq.Circuit(ops)
+    sim = cirq.Simulator()
+    Z = np.array([[1, 0], [0, -1]], dtype=np.complex64)
+    I2 = np.eye(2, dtype=np.complex64)
+    obs_mat = Z
+    for _ in range(wires - 1):
+        obs_mat = np.kron(obs_mat, I2)
+
+    def expectation(params):
+        resolver = cirq.ParamResolver({str(syms[i]): params[i] for i in range(nparams)})
+        sv = np.array(sim.simulate(circuit, param_resolver=resolver).final_state_vector)
+        return float((sv.conj() @ obs_mat @ sv).real)
+
+    def run():
+        p = np.random.uniform(0, np.pi, nparams)
+        lr = 0.1
+        for _ in range(steps):
+            grad = np.zeros(nparams)
+            for i in range(nparams):
+                shift = np.zeros(nparams)
+                shift[i] = np.pi / 2
+                grad[i] = (expectation(p + shift) - expectation(p - shift)) / 2
+            p -= lr * grad
+
+    for _ in range(WARMUP):
+        run()
+    times = []
+    for _ in range(N):
+        t0 = time.perf_counter()
+        run()
+        times.append((time.perf_counter() - t0) * 1e3)
+    return times
+
+
+def bench_braket(wires, layers, steps):
+    dev = LocalSimulator()
+    nparams = wires * layers
+
+    def expectation(params):
+        c = BCircuit()
+        idx = 0
+        for _ in range(layers):
+            for w in range(wires):
+                c.ry(w, float(params[idx]))
+                idx += 1
+            for w in range(wires - 1):
+                c.cnot(w, w + 1)
+        c.expectation(bobs.Z(), [0])
+        return float(dev.run(c, shots=0).result().values[0])
+
+    def run():
+        p = np.random.uniform(0, np.pi, nparams)
+        lr = 0.1
+        for _ in range(steps):
+            grad = np.zeros(nparams)
+            for i in range(nparams):
+                shift = np.zeros(nparams)
+                shift[i] = np.pi / 2
+                grad[i] = (expectation(p + shift) - expectation(p - shift)) / 2
+            p -= lr * grad
+
+    for _ in range(WARMUP):
+        run()
+    times = []
+    for _ in range(N):
+        t0 = time.perf_counter()
+        run()
+        times.append((time.perf_counter() - t0) * 1e3)
+    return times
+
+
+def bench_qutip(wires, layers, steps):
+    nparams = wires * layers
+    Z_op = qt.sigmaz()
+    I_op = qt.qeye(2)
+    obs = qt.tensor([Z_op] + [I_op] * (wires - 1))
+    psi0 = qt.tensor([qt.basis(2, 0)] * wires)
+
+    def expectation(params):
+        qc = QubitCircuit(wires)
+        idx = 0
+        for _ in range(layers):
+            for w in range(wires):
+                qc.add_gate("RY", targets=[w], arg_value=float(params[idx]))
+                idx += 1
+            for w in range(wires - 1):
+                qc.add_gate("CNOT", controls=[w], targets=[w + 1])
+        return float(qt.expect(obs, CircuitSimulator(qc).run(psi0).final_states[0]))
+
+    def run():
+        p = np.random.uniform(0, np.pi, nparams)
+        lr = 0.1
+        for _ in range(steps):
+            grad = np.zeros(nparams)
+            for i in range(nparams):
+                shift = np.zeros(nparams)
+                shift[i] = np.pi / 2
+                grad[i] = (expectation(p + shift) - expectation(p - shift)) / 2
+            p -= lr * grad
+
+    for _ in range(WARMUP):
+        run()
+    times = []
+    for _ in range(N):
+        t0 = time.perf_counter()
+        run()
+        times.append((time.perf_counter() - t0) * 1e3)
+    return times
+
+
+FRAMEWORKS = {
+    "qudit (AD)": bench_qudit,
+    "pennylane (AD)": bench_pennylane,
+    "qiskit (PS)": bench_qiskit,
+    "cirq (PS)": bench_cirq,
+    "braket (PS)": bench_braket,
+    "qutip (PS)": bench_qutip,
 }
 
-n_range = range(3, 21)
-results = {k: [] for k in backends}
-log_thresh = 8
+if __name__ == "__main__":
+    print(__doc__.strip())
+    print(f"\nN={N} runs, warmup={WARMUP}\n")
 
-for n in n_range:
-    print(f"{n}/{max(n_range)}")
-    for k in list(backends.keys()):
-        fn = backends[k]
-        if fn is None:
-            continue
-        t = fn(n, repeats) * ms
-        log_t = np.log(t)
-        print(f"\t{k}: {t:.2f} ms")
-        if log_t > log_thresh:
-            backends[k] = None
-        else:
-            results[k].append(log_t)
-
-backends = {k: v for k, v in backends.items() if v is not None}
-
-for k, ts in results.items():
-    if ts:
-        plt.plot(n_range[: len(ts)], ts, label=k, marker=".")
-
-with open("bench_sgd.json", "w") as f:
-    json.dump(results, f, indent=2)
-
-plt.axhline(log_thresh, color="red", linestyle="--", label="Cutoff Threshold")
-plt.xlabel("n Qubits")
-plt.ylabel("Avg log(ms)")
-plt.xticks(range(3, 18))
-plt.yticks(range(0, log_thresh))
-plt.ylim(0, log_thresh + 1)
-plt.title("Qubit GD Runtime")
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-plt.savefig("bench_sgd.png", dpi=300)
-plt.show()
+    for cfg in CONFIGS:
+        w, l, s = cfg["wires"], cfg["layers"], cfg["steps"]
+        print(f"  {cfg['label']}")
+        print(f"  {'framework':<20} {'mean_ms':>10} {'std_ms':>8}")
+        print("  " + "-" * 40)
+        for name, fn in FRAMEWORKS.items():
+            try:
+                times = fn(w, l, s)
+                print(f"  {name:<20} {np.mean(times):>10.2f} {np.std(times):>8.2f}")
+            except Exception as e:
+                print(f"  {name:<20} {'ERR':>10}  {e}")
+        print()

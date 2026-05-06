@@ -151,6 +151,56 @@ from qudit.noise import Process
 
 Kraus operators are tensor products of $\{I, \sqrt{p_X}X, \sqrt{p_Y}Y, \sqrt{p_Z}Z\}$ across all $n$ sites. Correctable subsets are labeled by Hamming weight.
 
+### Depolarising channel
+
+Applies all $d^2$ Weyl-Heisenberg operators as Kraus terms. Works for any $d \geq 2$:
+
+$$\Phi(\rho) = (1-p)\rho + \frac{p}{d^2}\sum_{j,k} W_{jk}\rho W_{jk}^\dagger$$
+
+```python
+channel = Process.Depolarising(d=2, n=2, p=0.05)
+channel = Process.Depolarising(d=3, n=1, p=0.02)  # qutrit
+```
+
+### Phase damping
+
+Kills off-diagonal coherences without energy exchange. For $d=2$: $K_0 = \mathrm{diag}(1,\sqrt{1-p})$, $K_1 = \mathrm{diag}(0,\sqrt{p})$. Works for any $d$:
+
+```python
+channel = Process.PhaseDamp(d=2, n=2, p=0.1)
+```
+
+### Bit-flip and phase-flip channels
+
+Qudit generalizations using the cyclic shift $X_d$ and clock $Z_d$ operators:
+
+```python
+channel = Process.BitFlip(d=2, n=2, p=0.05)   # applies X_d with prob p
+channel = Process.PhaseFlip(d=2, n=2, p=0.05)  # applies Z_d with prob p
+```
+
+Both reduce to the standard qubit channels when `d=2`.
+
+### Reset channel
+
+Collapses each qudit to $|0\rangle$ with probability $p$:
+
+$$\Phi(\rho) = (1-p)\rho + p\,|0\rangle\langle 0|\,\mathrm{Tr}(\rho)$$
+
+```python
+channel = Process.Reset(d=2, n=2, p=0.1)
+```
+
+### Thermal relaxation
+
+Combined $T_1$ energy decay and $T_2$ dephasing for qubits ($d=2$ only). Requires $T_2 \leq 2T_1$:
+
+```python
+channel = Process.ThermalRelax(n=2, T1=100e-6, T2=80e-6, t=50e-9)
+```
+
+All `Process` channels accept an `iid=True` flag to return a `Multiplex` of independent single-site channels instead of a joint $n$-site channel.
+
 ### Weyl-Heisenberg channel (NoisyGate)
 
 For circuit-level noise in `Mode.NOISY`, `NoisyGate("weyl", param, ...)` implements the Heisenberg-Weyl displacement channel for any local dimension $d$:
@@ -189,6 +239,11 @@ These are passed directly to `Recovery.leung` for constructing recovery maps (se
 | --- | --- | --- |
 | `IID.AD` | `(n, d, y)` | Amplitude damping on each of `n` qudits independently |
 | `IID.GAD` | `(n, d, y, p)` | Generalized amplitude damping on each qudit independently |
+| `IID.Depolarising` | `(n, d, p)` | Depolarising channel on each qudit independently |
+| `IID.PhaseDamp` | `(n, d, p)` | Phase damping on each qudit independently |
+| `IID.BitFlip` | `(n, d, p)` | Bit-flip ($X_d$) on each qudit independently |
+| `IID.PhaseFlip` | `(n, d, p)` | Phase-flip ($Z_d$) on each qudit independently |
+| `IID.Reset` | `(n, d, p)` | Reset to $|0\rangle$ on each qudit independently |
 
 ::: code-group
 
