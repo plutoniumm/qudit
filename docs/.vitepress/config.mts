@@ -28,12 +28,19 @@ export default defineConfig({
           { text: 'Quickstart', link: '/quickstart' },
           { text: 'Primitives', link: '/primitives' },
           { text: 'Circuit', link: '/circuit' },
+          { text: 'Noisy Circuits', link: '/noisy' },
           { text: 'QUBO', link: '/qubo' },
           { text: 'Error Correction', link: '/qec' },
           { text: 'Noise Channels', link: '/noise' },
           { text: 'Metrics', link: '/metrics' },
           { text: 'Algorithms', link: '/algo' },
         ]
+      },
+      {
+        text: 'Performance',
+        items: [
+          { text: 'Benchmarks', link: '/benchmarks' },
+        ],
       },
       {
         text: 'Testing',

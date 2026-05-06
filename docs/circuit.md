@@ -182,6 +182,9 @@ c = Circuit(wires=1, dim=3, mode=Mode.MATRIX) # [!code ++]
 rho = c(to_rho(x))
 ```
 
+> [!TIP]
+> For circuits with noise — stochastic Kraus sampling, quantum trajectories, or systematic over-rotation — see [Noisy Circuits](/noisy).
+
 ## Parameterized circuits and autograd
 
 Circuit parameters can be wired to `torch.nn.Parameter` values by passing them as gate keyword arguments.

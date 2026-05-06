@@ -13,6 +13,7 @@ All inputs can be statevectors (1D arrays) or density matrices (2D arrays). Meth
 | `Fidelity.default(rho, sigma)` | Uhlmann fidelity $F(\rho,\sigma)$ |
 | `Fidelity.channel(kraus, rho)` | Apply a Kraus channel $\mathcal{E}(\rho)=\sum_k K_k\rho K_k^\dagger$ |
 | `Fidelity.entanglement(R, E, codes)` | Entanglement fidelity for encode→noise→recovery |
+| `Fidelity.bare_qubit(R, E, state)` | Average fidelity of a single logical state through noise→recovery |
 | `Fidelity.cafaro(kraus)` | Cafaro proxy $F_e = \sum_k \|\mathrm{Tr}(K_k)\|^2/N^2$ |
 | `Fidelity.negativity(rho, dA, dB)` | Negativity $\mathcal{N}(\rho)=(\|\rho^{T_B}\|_1-1)/2$ |
 
