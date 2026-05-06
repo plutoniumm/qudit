@@ -58,7 +58,7 @@ test() {
   cd "$root";
 
   python -m view.lint;
-  black qudit/ tests/ view/;
+  black qudit/**/*.py;
 
   cd "$root/tests";
 
@@ -71,6 +71,22 @@ test() {
   python metrics.py;
   python primitives.py;
   python draw.py;
+  python channel.py;
+  python noise.py;
+  python qubo.py;
+  python states.py;
+  python entropy.py;
+  python tools_extra.py;
+  python cut.py;
+}
+
+bench() {
+  hasPython;
+  local root;
+  root="$(rootDir)";
+  cd "$root/bench";
+
+  conda run -n qudit python run.py "$@";
 }
 
 prof() {
@@ -124,6 +140,7 @@ Commands:
   build    Build sdist/wheel and run twine checks
   deploy   Upload dist/* to PyPI using token from .vscode/token.env
   test     Run test scripts in ./tests
+  bench    Run benchmarks and emit JSON (--only circuit|noisy|gd, --out file)
   prof     Profile bench_fast.py and open snakeviz
   headers  Run python ./view/headers.py
   docs     Run docs via npm (subcommands: dev, build)
@@ -142,7 +159,7 @@ main() {
   shift || true
 
   case "$cmd" in
-    build|deploy|test|prof|head|docs|help)
+    build|deploy|test|bench|prof|head|docs|help)
       "$cmd" "$@"
       ;;
     *)

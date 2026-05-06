@@ -1,5 +1,6 @@
 from typing import Union as U, List, Any, Optional, Dict
-from .gates import Gate, Gategen, Operator, NoisyGate
+from .gates import Gate, Gategen, Operator, NoisyGate, TrajectoryGate
+from ..noise.model import CoherentNoise
 from dataclasses import dataclass
 from .utils import LittleEndian
 import torch.nn as nn
@@ -14,12 +15,13 @@ Array = List[int]
 class Mode(Enum):
     """
     Execution mode for the circuit: statevector (VECTOR), density-matrix (MATRIX),
-    or noisy density-matrix (NOISY).
+    noisy density-matrix (NOISY), or statevector quantum trajectories (TRAJECTORY).
     """
 
     VECTOR = "vector"
     MATRIX = "matrix"
     NOISY = "noisy"
+    TRAJECTORY = "trajectory"
 
 
 @dataclass
@@ -122,7 +124,7 @@ class Circuit(nn.Module):
     operations: List[Frame]
     gates: Dict[int, Gategen]
     gate_gen: Any
-    noise_config: Optional[Dict[str, Any]]
+    noise_model: Optional[Any]
 
     def __init__(
         self,
@@ -131,7 +133,7 @@ class Circuit(nn.Module):
         device: str = "cpu",
         mode: U[Mode, str] = Mode.VECTOR,
         flip: bool = False,
-        noise: Optional[Dict[str, Any]] = None,
+        noise: Optional[Any] = None,
     ):
         """
         Initialize a circuit with `wires` subsystems of local dimension(s) `dim` on `device`.
@@ -166,15 +168,14 @@ class Circuit(nn.Module):
         if isinstance(self.dim, int):
             self.gate_gen = self.gates[self.dim]
 
-        # Noisy mode setup
-        if self.mode == Mode.NOISY:
+        if self.mode in (Mode.NOISY, Mode.TRAJECTORY):
             if noise is None:
-                raise ValueError("Circuit(mode='noisy') requires a noise config dict.")
-            self.noise_config = noise
-            self._noise_pairs: List[List[NoisyGate]] = []
+                raise ValueError(f"Circuit(mode={mode!r}) requires a noise model.")
+            self.noise_model = noise
+            self._noise_pairs: List[List] = []
             self._noise_module_list = nn.ModuleList()
         else:
-            self.noise_config = None
+            self.noise_model = None
 
     def gate(self, gate_in: Any, index: Any, **kwargs: Any) -> None:
         """
@@ -211,51 +212,44 @@ class Circuit(nn.Module):
         pos = str(len(self.circuit))
         self.circuit.add_module(pos, Instance)
 
-        if self.mode == Mode.NOISY:
-            pair: List[NoisyGate] = []
-            cfg = self.noise_config
-            noise_type = cfg["type"]
+        if self.mode in (Mode.NOISY, Mode.TRAJECTORY):
+            noise = self.noise_model
+            gate_name = self.operations[-1].name
+            generator = getattr(noise, "generator", None)
 
-            for wire in idx_list:
-                param = self._q_noise(wire)
+            if isinstance(noise, CoherentNoise):
+                d_local = Instance.target_size
+                Instance.U = noise.perturb(Instance.U, d_local).to(dtype=C64)
+                self._noise_pairs.append([])
+            else:
+                pair = []
+                for wire in idx_list:
+                    d = self.dims_[wire]
+                    K = noise.kraus_for(gate_name, wire, d).to(
+                        dtype=C64, device=self.device
+                    )
 
-                ng = NoisyGate(
-                    noise_type=noise_type,
-                    param=param,
-                    index=[wire],
-                    wires=self.wires,
-                    dims=self.dims_,
-                    device=self.device,
-                )
-                pair.append(ng)
-                self._noise_module_list.append(ng)
+                    if self.mode == Mode.NOISY:
+                        ng = NoisyGate(
+                            K=K,
+                            index=[wire],
+                            wires=self.wires,
+                            dims=self.dims_,
+                            generator=generator,
+                        )
+                    else:
+                        ng = TrajectoryGate(
+                            K=K,
+                            index=[wire],
+                            wires=self.wires,
+                            dims=self.dims_,
+                            generator=generator,
+                        )
 
-            self._noise_pairs.append(pair)
+                    pair.append(ng)
+                    self._noise_module_list.append(ng)
 
-    def _q_noise(self, wire: int) -> Any:
-        """
-        Extract the noise parameter for a given wire from self.noise_config.
-        Supports scalar (same rate for all wires) or list (per-wire rates).
-        For "pauli" type, returns [px, py, pz] as a tensor.
-        """
-        cfg = self.noise_config
-        noise_type = cfg["type"]
-        if noise_type == "pauli":
-            px = cfg.get("px", 0.0)
-            py = cfg.get("py", 0.0)
-            pz = cfg.get("pz", 0.0)
-
-            return torch.tensor([px, py, pz], dtype=torch.float32, device=self.device)
-
-        for k, v in cfg.items():
-            if k == "type":
-                continue
-            if isinstance(v, list):
-                return v[wire]
-
-            return v
-
-        raise ValueError(f"Cannot extract noise param from config: {cfg}")
+                self._noise_pairs.append(pair)
 
     def forward(self, x: Any) -> torch.Tensor:
         """
@@ -272,6 +266,16 @@ class Circuit(nn.Module):
             return self.circuit(x)
 
         W = self.width
+
+        if self.mode == Mode.TRAJECTORY:
+            psi = x.reshape(W)
+            for gate, noise_gates in zip(self.circuit, self._noise_pairs):
+                psi = gate(psi)
+                for ng in noise_gates:
+                    psi = ng(psi.reshape(W))
+
+            return psi.reshape(W)
+
         if x.dim() == 1 or (x.dim() == 2 and min(x.shape) == 1):
             psi = x.reshape(W, 1)
             rho = psi @ psi.conj().T
@@ -285,11 +289,11 @@ class Circuit(nn.Module):
                     rho = ng.forwardd(rho)
 
             return rho
-        else:
-            for module in self.circuit:
-                rho = module.forwardd(rho)
 
-            return rho
+        for module in self.circuit:
+            rho = module.forwardd(rho)
+
+        return rho
 
     def matrix(self, littleEndian=False) -> torch.Tensor:
         """
@@ -347,6 +351,109 @@ class Circuit(nn.Module):
             result[key] = result.get(key, 0) + 1
 
         return result
+
+    def cut(self, coupler: Any, index: Any, split: Optional[int] = None) -> None:
+        """
+        Mark a gate position as a circuit cut using the given Coupler.
+
+        index = [c_A, c_B]: the two wires the cut gate acts on.
+        split: wire index where partition A ends and B begins (wires 0..split-1 → A,
+               wires split..n-1 → B). For adjacent cuts (c_B == c_A + 1) split
+               defaults to c_B. For non-adjacent gates split must be given explicitly.
+        The gate is NOT added to the circuit — it is replaced by the Coupler
+        decomposition when run_cut() is called.
+        """
+        if not hasattr(self, "_cuts"):
+            self._cuts: list = []
+        idx = index if isinstance(index, list) else list(index)
+        c_A, c_B = idx
+        if split is None:
+            if c_B != c_A + 1:
+                raise ValueError(
+                    f"Cut wires {c_A} and {c_B} are not adjacent — "
+                    "provide split= to specify where partition A ends and B begins."
+                )
+            split = c_B
+        if not (c_A < split <= c_B):
+            raise ValueError(
+                f"split={split} must satisfy c_A < split <= c_B ({c_A} < split <= {c_B})."
+            )
+        self._cuts.append((coupler, idx, split, len(self.circuit)))
+
+    def run_cut(self) -> dict:
+        """
+        Execute the circuit using circuit cutting at the marked cut position.
+
+        Partitions wires at the cut: partition A = wires 0..split-1,
+        partition B = wires split..end. Gates on each partition are split
+        into pre- and post-cut segments; sub-circuits run as pre → cut_op → post.
+        The joint probability distribution is reconstructed via amplitude
+        superposition over the Coupler decomposition.
+        """
+        from ..cut.utils import matrix_of
+
+        if self.mode == Mode.TRAJECTORY:
+            raise NotImplementedError(
+                "Circuit cutting is not supported for TRAJECTORY mode — "
+                "stochastic collapse per term makes amplitude reconstruction invalid."
+            )
+
+        cuts = getattr(self, "_cuts", [])
+        if not cuts:
+            raise ValueError("No cuts defined — call cut() before run_cut().")
+        if len(cuts) > 1:
+            from ..cut.multi import run_multi
+
+            return run_multi(cuts, self.wires, self.dims_, self.circuit, self.device)
+
+        coupler, [c_A, c_B], split, cut_pos = cuts[0]
+
+        partA = set(range(0, split))
+        partB = set(range(split, self.wires))
+
+        dims_A = [self.dims_[w] for w in sorted(partA)]
+        dims_B = [self.dims_[w] for w in sorted(partB)]
+
+        preA, postA = [], []
+        preB, postB = [], []
+        for i, gate in enumerate(self.circuit.children()):
+            hasA = any(w in partA for w in gate.index)
+            hasB = any(w in partB for w in gate.index)
+            if hasA and hasB:
+                raise ValueError(
+                    f"Gate on wires {gate.index} spans both partitions. "
+                    "Only the marked cut gate may cross the partition boundary."
+                )
+            if hasA:
+                (preA if i < cut_pos else postA).append((matrix_of(gate), gate.index))
+            elif hasB:
+                (preB if i < cut_pos else postB).append(
+                    (matrix_of(gate), [w - split for w in gate.index])
+                )
+
+        device = self.device
+
+        def subA(op):
+            qc = Circuit(len(partA), dim=dims_A, device=device)
+            for U, idx in preA:
+                qc.gate(U, idx)
+            qc.gate(op, [c_A])
+            for U, idx in postA:
+                qc.gate(U, idx)
+
+            return qc
+
+        def subB(op):
+            qc = Circuit(len(partB), dim=dims_B, device=device)
+            for U, idx in preB:
+                qc.gate(U, idx)
+            qc.gate(op, [c_B - split])
+            for U, idx in postB:
+                qc.gate(U, idx)
+
+            return qc
+
+        return coupler.run(subA, subB)
 
     def draw(self, mode: str = "ascii") -> Any:
         """
