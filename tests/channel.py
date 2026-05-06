@@ -116,22 +116,20 @@ class ChannelAnalysisTests(Question):
 
 class WeylChannelTests(Question):
     """
-    NoisyGate Weyl-Heisenberg channel: TP for d=2 and d=3.
+    WeylNoise Kraus stack: trace-preserving for d=2, d=3, and identity at zero noise.
     """
 
     def test_weyl_d2_is_tp(self):
         """
-        Weyl channel on a qubit ($d=2$) with 3 parameters is trace-preserving:
-        $\\sum_k K_k^\\dagger K_k = I$
+        Weyl channel on a qubit ($d=2$) is trace-preserving: $\\sum_k K_k^\\dagger K_k = I$
         """
-        from qudit.circuit.gates import NoisyGate
+        from qudit.noise import WeylNoise
 
-        ng = NoisyGate("weyl", pt.tensor([0.1, 0.05, 0.05]), 0, 1, 2)
-        ops = ng._kraus_ops()
-        total = sum(k.conj().T @ k for k in ops)
+        K = WeylNoise(p=0.1).kraus_for("H", 0, 2).to(pt.complex64)
+        total = sum(k.conj().T @ k for k in K)
 
         self.assertEqual(
-            len(ops), 4, msg="Weyl qubit channel should have 4 Kraus operators"
+            len(K), 4, msg="Weyl qubit channel should have 4 Kraus operators"
         )
 
         self.assertTrue(
@@ -141,17 +139,15 @@ class WeylChannelTests(Question):
 
     def test_weyl_d3_is_tp(self):
         """
-        Weyl channel on a qutrit ($d=3$) with 8 parameters is trace-preserving:
-        $\\sum_k K_k^\\dagger K_k = I$
+        Weyl channel on a qutrit ($d=3$) is trace-preserving: $\\sum_k K_k^\\dagger K_k = I$
         """
-        from qudit.circuit.gates import NoisyGate
+        from qudit.noise import WeylNoise
 
-        ng = NoisyGate("weyl", pt.tensor([0.02] * 8), 0, 1, 3)
-        ops = ng._kraus_ops()
-        total = sum(k.conj().T @ k for k in ops)
+        K = WeylNoise(p=0.02).kraus_for("H", 0, 3).to(pt.complex64)
+        total = sum(k.conj().T @ k for k in K)
 
         self.assertEqual(
-            len(ops), 9, msg="Weyl qutrit channel should have 9 Kraus operators"
+            len(K), 9, msg="Weyl qutrit channel should have 9 Kraus operators"
         )
 
         self.assertTrue(
@@ -161,25 +157,24 @@ class WeylChannelTests(Question):
 
     def test_weyl_identity_at_zero_noise(self):
         """
-        Weyl channel with all zero parameters is the identity channel:
-        only $K_0 = I$ is active
+        Weyl channel with p=0 is the identity channel: $K_0 = I$, all others zero
         """
-        from qudit.circuit.gates import NoisyGate
+        from qudit.noise import WeylNoise
 
-        ng = NoisyGate("weyl", pt.zeros(3), 0, 1, 2)
-        ops = ng._kraus_ops()
+        K = WeylNoise(p=0.0).kraus_for("H", 0, 2).to(pt.complex64)
 
         self.assertEqual(
-            len(ops),
+            len(K),
             4,
             msg="Zero-noise Weyl channel should still have 4 Kraus operators",
         )
 
         self.assertTrue(
-            pt.allclose(ops[0].real, pt.eye(2), atol=1e-5),
+            pt.allclose(K[0].real, pt.eye(2), atol=1e-5),
             msg="K_0 should be identity at zero noise",
         )
-        for k in ops[1:]:
+
+        for k in K[1:]:
             self.assertTrue(
                 pt.allclose(k.abs(), pt.zeros(2, 2), atol=1e-5),
                 msg="Non-identity Kraus ops should be zero at zero noise",

@@ -381,6 +381,380 @@ class ProcessChannels(Question):
         )
 
 
+class ProcessLibraryTests(Question):
+    """
+    Process.* constructors: CPTP checks across channel types and dimensions.
+    """
+
+    def test_depolarising_qubit_is_cptp(self):
+        """
+        $Process.Depolarising(d=2, n=1, p=0.1)$ is CPTP
+        """
+        ch = Process.Depolarising(d=2, n=1, p=0.1)
+
+        self.assertTrue(ch.isCPTP, "Depolarising qubit channel should be CPTP")
+
+    def test_phasedamp_qubit_is_cptp(self):
+        """
+        $Process.PhaseDamp(d=2, n=1, p=0.1)$ is CPTP
+        """
+        ch = Process.PhaseDamp(d=2, n=1, p=0.1)
+
+        self.assertTrue(ch.isCPTP, "PhaseDamp qubit channel should be CPTP")
+
+    def test_reset_qubit_is_cptp(self):
+        """
+        $Process.Reset(d=2, n=1, p=0.1)$ is CPTP
+        """
+        ch = Process.Reset(d=2, n=1, p=0.1)
+
+        self.assertTrue(ch.isCPTP, "Reset qubit channel should be CPTP")
+
+    def test_depolarising_as_weyl_channel_is_cptp(self):
+        """
+        $Process.Depolarising(d=2, n=1, p=0.1)$ (Weyl-based) is CPTP
+        """
+        ch = Process.Depolarising(d=2, n=1, p=0.1)
+
+        self.assertTrue(ch.isCPTP, "Weyl/Depolarising qubit channel should be CPTP")
+
+    def test_ad_qutrit_is_cptp(self):
+        """
+        $Process.AD(d=3, n=1, Y=0.1, order=2)$ qutrit amplitude damping is CPTP
+        """
+        ch = Process.AD(d=3, n=1, Y=0.1, order=2)
+
+        self.assertTrue(ch.isCPTP, "Qutrit AD channel should be CPTP")
+
+    def test_depolarising_qutrit_is_cptp(self):
+        """
+        $Process.Depolarising(d=3, n=1, p=0.05)$ qutrit depolarising is CPTP
+        """
+        ch = Process.Depolarising(d=3, n=1, p=0.05)
+
+        self.assertTrue(ch.isCPTP, "Qutrit depolarising channel should be CPTP")
+
+    def test_pauli_is_cptp(self):
+        """
+        $Process.Pauli(n=1, p=[0.1, 0.05, 0.05])$ is CPTP
+        """
+        ch = Process.Pauli(n=1, p=[0.1, 0.05, 0.05])
+
+        self.assertTrue(ch.isCPTP, "Pauli channel should be CPTP")
+
+    def test_thermalrelax_is_cptp(self):
+        """
+        $Process.ThermalRelax(n=1, T1=100, T2=80, t=1)$ is CPTP
+        """
+        ch = Process.ThermalRelax(n=1, T1=100.0, T2=80.0, t=1.0)
+
+        self.assertTrue(ch.isCPTP, "ThermalRelax channel should be CPTP")
+
+
+class ChannelOutputTests(Question):
+    """
+    Verify channel.run() returns a valid density matrix: Hermitian, PSD, trace-1.
+    """
+
+    def _rho0(self):
+        r = pt.zeros((2, 2), dtype=C64)
+        r[0, 0] = 1.0
+
+        return r
+
+    def test_ad_output_hermitian(self):
+        """
+        $\\Phi_{AD}(|0\\rangle\\langle0|)$ is Hermitian: $\\rho^\\dagger = \\rho$
+        """
+        ch = Process.AD(d=2, n=1, Y=0.1, order=2)
+        out = ch.run(self._rho0())
+
+        diff = float(pt.norm(out - out.conj().T).real.item())
+
+        self.assertAlmostEqual(diff, 0.0, places=4, msg="AD output should be Hermitian")
+
+    def test_ad_output_psd(self):
+        """
+        $\\Phi_{AD}(|0\\rangle\\langle0|)$ is PSD: all eigenvalues $\\geq 0$
+        """
+        ch = Process.AD(d=2, n=1, Y=0.1, order=2)
+        out = ch.run(self._rho0())
+
+        evals = pt.linalg.eigvalsh(out.to(pt.float64))
+
+        self.assertTrue(
+            bool((evals >= -1e-6).all().item()),
+            "AD output should be positive semi-definite",
+        )
+
+    def test_depolarising_output_trace_one(self):
+        """
+        $\\mathrm{Tr}(\\Phi_{Dep}(|0\\rangle\\langle0|)) = 1$
+        """
+        ch = Process.Depolarising(d=2, n=1, p=0.1)
+        out = ch.run(self._rho0())
+
+        tr = float(pt.trace(out).real.item())
+
+        self.assertAlmostEqual(
+            tr, 1.0, places=4, msg="Depolarising output trace should be 1"
+        )
+
+    def test_pauli_mixed_state_invariant(self):
+        """
+        $\\Phi_{Pauli}(I/2) = I/2$: balanced Pauli channel leaves maximally mixed state invariant
+        """
+        p = [1.0 / 6, 1.0 / 6, 1.0 / 6]
+        ch = Process.Pauli(n=1, p=p)
+
+        rho_mix = rho_mixed_qubit()
+        out = ch.run(rho_mix)
+
+        diff = float(pt.norm(out - rho_mix).real.item())
+
+        self.assertAlmostEqual(
+            diff,
+            0.0,
+            places=3,
+            msg="Pauli channel should leave maximally mixed state invariant",
+        )
+
+    def test_reset_full_collapses_to_ground(self):
+        """
+        $Process.Reset(d=2, n=1, p=1.0)$ collapses any state to $|0\\rangle\\langle0|$
+        """
+        ch = Process.Reset(d=2, n=1, p=1.0)
+
+        rho1 = pt.zeros((2, 2), dtype=C64)
+        rho1[1, 1] = 1.0
+        out = ch.run(rho1)
+
+        diff = float(pt.norm(out - self._rho0()).real.item())
+
+        self.assertAlmostEqual(
+            diff, 0.0, places=4, msg="Full reset should collapse to |0><0|"
+        )
+
+    def test_phasedamp_preserves_populations(self):
+        """
+        PhaseDamp preserves diagonal populations: $\\rho_{00}$ and $\\rho_{11}$ unchanged
+        """
+        ch = Process.PhaseDamp(d=2, n=1, p=0.5)
+
+        rho = pt.tensor([[0.6, 0.4], [0.4, 0.4]], dtype=C64)
+        out = ch.run(rho)
+
+        self.assertAlmostEqual(
+            float(out[0, 0].real.item()),
+            0.6,
+            places=4,
+            msg="PhaseDamp should not change |0><0| population",
+        )
+
+        self.assertAlmostEqual(
+            float(out[1, 1].real.item()),
+            0.4,
+            places=4,
+            msg="PhaseDamp should not change |1><1| population",
+        )
+
+    def test_phasedamp_kills_coherence(self):
+        """
+        PhaseDamp($p=1$) fully kills off-diagonal coherences
+        """
+        ch = Process.PhaseDamp(d=2, n=1, p=1.0)
+
+        rho = pt.tensor([[0.5, 0.5], [0.5, 0.5]], dtype=C64)
+        out = ch.run(rho)
+
+        self.assertAlmostEqual(
+            float(pt.abs(out[0, 1]).item()),
+            0.0,
+            places=4,
+            msg="Full phase damping should eliminate off-diagonal elements",
+        )
+
+
+class MultiplexTests(Question):
+    """
+    IID channel constructors and Multiplex.run() trace-preservation.
+    """
+
+    def test_iid_ad_n2_is_multiplex(self):
+        """
+        $IID.AD(n=2, d=2, y=0.1)$ returns a Multiplex instance
+        """
+        mul = IID.AD(n=2, d=2, y=0.1)
+
+        self.assertIsInstance(mul, Multiplex, "IID.AD should return a Multiplex")
+
+    def test_iid_ad_n2_run_trace_preserved(self):
+        """
+        $IID.AD(n=2)$.run$(\\rho)$ on a 2-qubit state has $\\mathrm{Tr}=1$
+        """
+        mul = IID.AD(n=2, d=2, y=0.1)
+
+        rho = pt.zeros((4, 4), dtype=C64)
+        rho[0, 0] = 1.0
+        out = mul.run(rho)
+
+        tr = float(pt.trace(out).real.item())
+
+        self.assertAlmostEqual(
+            tr, 1.0, places=4, msg="IID.AD n=2 should preserve trace"
+        )
+
+    def test_iid_ad_n3_trace_preserved(self):
+        """
+        $IID.AD(n=3, d=2, y=0.1)$.run$(\\rho)$ on a 3-qubit state has $\\mathrm{Tr}=1$
+        """
+        mul = IID.AD(n=3, d=2, y=0.1)
+
+        rho = pt.zeros((8, 8), dtype=C64)
+        rho[0, 0] = 1.0
+        out = mul.run(rho)
+
+        tr = float(pt.trace(out).real.item())
+
+        self.assertAlmostEqual(
+            tr, 1.0, places=4, msg="IID.AD n=3 should preserve trace"
+        )
+
+    def test_iid_depolarising_n2_trace_preserved(self):
+        """
+        $IID.Depolarising(n=2, d=2, p=0.1)$.run$(\\rho)$ has $\\mathrm{Tr}=1$
+        """
+        mul = IID.Depolarising(n=2, d=2, p=0.1)
+
+        rho = pt.zeros((4, 4), dtype=C64)
+        rho[0, 0] = 1.0
+        out = mul.run(rho)
+
+        tr = float(pt.trace(out).real.item())
+
+        self.assertAlmostEqual(
+            tr, 1.0, places=4, msg="IID.Depolarising n=2 should preserve trace"
+        )
+
+    def test_iid_reset_n2_trace_preserved(self):
+        """
+        $IID.Reset(n=2, d=2, p=0.3)$.run$(\\rho)$ has $\\mathrm{Tr}=1$
+        """
+        mul = IID.Reset(n=2, d=2, p=0.3)
+
+        rho = pt.zeros((4, 4), dtype=C64)
+        rho[3, 3] = 1.0
+        out = mul.run(rho)
+
+        tr = float(pt.trace(out).real.item())
+
+        self.assertAlmostEqual(
+            tr, 1.0, places=4, msg="IID.Reset n=2 should preserve trace"
+        )
+
+    def test_multiplex_length_matches_n(self):
+        """
+        $IID.AD(n=3)$ Multiplex has exactly 3 channels
+        """
+        mul = IID.AD(n=3, d=2, y=0.1)
+
+        self.assertEqual(len(mul.channels), 3, "IID.AD(n=3) should have 3 channels")
+
+
+class ChannelCompositionTests(Question):
+    """
+    Sequential channel application and identity-channel behaviour.
+    """
+
+    def _fidelity(self, rho: pt.Tensor) -> float:
+        return float(rho[0, 0].real.item())
+
+    def test_double_ad_more_noisy(self):
+        """
+        Applying AD twice gives lower fidelity to $|0\\rangle\\langle0|$ than once
+        """
+        rho1 = pt.zeros((2, 2), dtype=C64)
+        rho1[1, 1] = 1.0
+
+        ch = Process.AD(d=2, n=1, Y=0.5, order=1)
+
+        out1 = ch.run(rho1)
+        out2 = ch.run(out1)
+
+        f1 = self._fidelity(out1)
+        f2 = self._fidelity(out2)
+
+        self.assertGreater(
+            f2, f1, msg="Applying AD twice should increase ground-state population"
+        )
+
+    def test_low_noise_pauli_near_identity(self):
+        """
+        $Process.Pauli(n=1, p=[10^{-4}, 10^{-4}, 10^{-4}])$ output is close to input
+        """
+        eps = 1e-4
+        ch = Process.Pauli(n=1, p=[eps, eps, eps])
+
+        rho = pt.tensor([[0.7, 0.3], [0.3, 0.3]], dtype=C64)
+        out = ch.run(rho)
+
+        diff = float(pt.norm(out - rho).real.item())
+
+        self.assertLess(
+            diff, 1e-2, msg="Near-zero Pauli noise should leave state nearly unchanged"
+        )
+
+    def test_low_noise_depolarising_near_identity(self):
+        """
+        $Process.Depolarising(d=2, n=1, p=10^{-4})$ output is close to input
+        """
+        ch = Process.Depolarising(d=2, n=1, p=1e-4)
+
+        rho = rho_mixed_qubit()
+        out = ch.run(rho)
+
+        diff = float(pt.norm(out - rho).real.item())
+
+        self.assertLess(
+            diff, 1e-2, msg="Near-zero depolarising should leave state nearly unchanged"
+        )
+
+    def test_ad_then_reset_trace_preserved(self):
+        """
+        Sequential AD then Reset preserves trace: $\\mathrm{Tr}((\\Phi_{RS} \\circ \\Phi_{AD})(\\rho)) = 1$
+        """
+        ch_ad = Process.AD(d=2, n=1, Y=0.3, order=1)
+        ch_rs = Process.Reset(d=2, n=1, p=0.5)
+
+        rho = pt.zeros((2, 2), dtype=C64)
+        rho[1, 1] = 1.0
+
+        out = ch_rs.run(ch_ad.run(rho))
+
+        tr = float(pt.trace(out).real.item())
+
+        self.assertAlmostEqual(
+            tr, 1.0, places=4, msg="Sequential AD+Reset should preserve trace"
+        )
+
+    def test_higher_noise_ad_more_damping(self):
+        """
+        Higher $Y$ in AD channel yields greater damping of $|1\\rangle\\langle1|$ population
+        """
+        rho1 = pt.zeros((2, 2), dtype=C64)
+        rho1[1, 1] = 1.0
+
+        ch_low = Process.AD(d=2, n=1, Y=0.1, order=1)
+        ch_high = Process.AD(d=2, n=1, Y=0.9, order=1)
+
+        pop_low = float(ch_low.run(rho1)[1, 1].real.item())
+        pop_high = float(ch_high.run(rho1)[1, 1].real.item())
+
+        self.assertGreater(
+            pop_low, pop_high, msg="Higher Y should damp excited population more"
+        )
+
+
 if __name__ == "__main__":
     runner = Exam(
         name="Qudit Noise Tests",
@@ -389,3 +763,7 @@ if __name__ == "__main__":
     )
     runner.run(load(ChannelProperties))
     runner.run(load(ProcessChannels))
+    runner.run(load(ProcessLibraryTests))
+    runner.run(load(ChannelOutputTests))
+    runner.run(load(MultiplexTests))
+    runner.run(load(ChannelCompositionTests))

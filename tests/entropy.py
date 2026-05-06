@@ -539,6 +539,71 @@ class FidelityExtendedTests(Question):
         )
 
 
+class BareQubitFidelityTests(Question):
+    """
+    Fidelity.bare_qubit tests: identity channel gives fidelity 1, noisy channel < 1.
+    """
+
+    def test_identity_channel_fidelity_one(self):
+        """
+        Identity noise + identity recovery on $|0\\rangle$: fidelity = 1
+        """
+        from qudit.tools.metrics import Fidelity
+
+        I = np.eye(2, dtype=complex)
+        state = np.array([1, 0], dtype=complex)
+        fid = Fidelity.bare_qubit([I], [I], state)
+
+        self.assertAlmostEqual(
+            float(np.real(fid)),
+            1.0,
+            places=6,
+            msg="Identity channel fidelity should be 1",
+        )
+
+    def test_noisy_channel_fidelity_less_than_one(self):
+        """
+        AD noise without recovery on $|1\\rangle$ reduces fidelity below 1
+        """
+        from qudit.tools.metrics import Fidelity
+
+        Y = 0.5
+        E0 = np.array([[1, 0], [0, np.sqrt(1 - Y)]], dtype=complex)
+        E1 = np.array([[0, np.sqrt(Y)], [0, 0]], dtype=complex)
+        I = np.eye(2, dtype=complex)
+        state = np.array([0, 1], dtype=complex)
+
+        fid = Fidelity.bare_qubit([I], [E0, E1], state)
+
+        self.assertLess(
+            float(np.real(fid)),
+            1.0,
+            msg="AD noise on |1> without recovery should reduce fidelity",
+        )
+
+    def test_recovery_improves_fidelity(self):
+        """
+        Applying the AD recovery (X after E1) improves fidelity over noise alone
+        """
+        from qudit.tools.metrics import Fidelity
+
+        Y = 0.3
+        E0 = np.array([[1, 0], [0, np.sqrt(1 - Y)]], dtype=complex)
+        E1 = np.array([[0, np.sqrt(Y)], [0, 0]], dtype=complex)
+        I = np.eye(2, dtype=complex)
+        X = np.array([[0, 1], [1, 0]], dtype=complex)
+        state = np.array([0, 1], dtype=complex)
+
+        fidRaw = float(np.real(Fidelity.bare_qubit([I], [E0, E1], state)))
+        fid_rec = float(np.real(Fidelity.bare_qubit([I, X], [E0, E1], state)))
+
+        self.assertGreater(
+            fid_rec,
+            fidRaw,
+            msg="Recovery should improve bare-qubit fidelity over no recovery",
+        )
+
+
 if __name__ == "__main__":
     runner = Exam(
         name="Entropy & Metrics Tests",
@@ -552,3 +617,4 @@ if __name__ == "__main__":
     runner.run(load(InfoCondtionalTests))
     runner.run(load(DistanceExtendedTests))
     runner.run(load(FidelityExtendedTests))
+    runner.run(load(BareQubitFidelityTests))
