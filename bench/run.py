@@ -8,6 +8,8 @@ import circuit as C
 import noisy as N
 import gd as G
 import qec as Q
+import metrics as M
+import qubo as QB
 
 
 def run_circuit():
@@ -101,11 +103,23 @@ def run_qec():
     return results
 
 
+def run_metrics():
+    print("  metrics...", file=sys.stderr)
+    return M.run_all()
+
+
+def run_qubo():
+    print("  qubo...", file=sys.stderr)
+    return QB.run_all()
+
+
 BENCHES = {
     "circuit": run_circuit,
     "noisy": run_noisy,
     "gd": run_gd,
     "qec": run_qec,
+    "metrics": run_metrics,
+    "qubo": run_qubo,
 }
 
 if __name__ == "__main__":

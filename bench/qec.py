@@ -16,6 +16,8 @@ from qudit.qec import Recovery
 from qudit.qec.lib import Dutta3, Leung, Perfect
 from qudit.noise import Process
 
+from timing import timed
+
 C64 = torch.complex64
 WARMUP = 5
 N = 50
@@ -27,14 +29,7 @@ def _rho(psi):
 
 
 def _time(fn):
-    for _ in range(WARMUP):
-        fn()
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        fn()
-        times.append((time.perf_counter() - t0) * 1e3)
-    return times
+    return timed(fn, N, WARMUP)
 
 
 # Codes to benchmark over

@@ -2,7 +2,7 @@ from typing import List, Any, Sequence, Optional, Union
 from .index import Channel, Multiplex
 from itertools import product
 from ..circuit.gates import Gate
-from .kraus import GAD, Pauli
+from .kraus import GAD, Pauli, Depolarising, PhaseDamp, Reset, ThermalRelax
 import torch as pt
 
 C128 = pt.complex128
@@ -96,6 +96,138 @@ class IID:
                     params=[("y", y), ("p", p), ("i", i)],
                 )
                 for k, m in enumerate(R_mats)
+            ]
+            channel_list.append(Channel([[g] for g in kraus_gates]))
+
+        return Multiplex(channel_list)
+
+    @staticmethod
+    def Depolarising(n: int, d: int, p: float) -> "Multiplex":
+        """
+        Independent identical depolarising noise on each of $n$ qudits of dimension $d$.
+
+        Single-site Kraus set: all $d^2$ Weyl-Heisenberg operators from `Depolarising.ops(d, p)`.
+        """
+        channel_list = []
+        kraus_mats = Depolarising.ops(d, p)
+        for i in range(n):
+            kraus_gates = [
+                Gate(
+                    m,
+                    index=[i],
+                    wires=n,
+                    dim=d,
+                    name=f"W{k}_{i}",
+                    params=[("p", p), ("i", i)],
+                )
+                for k, m in enumerate(kraus_mats)
+            ]
+            channel_list.append(Channel([[g] for g in kraus_gates]))
+
+        return Multiplex(channel_list)
+
+    @staticmethod
+    def PhaseDamp(n: int, d: int, p: float) -> "Multiplex":
+        """
+        Independent identical phase damping on each of $n$ qudits of dimension $d$.
+
+        Single-site Kraus set: $d$ operators from `PhaseDamp.ops(d, p)`.
+        """
+        channel_list = []
+        kraus_mats = PhaseDamp.ops(d, p)
+        for i in range(n):
+            kraus_gates = [
+                Gate(
+                    m,
+                    index=[i],
+                    wires=n,
+                    dim=d,
+                    name=f"PD{k}_{i}",
+                    params=[("p", p), ("i", i)],
+                )
+                for k, m in enumerate(kraus_mats)
+            ]
+            channel_list.append(Channel([[g] for g in kraus_gates]))
+
+        return Multiplex(channel_list)
+
+    @staticmethod
+    def BitFlip(n: int, d: int, p: float) -> "Multiplex":
+        """
+        Independent identical bit-flip (shift) noise on each of $n$ qudits of dimension $d$.
+
+        Single-site Kraus set: $\{\sqrt{1-p}\,I,\, \sqrt{p}\,X_d\}$ where $X_d$ is the
+        cyclic shift operator. For $d=2$ this is the standard qubit bit-flip channel.
+        """
+        channel_list = []
+        shift = pt.roll(pt.eye(d, dtype=C128), shifts=-1, dims=1)
+        kraus_mats = [(1 - p) ** 0.5 * pt.eye(d, dtype=C128), p**0.5 * shift]
+        for i in range(n):
+            kraus_gates = [
+                Gate(
+                    m,
+                    index=[i],
+                    wires=n,
+                    dim=d,
+                    name=f"BF{k}_{i}",
+                    params=[("p", p), ("i", i)],
+                )
+                for k, m in enumerate(kraus_mats)
+            ]
+            channel_list.append(Channel([[g] for g in kraus_gates]))
+
+        return Multiplex(channel_list)
+
+    @staticmethod
+    def PhaseFlip(n: int, d: int, p: float) -> "Multiplex":
+        """
+        Independent identical phase-flip (clock) noise on each of $n$ qudits of dimension $d$.
+
+        Single-site Kraus set: $\{\sqrt{1-p}\,I,\, \sqrt{p}\,Z_d\}$ where $Z_d$ is the
+        clock (phase) operator. For $d=2$ this is the standard qubit phase-flip channel.
+        """
+        import cmath as cm
+
+        w = cm.exp(2j * cm.pi / d)
+        channel_list = []
+        clock = pt.diag(pt.tensor([w**k for k in range(d)], dtype=C128))
+        kraus_mats = [(1 - p) ** 0.5 * pt.eye(d, dtype=C128), p**0.5 * clock]
+        for i in range(n):
+            kraus_gates = [
+                Gate(
+                    m,
+                    index=[i],
+                    wires=n,
+                    dim=d,
+                    name=f"PF{k}_{i}",
+                    params=[("p", p), ("i", i)],
+                )
+                for k, m in enumerate(kraus_mats)
+            ]
+            channel_list.append(Channel([[g] for g in kraus_gates]))
+
+        return Multiplex(channel_list)
+
+    @staticmethod
+    def Reset(n: int, d: int, p: float) -> "Multiplex":
+        """
+        Independent identical reset noise on each of $n$ qudits of dimension $d$.
+
+        Single-site Kraus set: $d+1$ operators from `Reset.ops(d, p)`.
+        """
+        channel_list = []
+        kraus_mats = Reset.ops(d, p)
+        for i in range(n):
+            kraus_gates = [
+                Gate(
+                    m,
+                    index=[i],
+                    wires=n,
+                    dim=d,
+                    name=f"RS{k}_{i}",
+                    params=[("p", p), ("i", i)],
+                )
+                for k, m in enumerate(kraus_mats)
             ]
             channel_list.append(Channel([[g] for g in kraus_gates]))
 
@@ -289,3 +421,270 @@ class Process:
         op_ch.correctables = Ek if group else ungroup(Ek)
 
         return op_ch
+
+    @staticmethod
+    def Depolarising(
+        d: int,
+        n: int,
+        p: float,
+        iid: bool = False,
+    ) -> Union[Channel, "Multiplex"]:
+        """
+        Build an $n$-site depolarising channel.
+
+        Applies all $d^2$ Weyl-Heisenberg operators as tensor-product Kraus operators.
+        The channel is $(1-p)\\rho + \\frac{p}{d^2}\\sum_{jk} W_{jk}\\rho W_{jk}^\\dagger$.
+        Works for any $d \geq 2$.
+        """
+        assert 0 <= p <= 1, "p must be in [0, 1]"
+
+        if iid:
+            return IID.Depolarising(n, d, p)
+
+        kraus_single = Depolarising.ops(d, p)
+
+        def _op_gen(word: Sequence[int]) -> Optional[list[Gate]]:
+            gates = []
+            for i, ki in enumerate(word):
+                m = kraus_single[ki]
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
+                    return None
+
+                if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
+                    gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"W{ki}_{i}"))
+
+            return gates
+
+        num_ops = d * d
+        keys = list(product(range(num_ops), repeat=n))
+
+        Ak = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+
+        return Channel(Ak)
+
+    @staticmethod
+    def PhaseDamp(
+        d: int,
+        n: int,
+        p: float,
+        iid: bool = False,
+    ) -> Union[Channel, "Multiplex"]:
+        """
+        Build an $n$-site phase damping (dephasing) channel.
+
+        Eliminates off-diagonal coherences without energy exchange.
+        Works for any $d \geq 2$.
+        """
+        assert 0 <= p <= 1, "p must be in [0, 1]"
+
+        if iid:
+            return IID.PhaseDamp(n, d, p)
+
+        kraus_single = PhaseDamp.ops(d, p)
+
+        def _op_gen(word: Sequence[int]) -> Optional[list[Gate]]:
+            gates = []
+            for i, ki in enumerate(word):
+                m = kraus_single[ki]
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
+                    return None
+
+                if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
+                    gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"PD{ki}_{i}"))
+
+            return gates
+
+        num_ops = d
+        keys = list(product(range(num_ops), repeat=n))
+
+        Ak = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+
+        return Channel(Ak)
+
+    @staticmethod
+    def BitFlip(
+        d: int,
+        n: int,
+        p: float,
+        iid: bool = False,
+    ) -> Union[Channel, "Multiplex"]:
+        """
+        Build an $n$-site bit-flip (shift) channel.
+
+        Applies the cyclic shift $X_d$ with probability $p$. For $d=2$ this is the
+        standard qubit bit-flip channel. Works for any $d \geq 2$.
+        """
+        assert 0 <= p <= 1, "p must be in [0, 1]"
+
+        if iid:
+            return IID.BitFlip(n, d, p)
+
+        shift = pt.roll(pt.eye(d, dtype=C128), shifts=-1, dims=1)
+        kraus_single = [(1 - p) ** 0.5 * pt.eye(d, dtype=C128), p**0.5 * shift]
+
+        def _op_gen(word: Sequence[int]) -> Optional[list[Gate]]:
+            gates = []
+            for i, ki in enumerate(word):
+                m = kraus_single[ki]
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
+                    return None
+
+                if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
+                    gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"BF{ki}_{i}"))
+
+            return gates
+
+        keys = list(product(range(2), repeat=n))
+
+        Ak = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+
+        return Channel(Ak)
+
+    @staticmethod
+    def PhaseFlip(
+        d: int,
+        n: int,
+        p: float,
+        iid: bool = False,
+    ) -> Union[Channel, "Multiplex"]:
+        """
+        Build an $n$-site phase-flip (clock) channel.
+
+        Applies the clock operator $Z_d$ with probability $p$. For $d=2$ this is the
+        standard qubit phase-flip channel. Works for any $d \geq 2$.
+        """
+        assert 0 <= p <= 1, "p must be in [0, 1]"
+
+        if iid:
+            return IID.PhaseFlip(n, d, p)
+
+        import cmath as cm
+
+        w = cm.exp(2j * cm.pi / d)
+        clock = pt.diag(pt.tensor([w**k for k in range(d)], dtype=C128))
+        kraus_single = [(1 - p) ** 0.5 * pt.eye(d, dtype=C128), p**0.5 * clock]
+
+        def _op_gen(word: Sequence[int]) -> Optional[list[Gate]]:
+            gates = []
+            for i, ki in enumerate(word):
+                m = kraus_single[ki]
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
+                    return None
+
+                if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
+                    gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"PF{ki}_{i}"))
+
+            return gates
+
+        keys = list(product(range(2), repeat=n))
+
+        Ak = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+
+        return Channel(Ak)
+
+    @staticmethod
+    def Reset(
+        d: int,
+        n: int,
+        p: float,
+        iid: bool = False,
+    ) -> Union[Channel, "Multiplex"]:
+        """
+        Build an $n$-site reset channel.
+
+        Collapses each qudit to $|0\\rangle$ with probability $p$. Works for any $d \\geq 2$.
+        """
+        assert 0 <= p <= 1, "p must be in [0, 1]"
+
+        if iid:
+            return IID.Reset(n, d, p)
+
+        kraus_single = Reset.ops(d, p)
+
+        def _op_gen(word: Sequence[int]) -> Optional[list[Gate]]:
+            gates = []
+            for i, ki in enumerate(word):
+                m = kraus_single[ki]
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
+                    return None
+
+                if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
+                    gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"RS{ki}_{i}"))
+
+            return gates
+
+        num_ops = d + 1
+        keys = list(product(range(num_ops), repeat=n))
+
+        Ak = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+
+        return Channel(Ak)
+
+    @staticmethod
+    def ThermalRelax(
+        n: int,
+        T1: float,
+        T2: float,
+        t: float,
+    ) -> Channel:
+        """
+        Build an $n$-site thermal relaxation channel ($d=2$ qubits only).
+
+        Combines $T_1$ energy decay and $T_2$ dephasing. Raises `ValueError` for $d > 2$.
+        Requires $T_2 \leq 2 T_1$.
+
+        Args:
+            n: number of qubits
+            T1: longitudinal relaxation time
+            T2: transverse dephasing time ($T_2 \leq 2T_1$ required)
+            t: gate time
+        """
+        d = 2
+
+        if T2 > 2 * T1:
+            raise ValueError("ThermalRelax requires T2 <= 2*T1")
+
+        kraus_single = ThermalRelax.ops(T1, T2, t)
+
+        def _op_gen(word: Sequence[int]) -> Optional[list[Gate]]:
+            gates = []
+            for i, ki in enumerate(word):
+                m = kraus_single[ki]
+                if pt.allclose(m, pt.zeros_like(m), atol=1e-8):
+                    return None
+
+                if not pt.allclose(m, pt.eye(d, dtype=m.dtype), atol=1e-8):
+                    gates.append(Gate(m, index=[i], wires=n, dim=d, name=f"TR{ki}_{i}"))
+
+            return gates
+
+        num_ops = len(kraus_single)
+        keys = list(product(range(num_ops), repeat=n))
+
+        Ak = []
+        for key in keys:
+            word_gates = _op_gen(key)
+            if word_gates is not None:
+                Ak.append(word_gates)
+
+        return Channel(Ak)

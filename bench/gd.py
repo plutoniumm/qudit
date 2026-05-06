@@ -18,7 +18,6 @@ not algorithmic complexity, so both gradient methods are noted in the output.
 """
 
 import sys
-import time
 import numpy as np
 
 sys.path.insert(0, "..")
@@ -38,15 +37,17 @@ from qutip_qip.circuit import QubitCircuit, CircuitSimulator
 
 from qudit.circuit import Circuit
 
+from timing import timed
+
 C64 = torch.complex64
 WARMUP = 3
 N = 20
 
 CONFIGS = [
-    {"label": "2q 1-layer  50 steps", "wires": 2, "layers": 1, "steps": 50},
-    {"label": "4q 2-layer  50 steps", "wires": 4, "layers": 2, "steps": 50},
-    {"label": "6q 3-layer 100 steps", "wires": 6, "layers": 3, "steps": 100},
-    {"label": "8q 3-layer 100 steps", "wires": 8, "layers": 3, "steps": 100},
+    {"label": "2q 1-layer 50 steps",  "wires": 2, "layers": 1, "steps": 50},
+    {"label": "4q 2-layer 50 steps",  "wires": 4, "layers": 2, "steps": 50},
+    {"label": "6q 3-layer 50 steps",  "wires": 6, "layers": 3, "steps": 50},
+    {"label": "8q 3-layer 50 steps",  "wires": 8, "layers": 3, "steps": 50},
 ]
 
 
@@ -85,14 +86,7 @@ def bench_qudit(wires, layers, steps):
             c.expectation(obs, ket).backward()
             opt.step()
 
-    for _ in range(WARMUP):
-        run()
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        run()
-        times.append((time.perf_counter() - t0) * 1e3)
-    return times
+    return timed(run, N, WARMUP)
 
 
 def bench_pennylane(wires, layers, steps):
@@ -117,14 +111,7 @@ def bench_pennylane(wires, layers, steps):
             circuit(angles).backward()
             opt.step()
 
-    for _ in range(WARMUP):
-        run()
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        run()
-        times.append((time.perf_counter() - t0) * 1e3)
-    return times
+    return timed(run, N, WARMUP)
 
 
 def bench_qiskit(wires, layers, steps):
@@ -160,14 +147,7 @@ def bench_qiskit(wires, layers, steps):
             grad = np.array([(evs[i] - evs[nparams + i]) / 2 for i in range(nparams)])
             p -= lr * grad
 
-    for _ in range(WARMUP):
-        run()
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        run()
-        times.append((time.perf_counter() - t0) * 1e3)
-    return times
+    return timed(run, N, WARMUP)
 
 
 def bench_cirq(wires, layers, steps):
@@ -206,14 +186,7 @@ def bench_cirq(wires, layers, steps):
                 grad[i] = (expectation(p + shift) - expectation(p - shift)) / 2
             p -= lr * grad
 
-    for _ in range(WARMUP):
-        run()
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        run()
-        times.append((time.perf_counter() - t0) * 1e3)
-    return times
+    return timed(run, N, WARMUP)
 
 
 def bench_braket(wires, layers, steps):
@@ -243,14 +216,7 @@ def bench_braket(wires, layers, steps):
                 grad[i] = (expectation(p + shift) - expectation(p - shift)) / 2
             p -= lr * grad
 
-    for _ in range(WARMUP):
-        run()
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        run()
-        times.append((time.perf_counter() - t0) * 1e3)
-    return times
+    return timed(run, N, WARMUP)
 
 
 def bench_qutip(wires, layers, steps):
@@ -282,14 +248,7 @@ def bench_qutip(wires, layers, steps):
                 grad[i] = (expectation(p + shift) - expectation(p - shift)) / 2
             p -= lr * grad
 
-    for _ in range(WARMUP):
-        run()
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        run()
-        times.append((time.perf_counter() - t0) * 1e3)
-    return times
+    return timed(run, N, WARMUP)
 
 
 FRAMEWORKS = {

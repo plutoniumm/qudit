@@ -29,13 +29,15 @@ from qutip_qip.circuit import QubitCircuit, CircuitSimulator
 
 from qudit.circuit import Circuit
 from qudit.circuit.index import Mode
-from qudit.noise import WeylNoise, PhysicalNoise
+from qudit.noise import WeylNoise, PhysicalNoise, Channel
+from qudit.noise.lib import Process
+
+from timing import timed
 
 C64 = torch.complex64
 WARMUP = 3
 N = 30
 SIZES = [2, 4, 6]
-
 
 MPS = torch.backends.mps.is_available()
 
@@ -52,18 +54,7 @@ def _rho0(n, device="cpu"):
 
 
 def _time(fn, mps=False):
-    for _ in range(WARMUP):
-        fn()
-        if mps:
-            torch.mps.synchronize()
-    times = []
-    for _ in range(N):
-        t0 = time.perf_counter()
-        fn()
-        if mps:
-            torch.mps.synchronize()
-        times.append((time.perf_counter() - t0) * 1e3)
-    return times
+    return timed(fn, N, WARMUP, mps=mps)
 
 
 def _qiskit_sim(wires, noise_model):
@@ -115,26 +106,54 @@ def _qutip_sim(wires, kraus_fn):
     return _time(run)
 
 
-# ── Depolarising ──────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
-def depol_qudit(wires, p):
-    c = Circuit(wires=wires, dim=2, mode=Mode.NOISY, noise=WeylNoise(p=p))
+def _ghz_circuit(wires, mode, noise=None, device="cpu"):
+    c = Circuit(wires=wires, dim=2, mode=mode, noise=noise, device=device)
     G = c.gates[2]
     c.gate(G.H, [0])
     for i in range(wires - 1):
         c.gate(G.CX, [i, i + 1])
+    return c
+
+
+# ── Depolarising ──────────────────────────────────────────────────────────────
+
+def depol_qudit(wires, p):
+    c = _ghz_circuit(wires, Mode.NOISY, WeylNoise(p=p))
     rho = _rho0(wires)
     return _time(lambda: c(rho))
+
+
+def depol_qudit_det(wires, p):
+    K_local = WeylNoise(p=p).kraus_for("H", 0, 2)   # (d², 2, 2) local Kraus
+    c = _ghz_circuit(wires, Mode.MATRIX)
+    rho0 = _rho0(wires)
+    I2 = torch.eye(2, dtype=K_local.dtype)
+
+    def _embed(k, wire):
+        ops = [I2] * wires
+        ops[wire] = k
+        out = ops[0]
+        for op in ops[1:]:
+            out = torch.kron(out, op)
+        return out
+
+    K_full = [[_embed(k, w) for k in K_local] for w in range(wires)]
+
+    def run():
+        rho = c(rho0).to(K_local.dtype)
+        for Kw in K_full:
+            rho = sum(k @ rho @ k.conj().T for k in Kw)
+        return rho
+
+    return _time(run)
 
 
 def depol_qudit_mps(wires, p):
     if not MPS:
         raise RuntimeError("MPS not available")
-    c = Circuit(wires=wires, dim=2, mode=Mode.NOISY, noise=WeylNoise(p=p), device="mps")
-    G = c.gates[2]
-    c.gate(G.H, [0])
-    for i in range(wires - 1):
-        c.gate(G.CX, [i, i + 1])
+    c = _ghz_circuit(wires, Mode.NOISY, WeylNoise(p=p), "mps")
     rho = _rho0(wires, "mps")
     return _time(lambda: c(rho), mps=True)
 
@@ -195,13 +214,19 @@ def depol_qutip(wires, p):
 def ad_qudit(wires, p):
     T1 = -50e-9 / np.log(max(1 - p, 1e-10))
     T2 = 2 * T1
-    c = Circuit(wires=wires, dim=2, mode=Mode.NOISY, noise=PhysicalNoise(T1=T1, T2=T2))
-    G = c.gates[2]
-    c.gate(G.H, [0])
-    for i in range(wires - 1):
-        c.gate(G.CX, [i, i + 1])
+    c = _ghz_circuit(wires, Mode.NOISY, PhysicalNoise(T1=T1, T2=T2))
     rho = _rho0(wires)
     return _time(lambda: c(rho))
+
+
+def ad_qudit_det(wires, p):
+    noise = Process.AD(d=2, n=wires, Y=p, order=wires - 1)
+    c = _ghz_circuit(wires, Mode.MATRIX)
+    rho0 = _rho0(wires)
+    def run():
+        rho = c(rho0)
+        return noise.run(rho)
+    return _time(run)
 
 
 def ad_qudit_mps(wires, p):
@@ -209,11 +234,7 @@ def ad_qudit_mps(wires, p):
         raise RuntimeError("MPS not available")
     T1 = -50e-9 / np.log(max(1 - p, 1e-10))
     T2 = 2 * T1
-    c = Circuit(wires=wires, dim=2, mode=Mode.NOISY, noise=PhysicalNoise(T1=T1, T2=T2), device="mps")
-    G = c.gates[2]
-    c.gate(G.H, [0])
-    for i in range(wires - 1):
-        c.gate(G.CX, [i, i + 1])
+    c = _ghz_circuit(wires, Mode.NOISY, PhysicalNoise(T1=T1, T2=T2), "mps")
     rho = _rho0(wires, "mps")
     return _time(lambda: c(rho), mps=True)
 
@@ -270,13 +291,35 @@ def ad_qutip(wires, p):
 def pd_qudit(wires, p):
     T1 = 1.0
     T2 = -50e-9 / np.log(max(1 - p, 1e-10))
-    c = Circuit(wires=wires, dim=2, mode=Mode.NOISY, noise=PhysicalNoise(T1=T1, T2=T2))
-    G = c.gates[2]
-    c.gate(G.H, [0])
-    for i in range(wires - 1):
-        c.gate(G.CX, [i, i + 1])
+    c = _ghz_circuit(wires, Mode.NOISY, PhysicalNoise(T1=T1, T2=T2))
     rho = _rho0(wires)
     return _time(lambda: c(rho))
+
+
+def pd_qudit_det(wires, p):
+    T2 = -50e-9 / np.log(max(1 - p, 1e-10))
+    K_local = PhysicalNoise(T1=1.0, T2=T2).kraus_for("H", 0, 2)   # (r, 2, 2)
+    c = _ghz_circuit(wires, Mode.MATRIX)
+    rho0 = _rho0(wires)
+    I2 = torch.eye(2, dtype=K_local.dtype)
+
+    def _embed(k, wire):
+        ops = [I2] * wires
+        ops[wire] = k
+        out = ops[0]
+        for op in ops[1:]:
+            out = torch.kron(out, op)
+        return out
+
+    K_full = [[_embed(k, w) for k in K_local] for w in range(wires)]
+
+    def run():
+        rho = c(rho0).to(K_local.dtype)
+        for Kw in K_full:
+            rho = sum(k @ rho @ k.conj().T for k in Kw)
+        return rho
+
+    return _time(run)
 
 
 def pd_qudit_mps(wires, p):
@@ -284,11 +327,7 @@ def pd_qudit_mps(wires, p):
         raise RuntimeError("MPS not available")
     T1 = 1.0
     T2 = -50e-9 / np.log(max(1 - p, 1e-10))
-    c = Circuit(wires=wires, dim=2, mode=Mode.NOISY, noise=PhysicalNoise(T1=T1, T2=T2), device="mps")
-    G = c.gates[2]
-    c.gate(G.H, [0])
-    for i in range(wires - 1):
-        c.gate(G.CX, [i, i + 1])
+    c = _ghz_circuit(wires, Mode.NOISY, PhysicalNoise(T1=T1, T2=T2), "mps")
     rho = _rho0(wires, "mps")
     return _time(lambda: c(rho), mps=True)
 
@@ -347,7 +386,8 @@ NOISE_TYPES = {
         "label": "Depolarising (p=0.01)",
         "p": 0.01,
         "frameworks": {
-            "qudit (cpu)": depol_qudit,
+            "qudit (stochastic)": depol_qudit,
+            "qudit (deterministic)": depol_qudit_det,
             "qudit (mps)": depol_qudit_mps,
             "qiskit": depol_qiskit,
             "cirq": depol_cirq,
@@ -360,7 +400,8 @@ NOISE_TYPES = {
         "label": "Amplitude Damping (γ=0.05)",
         "p": 0.05,
         "frameworks": {
-            "qudit (cpu)": ad_qudit,
+            "qudit (stochastic)": ad_qudit,
+            "qudit (deterministic)": ad_qudit_det,
             "qudit (mps)": ad_qudit_mps,
             "qiskit": ad_qiskit,
             "cirq": ad_cirq,
@@ -373,7 +414,8 @@ NOISE_TYPES = {
         "label": "Phase Damping (γ=0.05)",
         "p": 0.05,
         "frameworks": {
-            "qudit (cpu)": pd_qudit,
+            "qudit (stochastic)": pd_qudit,
+            "qudit (deterministic)": pd_qudit_det,
             "qudit (mps)": pd_qudit_mps,
             "qiskit": pd_qiskit,
             "cirq": pd_cirq,

@@ -229,7 +229,7 @@ class Gate(nn.Module):
         """
         Generalized core logic: applies the embedded unitary U to the first dimension of a tensor.
         Handles both 1D statevectors (D,) and 2D matrices (D, 1) or (D, D).
-        Pass an explicit U to override self.U (used by NoisyGate for live Kraus operators).
+        Pass an explicit U to override self.U (used by NoisyGate/TrajectoryGate for Kraus branches).
         """
         if U is None:
             U = self.U
@@ -740,30 +740,17 @@ class VarGate(Gate):
 
 class NoisyGate(Gate):
     """
-    A per-wire noise channel applied after each gate in `Mode.NOISY` circuits.
-
-    Subclasses Gate to reuse all wire-permutation logic (perm, inv_perm, target_size, etc.).
-    The placeholder zeros matrix passed to Gate.__init__ is never used, instead Kraus
-    operators are computed live in `forwardd` from `self.param` via differentiable ops
-    of the form `scalar(param) * constant_buffer`.
-
-    Supported noise types: "depolarizing", "amplitude_damping", "phase_damping", "pauli".
+    Per-wire noise channel with pre-baked Kraus ops. Samples one branch stochastically.
     """
-
-    SUPPORTED = ("depolarizing", "amplitude_damping", "phase_damping", "pauli", "weyl")
 
     def __init__(
         self,
-        noise_type: str,
-        param: Any,
+        K: torch.Tensor,
         index: Any,
         wires: int,
         dims: Any,
-        device: str = "cpu",
+        generator=None,
     ) -> None:
-        assert (
-            noise_type in self.SUPPORTED
-        ), f"noise_type must be one of {self.SUPPORTED}"
         idx = index if isinstance(index, list) else [index]
         dim_list = [dims] * wires if isinstance(dims, int) else dims
         d_local = math.prod([dim_list[i] for i in idx])
@@ -773,192 +760,69 @@ class NoisyGate(Gate):
             index=idx,
             wires=wires,
             dim=dim_list,
-            device=device,
-            name=f"Noise_{noise_type}",
+            name="NoisyGate",
         )
-        self.noise_type = noise_type
-
-        if isinstance(param, nn.Parameter):
-            self.param = param
-        elif isinstance(param, torch.Tensor) and param.requires_grad:
-            self.param = nn.Parameter(param)
-        else:
-            self.register_buffer(
-                "param", torch.as_tensor(param, dtype=torch.float32).to(device)
-            )
-        self._register_bases()
-
-    def _register_bases(self) -> None:
-        """
-        Pre-compute constant basis matrices as buffers (no grad, computed once).
-        """
-        d = self.target_size
-        dev = self.device
-
-        if self.noise_type == "amplitude_damping":
-            # K_0 = |0><0| + sqrt(1-Y) * (I - |0><0|)
-            # K_k = sqrt(Y) * |k-1><k|  for k = 1..d-1
-            I00 = torch.zeros(d, d, dtype=C64, device=dev)
-            I00[0, 0] = 1.0
-            self.register_buffer("_b_I00", I00)
-            higher = torch.eye(d, dtype=C64, device=dev) - I00
-            self.register_buffer("_b_higher", higher)
-            jumps = []
-            for k in range(1, d):
-                jmp = torch.zeros(d, d, dtype=C64, device=dev)
-                jmp[k - 1, k] = 1.0
-                jumps.append(jmp)
-            self.register_buffer("_b_jumps", torch.stack(jumps))  # (d-1, d, d)
-
-        elif self.noise_type == "phase_damping":
-            # K_0 = |0><0| + sqrt(1-λ) * (I - |0><0|)
-            # K_k = sqrt(λ) * |k><k|  for k = 1..d-1
-            I00 = torch.zeros(d, d, dtype=C64, device=dev)
-            I00[0, 0] = 1.0
-            self.register_buffer("_b_I00", I00)
-            higher = torch.eye(d, dtype=C64, device=dev) - I00
-            self.register_buffer("_b_higher", higher)
-            projs = []
-            for k in range(1, d):
-                proj = torch.zeros(d, d, dtype=C64, device=dev)
-                proj[k, k] = 1.0
-                projs.append(proj)
-            self.register_buffer("_b_projs", torch.stack(projs))  # (d-1, d, d)
-
-        elif self.noise_type == "depolarizing":
-            if d == 2:
-                self.register_buffer("_b_I", torch.eye(2, dtype=C64, device=dev))
-                self.register_buffer(
-                    "_b_X", torch.tensor([[0, 1], [1, 0]], dtype=C64, device=dev)
-                )
-                self.register_buffer(
-                    "_b_Y", torch.tensor([[0, -1j], [1j, 0]], dtype=C64, device=dev)
-                )
-                self.register_buffer(
-                    "_b_Z", torch.tensor([[1, 0], [0, -1]], dtype=C64, device=dev)
-                )
-            else:
-                # General qudit: use d^2 Gell-Mann matrices (including identity)
-                gms = [torch.eye(d, dtype=C64, device=dev)]
-                for j in range(d):
-                    for k in range(d):
-                        if j != k or j < d - 1:
-                            gms.append(gell_mann(j, k, d, device=dev))
-                # Store as a stacked buffer: shape (d^2, d, d)
-                self.register_buffer("_b_gm", torch.stack(gms))
-
-        elif self.noise_type == "pauli":
-            assert d == 2, "pauli channel requires d=2 (qubit) wires"
-            self.register_buffer("_b_I", torch.eye(2, dtype=C64, device=dev))
-            self.register_buffer(
-                "_b_X", torch.tensor([[0, 1], [1, 0]], dtype=C64, device=dev)
-            )
-            self.register_buffer(
-                "_b_Y", torch.tensor([[0, -1j], [1j, 0]], dtype=C64, device=dev)
-            )
-            self.register_buffer(
-                "_b_Z", torch.tensor([[1, 0], [0, -1]], dtype=C64, device=dev)
-            )
-
-        elif self.noise_type == "weyl":
-            # Heisenberg-Weyl displacement operators W_mn = X^m Z^n, (m,n) != (0,0)
-            # X = cyclic shift, Z = clock (diagonal phase)
-            omega = torch.exp(torch.tensor(2j * math.pi / d, dtype=C64, device=dev))
-            X = torch.zeros(d, d, dtype=C64, device=dev)
-            for j in range(d):
-                X[j, (j - 1) % d] = 1.0
-            Z = torch.diag(torch.stack([omega**k for k in range(d)]))
-            # build all W_mn for (m,n) in {0..d-1}^2 \ {(0,0)}
-            weyl_ops = []
-            for m in range(d):
-                Xm = torch.linalg.matrix_power(X, m)
-                for n in range(d):
-                    if m == 0 and n == 0:
-                        continue
-                    Zn = torch.linalg.matrix_power(Z, n)
-                    weyl_ops.append(Xm @ Zn)
-            self.register_buffer("_b_weyl", torch.stack(weyl_ops))  # (d²-1, d, d)
-            self.register_buffer("_b_I_weyl", torch.eye(d, dtype=C64, device=dev))
-
-    def _kraus_ops(self) -> List[torch.Tensor]:
-        """
-        Return Kraus matrices as `scalar(param) * constant_buffer`.
-        All scalars are differentiable w.r.t. self.param;  the computation graph is preserved.
-        """
-        if self.noise_type == "amplitude_damping":
-            g = self.param.clamp(0, 1).to(C64)
-            K0 = self._b_I00 + torch.sqrt(1 - g) * self._b_higher
-
-            return [K0] + list(torch.sqrt(g) * self._b_jumps)
-
-        elif self.noise_type == "phase_damping":
-            lam = self.param.clamp(0, 1).to(C64)
-            K0 = self._b_I00 + torch.sqrt(1 - lam) * self._b_higher
-
-            return [K0] + list(torch.sqrt(lam) * self._b_projs)
-
-        elif self.noise_type == "depolarizing":
-            p = self.param.clamp(0, 1)
-            d = self.target_size
-            if d == 2:
-                r = torch.sqrt(1 - p).to(C64)
-                s = torch.sqrt(p / 3).to(C64)
-
-                return [
-                    r * self._b_I,
-                    s * self._b_X,
-                    s * self._b_Y,
-                    s * self._b_Z,
-                ]
-            else:
-                # Generalized depolarizing: (1-p)*I + p/(d^2-1) * sum_j G_j rho G_j†
-                # Kraus: sqrt(1-p)*I, sqrt(p/(d^2-1))*G_j for j=1..d^2-1
-                n_extra = d * d - 1
-                r = torch.sqrt(1 - p).to(C64)
-                s = torch.sqrt(p / n_extra).to(C64)
-                gms = self._b_gm  # shape (d^2, d, d)
-
-                return [r * gms[0]] + list(s * gms[1:])
-
-        elif self.noise_type == "pauli":
-            px = self.param[0].clamp(0, 1)
-            py = self.param[1].clamp(0, 1)
-            pz = self.param[2].clamp(0, 1)
-            p_sum = (px + py + pz).clamp(max=1)
-            r = torch.sqrt(1 - p_sum).to(C64)
-
-            return [
-                r * self._b_I,
-                torch.sqrt(px).to(C64) * self._b_X,
-                torch.sqrt(py).to(C64) * self._b_Y,
-                torch.sqrt(pz).to(C64) * self._b_Z,
-            ]
-
-        else:  # weyl
-            # param has d²-1 entries (probabilities for each W_mn, (m,n)!=(0,0))
-            p = self.param.clamp(0, 1)
-            p_sum = p.sum().clamp(max=1)
-            r = torch.sqrt(1 - p_sum).to(C64)
-
-            return [r * self._b_I_weyl] + list(
-                torch.sqrt(p).to(C64).view(-1, 1, 1) * self._b_weyl
-            )
+        self.register_buffer("_K", K.to(dtype=C64))
+        self.generator = generator
 
     def forwardd(self, rho: torch.Tensor) -> torch.Tensor:
-        """
-        Apply the noise channel $\\Phi(\\rho) = \\sum_k K_k \\rho K_k^\\dagger$ to a density matrix.
-        Reuses Gate._left with explicit U to avoid full matrix materialization.
-        """
-        rho_out = torch.zeros_like(rho)
-        for K in self._kraus_ops():
-            rho_prime = self._left(rho, K)
-            rhoAdj = rho_prime.conj().T
-            out_T = self._left(rhoAdj, K)
-            rho_out = rho_out + out_T.conj().T
+        branches = []
+        for k in range(self._K.shape[0]):
+            rho_k = self._left(rho, self._K[k])
+            branches.append(self._left(rho_k.conj().T, self._K[k]).conj().T)
 
-        return rho_out
+        probs = torch.stack([torch.trace(b).real for b in branches]).clamp(min=0)
+        probs = probs / probs.sum()
+
+        ki = torch.multinomial(probs, 1, generator=self.generator).item()
+
+        return branches[ki] / probs[ki]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError(
-            "NoisyGate only supports density matrix evolution via forwardd()"
+        raise NotImplementedError("NoisyGate only supports forwardd()")
+
+
+class TrajectoryGate(Gate):
+    """
+    Stochastic quantum jump gate for Mode.TRAJECTORY. Operates on statevectors.
+    """
+
+    def __init__(
+        self,
+        K: torch.Tensor,
+        index: Any,
+        wires: int,
+        dims: Any,
+        generator=None,
+    ) -> None:
+        idx = index if isinstance(index, list) else [index]
+        dim_list = [dims] * wires if isinstance(dims, int) else dims
+        d_local = math.prod([dim_list[i] for i in idx])
+
+        super().__init__(
+            matrix=torch.zeros(d_local, d_local, dtype=C64),
+            index=idx,
+            wires=wires,
+            dim=dim_list,
+            name="TrajectoryGate",
         )
+        self.register_buffer("_K", K.to(dtype=C64))
+        self.generator = generator
+
+    def forward(self, psi: torch.Tensor) -> torch.Tensor:
+        branches = []
+        for k in range(self._K.shape[0]):
+            psi_k = self._left(psi.view(self.total_dim), self._K[k])
+            branches.append(psi_k)
+
+        norms_sq = torch.stack([b.norm() ** 2 for b in branches]).real.clamp(min=0)
+        p = norms_sq / norms_sq.sum()
+
+        ki = torch.multinomial(p, 1, generator=self.generator).item()
+
+        psi_out = branches[ki]
+
+        return (psi_out / psi_out.norm()).view(self.total_dim, 1)
+
+    def forwardd(self, rho: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError("TrajectoryGate only supports forward()")
